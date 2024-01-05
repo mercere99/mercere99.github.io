@@ -1,18 +1,237 @@
-<title>Dr. Charles Ofria</title>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Home page for Dr. Charles Ofria">
+    <meta name="keywords" content="Charles Ofria, Computer Science, Digital Evolution, Artificial Life, Michigan State University">
+    <meta name="author" content="Dr. Charles Ofria">
 
-<h1>Dr. Charles Ofria</h1>
+    <title>Dr. Charles Ofria</title>
 
-<img width="300px" src="images/OfriaPhoto-small.jpg">
+    <link rel="stylesheet" href="index.css">
+    <script src="index.js"></script>
+      
+    <!-- Google Fonts link, if you decide to use them
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
 
-<h3>Professor of <a href="https://www.cse.msu.edu">Computer Science & Engineering</a></big><br>
-at <a href="https://www.msu.edu">Michigan State University</a><br><br>
-<b>Digital Evoltuion Laboratory</b> (Devolab)<br><br>
-<a href="https://alife.org">International Society for Artificial Life</a><br><br>
-Director of the <a href="https://beacon-center.org">BEACON Center for the Study of Evolution in Action</a><br><br>
-<br>
-<a href="https://scholar.google.com/citations?user=nYLuKDAAAAAJ&hl=en">Publications</a><br><br>
-E-mail: ofria @ cse.msu.edu<br><br>
-Twitter: <a href="https://twitter.com/CharlesOfria">@CharlesOfria</a><br>
-</h3>
+    Optional: Favicon
+    <link rel="icon" href="path/to/favicon.ico" type="image/x-icon">
+    -->
 
-	
+</head>
+
+<!-- Tab Links -->
+<div class="tab">
+  <button class="tablinks" onclick="openTab(event, 'About')" id="defaultOpen" >About</button>
+  <button class="tablinks" onclick="openTab(event, 'Research')">Research Interests</button>
+  <button class="tablinks" onclick="openTab(event, 'Software')">Software Projects</button>
+  <button class="tablinks" onclick="openTab(event, 'Students')">Students</button>
+  <button class="tablinks" onclick="openTab(event, 'Blog')">Blog Posts</button>
+  <button class="tablinks" onclick="openTab(event, 'Links')">Other Links</button>
+</div>
+
+<!-- Tab Content -->
+<div id="About" class="tabcontent">
+  <div class="profile-container">
+    <div class="profile-picture">
+        <img width="300px" src="images/OfriaPhoto-small.jpg" alt="Dr. Charles Ofria">
+    </div>
+    <div class="profile-info">
+      <h1>Dr. Charles Ofria</h1>
+      <big>
+        Professor of <a href="https://www.cse.msu.edu">Computer Science & Engineering</a><br>
+        Core Faculty in <a href="https://eeb.msu.edu">Ecology, Evolution, and Behavior</a><br> 
+        <a href="https://www.msu.edu">Michigan State University</a><br><br>
+      </big>
+  
+      <b>Director, MSU Digital Evoltuion Laboratory</b> (Devolab)<br>
+      Director, <a href="https://beacon-center.org">BEACON Center for the Study of Evolution in Action</a><br>
+      Former President, <a href="https://alife.org">International Society for Artificial Life</a><br>
+      <br>
+      <a href="https://scholar.google.com/citations?user=nYLuKDAAAAAJ&hl=en">Publications</a> (from Google Scholar)<br>
+  ofria @ cse.msu.edu<br>
+      <a href="https://twitter.com/CharlesOfria">@CharlesOfria</a><br>
+    </div>
+  </div>
+  <br>
+    Charles Ofria is a Professor of Computer Science and Engineering at Michigan State University
+    and the director of the BEACON Center for the Study of Evolution in Action.
+    His research lies at the intersection of Computer Science and Evolutionary Biology, developing
+    a two-way flow of ideas between the fields, with a goal of understanding how evolution produces
+    complex traits, behaviors, and intelligent processes.
+  <br><br>
+    Dr. Ofria received a bachelor’s degree in 1994 from SUNY Stony Brook with a triple major in
+    Pure Math, Applied Math, and Computer Science.  In 1999, he received a Ph.D. in Computation and
+    Neural Systems from the California Institute of Technology, followed by a three-year postdoc in
+    the Center for Microbial Ecology at MSU.  He has been a professor at MSU since 2002.
+  <br><br>
+    Dr. Ofria is the architect of the Avida Digital Evolution Research Platform, which is use in
+    research and education at hundreds of universities around the world.  He is broadly interested
+    in studying an harnessing evolutionary dynamics.
+</div>
+
+<div id="Research" class="tabcontent">
+  <h3>Research Interests</h3>
+  <p>
+    Evolution is a powerful force capable of finding elegant solutions to challenges faced by
+    living systems.  It has produced a wide variety of complex structures such as intricate
+    gene-regulatory networks, distributed societies of cooperating eusocial insects, and
+    sophisticated forms of intelligence including the human brain.  Yet all of this evolution
+    comes from a single instance of life, with common ancestry and a basis in DNA, RNA, and
+    proteins.  How much of the evolutionary process that we see on Earth is, in fact, universal?
+
+    <br><br>
+    One way to explore this idea is to build new forms of living systems that possess the basic
+    capacity for evolution (with replication, heritable variation, and selection), but are
+    otherwise distinct from life on Earth.  I conduct research with many such artificial living
+    systems, where digital organisms are composed of self-replicating computer programs
+    or other computational systems.  These artificial organisms allow us to simultaneously learn
+    more about life as it is on Earth as we also explore “life as it could be”.
+    <br><br>
+
+    Some specific topics that I am interested in include:
+    <br><br>
+
+    <b>The evolutionary origins of biological complexity.</b> Computational evolutionary systems
+    are unable to produce anywhere near the same level of complexity as what is seen in nature.
+    Most of my research, in one way or another, revolves around understanding natural evolutionary
+    dynamics and applying them to computational systems.  I take many different approaches,
+    including using information theory or releated techniques to measure complexity, novelty,
+    and open-endedness exhibited by a system.
+    <br><br>
+
+    <b>The early evolution of intelligent behaviors.</b>  Human intelligence is arguably the most
+    complex evolutionary traits ever evolved; it is no surprise that developing human-level AIs
+    has been such a challenge. Even so, the large-language models favored today use very different
+    techniques than humans to answer questions or solve problems. Human intelligence was built
+    using the materials available (cells), while computers have very different materials (logic
+    circuits).  My goal is to understand how early building blocks formed the first components of
+    natural intelligence and to duplicate these efforts using circle-like structures that are more
+    natural for a computational environment.  As these pieces come together, they provide a
+    roadmap for continued development.
+    <br><br>
+
+    <b>Major evolutionary transitions.</b> Some of the most profound evolutionary changes alter
+    what it means to be an "individual" organism.  One of the most profound of these was the
+    evolutionary transition from single cells to multi-cellular organisms.  While impressive
+    advancements are being made in wet labs to understand these transitions, the slow nature
+    of evolution makes such studies difficult, especially when looking at broad environmental
+    conditions that allow for a major transition.  Digital systems allow us to investigate
+    more broadly how such transitions occur, and can even given insights on coordination and
+    cooperation and how they can be applied back to solve computational problems. (see next!)
+    <br><br>
+
+    <b>The evolution of coordination and cooperative behaviors.</b>  As Moore's Law has slowed
+    dramatically, improvements in computational power have shifted from ever smaller and faster
+    CPUs to simply using more and more CPUs.  Unfortunatley, the distributed code needed to
+    take advantage of such architectures tends to not be especially intuitive.  Furthermore, 
+    as the number of CPUs employed increases exponentially, so too does the chance of a single
+    core failing, bringing down the whole system.  Biological organisms have proved incredibly
+    robost on both of these fronts, and thus understanding more about how evolution produces
+    cooperative behaviors can also allow these same techniques to be used for computational
+    problem solving.
+    <br><br>
+    
+    <b>Interactions between ecological and evolutionary dynamics.</b>
+    <br><br>
+    
+    <b>Open-ended evolutionary computation.</b><br>
+
+    <br>
+    See also my list of Software Projects for other major activities in the lab.
+  </p>
+
+</div>
+
+<div id="Software" class="tabcontent">
+  <h3>Software Projects</h3>
+  In addition to a broad range of reseach projects, the Digital Evolution Lab develops and maintains
+  a broad range of academic software.  These include:<br><br>
+
+  <table>
+  <tr><td align="center" bgcolor="white"><a href="https://github.com/devosoft/avida">
+      <img height="150px" src="images/avidalogo.jpg" alt="Avida Logo"></a></td>
+  <td valign="top"><a href="https://github.com/devosoft/avida"><b>The Avida Digital Evolution Research Platform.</b></a>
+    Avida is a free, open source scientific software platform for conducting and analyzing
+    experiments with self-replicating and evolving computer programs. It provides detailed control
+    over experimental settings and protocols, a large array of measurement tools, and sophisticated
+    methods to analyze and post-process experimental data.</td>
+  </tr>
+
+  <tr><td align="center" bgcolor="white"><a href="https://github.com/devosoft/Empirical">
+      <img height="150px" src="images/EmpiricalTube.png" alt="Avida Logo"></a></td>
+  <td valign="top"><b><a href="https://github.com/devosoft/Empirical">The Empicial Scientific Software Library.</a></b>
+    Empirical is a C++ library of tools for developing useful, efficient, reliable, and
+    web-accessible scientific software.  The provided code is header-only simple to
+    incorporate into existing projects.</td>
+  </tr>
+
+  <tr><td align="center" bgcolor="white"><a href="https://github.com/mercere99/MABE2">
+    <img height="150px" src="images/MABE Logo.png" alt="MABE Logo"></a></td>
+  <td valign="top"><b><a href="https://github.com/mercere99/MABE2">The Modular Agent-Based Evolver (MABE) v2.0.</a></b>
+    MABE 2.0 is a framework for building evolutionary computation or artificial life software
+    systems useful for studying evolutionary dynamics, solving complex problems, comparing
+    evolving systems, or exploring the open-ended power of evolution.  MABE is being re-built
+    using the Empirical library. Our goal is to allow for more modular control,
+    flexible agents, faster run times and portability to the web.</td>
+  </tr>
+
+  <tr><td align="center" bgcolor="white"><a href="https://github.com/mercere99/Emperfect">
+    <img height="150px" src="images/Emperfect Logo.png" alt="Emperfect Logo"></a></td>
+  <td valign="top"><b><a href="https://github.com/mercere99/Emperfect">Emperfect.</a></b>
+    Emperfect is a C++ unit test framework geared toward a classroom setting.  Student compiled
+    code can be tested for I/O capabilities, or individual functions can be tested.  Feedback
+    can be customized to provide full details (including compilation errors, timeouts, crash
+    reports, etc) and test cases can be made "secret".</td>
+  </tr>
+
+  <tr><td align="center" bgcolor="white"><a href="https://github.com/mercere99/QBL">
+          <img height="150px" src="images/QBL Logo.png" alt="QBL Logo"></a></td>
+  <td valign="top"><b><a href="https://github.com/mercere99/QBL">The Question-Bank Language (QBL)</a></b>
+    QBL (pronounced "Quibble") manages a repository of multiple choice questions that can be used
+    to generate exams in a desired format.  Questions can be picked completely at random, or
+    following guidelines provided in tags (e.g., to limit categories, ensure only one question of
+    a given type, etc).  Questions can also have many possible answers that are carefully selected
+    based on configuration.</td>
+  </tr>
+  </table>
+
+</div>
+
+<div id="Students" class="tabcontent">
+  <h3>Students</h3>
+  <p>To Be Added</p>
+</div>
+
+<div id="Blog" class="tabcontent">
+  <h3>Blog</h3>
+  <p>To Be Added</p>
+</div>
+
+<div id="Links" class="tabcontent">
+  <h3>Links</h3>
+  <br>
+    <b>Commonly Requested Links:</b><br>
+    Do you need a <a href="reference_letter.html">Reference Letter</a> from me?</li><br>
+
+    <br>
+    <b>Organizations:</b><br>
+    <a href="https://www.msu.edu">Michigan State University</a><br>
+    &nbsp;&nbsp;<a href="https://cse.msu.edu">Department of Computer Science and Engineering</a><br>
+    &nbsp;&nbsp;<a href="https://eeb.msu.edu">Program in Ecology, Evolution, and Behavior</a><br>
+    &nbsp;&nbsp;<a href="https://beacon.msu.edu">BEACON Center for the Study of Evolution in Action</a><br>
+    <a href="https://alife.org">International Society of Artificial Life (ISAL)</a><br>
+
+    <br>
+    <b>Internal Links (permissions required)</b><br>
+    <a htef="https://avida.slack.com">Devolab Slack</a><br>
+
+  </div>
+
+<script>
+  // Open the "About" tab by default.
+  document.getElementById("defaultOpen").click();
+</script>
+
+</html>

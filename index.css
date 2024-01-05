@@ -1,0 +1,161 @@
+/* Basic Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    color: #333;
+    line-height: 1.6;
+    background-color: #f4f4f4;
+    margin: 20px;
+    max-width: 1000px;
+}
+
+.container {
+    width: 80%;
+    margin: auto;
+    overflow: hidden;
+    padding: 20px;
+}
+
+/* Header */
+header {
+    background: #333;
+    color: #fff;
+    padding-top: 30px;
+    min-height: 70px;
+    border-bottom: #bbb 1px solid;
+}
+
+header a {
+    color: #fff;
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: 16px;
+}
+
+/* Navigation Bar */
+nav {
+    padding: 5px 0;
+    background: #333;
+}
+
+nav ul {
+    padding: 0;
+    list-style: none;
+    text-align: center;
+}
+
+nav ul li {
+    display: inline;
+    margin: 0 20px;
+}
+
+nav ul li a:hover {
+    color: #bbb;
+}
+
+/* Main Area */
+main {
+    padding: 20px;
+}
+
+/* Headings */
+h1, h2, h3 {
+    color: #222;
+}
+
+/* Links */
+a {
+    color: #353;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #0077cc;
+}
+
+/* Footer */
+footer {
+    background: #333;
+    color: #fff;
+    text-align: center;
+    padding: 10px 0;
+}
+
+
+
+.profile-container {
+    display: flex;
+    align-items: center; /* This will vertically align items in the container */
+    justify-content: start; /* This will horizontally align items to the start */
+    gap: 20px; /* This adds some space between your image and the text */
+}
+
+.profile-picture img {
+    max-width: 100%;
+    height: auto;
+}
+
+.profile-info {
+    /* Add any specific styling for your text here */
+}
+
+
+
+/* Style the tab */
+.tab {
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+}
+
+/* Style the buttons inside the tab */
+.tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 17px;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+  background-color: #ccc;
+}
+
+/* Style the tab content */
+.tabcontent {
+  display: none;
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-top: none;
+}
+
+
+
+/* Responsive Design */
+@media only screen and (max-width: 600px) {
+    .container {
+        width: 100%;
+    }
+
+    nav ul li {
+        display: block;
+        margin: 5px 0;
+    }
+    .profile-container {
+        flex-direction: column; /* Stacks the items vertically on small screens */
+    }
+}
