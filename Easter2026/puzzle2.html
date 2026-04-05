@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pop Music Trivia</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Bebas+Neue&display=swap');
+
+  :root {
+    --ink: #1a1208;
+    --paper: #f5efe0;
+    --aged: #e8ddc8;
+    --accent: #8b1a1a;
+    --faded: #9e8f78;
+    --glow: #c8a84b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background-color: #2a2016;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(0,0,0,0.08) 40px, rgba(0,0,0,0.08) 41px),
+      repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0,0,0,0.05) 40px, rgba(0,0,0,0.05) 41px);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Courier Prime', monospace;
+    padding: 2rem;
+  }
+
+  .envelope {
+    background: var(--paper);
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    max-width: 560px;
+    width: 100%;
+    border-radius: 2px;
+    box-shadow:
+      0 0 0 1px #c8b89a,
+      4px 4px 0 #c0a87e,
+      8px 8px 0 #b89860,
+      0 20px 60px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .envelope::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 10px, transparent 10px, transparent 20px);
+  }
+
+  .header {
+    padding: 2rem 2rem 1rem;
+    border-bottom: 1px dashed var(--faded);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .stamp {
+    width: 64px;
+    height: 64px;
+    border: 2px solid var(--accent);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stamp::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(139,26,26,0.05) 4px, rgba(139,26,26,0.05) 5px);
+  }
+
+  .stamp-inner {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    text-align: center;
+    line-height: 1.2;
+    padding: 4px;
+    white-space: pre-line;
+  }
+
+  .title-block { flex: 1; }
+
+  .title-block h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.08em;
+    color: var(--ink);
+    line-height: 1;
+  }
+
+  .step-indicator {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--faded);
+    margin-top: 0.25rem;
+  }
+
+  /* Welcome banner */
+  .welcome-banner {
+    margin: 1.5rem 2rem 0;
+    padding: 0.85rem 1.1rem;
+    background: rgba(139,26,26,0.07);
+    border-left: 3px solid var(--accent);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+  }
+
+  .content { padding: 1.25rem 2rem; }
+
+  .image-frame {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: var(--aged);
+    border: 1px solid #c8b89a;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .image-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    transition: opacity 0.4s ease;
+  }
+
+  .image-frame .placeholder-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.2rem;
+    letter-spacing: 0.1em;
+    color: var(--faded);
+  }
+
+  .image-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 30px rgba(139,100,30,0.15);
+  }
+
+  .question-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--faded);
+    margin-bottom: 0.5rem;
+  }
+
+  .question-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 1.25rem;
+    line-height: 1.4;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .answer-input {
+    flex: 1;
+    background: white;
+    border: 1px solid #c8b89a;
+    border-radius: 0;
+    padding: 0.75rem 1rem;
+    font-family: 'Courier Prime', monospace;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.1em;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -moz-appearance: textfield;
+  }
+
+  .answer-input::-webkit-outer-spin-button,
+  .answer-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  .answer-input:focus {
+    border-color: var(--glow);
+    box-shadow: 0 0 0 2px rgba(200,168,75,0.2);
+  }
+
+  .answer-input.shake {
+    animation: shake 0.4s ease;
+    border-color: var(--accent);
+  }
+
+  .submit-btn {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+
+  .submit-btn:hover { background: var(--accent); }
+  .submit-btn:active { transform: scale(0.97); }
+
+  .message {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    line-height: 1.5;
+    opacity: 0;
+    transition: opacity 0.3s;
+    min-height: 3rem;
+  }
+
+  .message.visible { opacity: 1; }
+
+  .message.error {
+    background: rgba(139,26,26,0.08);
+    border-left: 3px solid var(--accent);
+    color: var(--accent);
+  }
+
+  .message.success {
+    background: rgba(30,80,30,0.08);
+    border-left: 3px solid #2e6b2e;
+    color: #2e6b2e;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .footer {
+    padding: 0.75rem 2rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .attempts-counter {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--faded);
+  }
+
+  .postmark {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--faded);
+    text-align: right;
+    line-height: 1.4;
+  }
+
+  .completion {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .completion-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .completion-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem;
+    letter-spacing: 0.1em;
+    color: #2e6b2e;
+    margin-bottom: 0.5rem;
+  }
+
+  .completion-msg {
+    font-size: 1rem;
+    color: var(--ink);
+    line-height: 1.6;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+</style>
+</head>
+<body>
+
+<div class="envelope" id="envelope">
+  <div class="header">
+    <div class="stamp">
+      <div class="stamp-inner" id="stamp-inner">CLUE
+№5</div>
+    </div>
+    <div class="title-block">
+      <h1>Pop Trivia</h1>
+      <div class="step-indicator" id="step-indicator">Step 1 of 3</div>
+    </div>
+  </div>
+
+  <div class="welcome-banner" id="welcome-banner">
+    Welcome back!&nbsp; Next up, we have pop music trivia!
+  </div>
+
+  <div class="content" id="main-content">
+    <div class="image-frame">
+      <img id="clue-image" src="image5.png" alt="Clue image"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+      <div class="placeholder-text" style="display:none">[ IMAGE ]</div>
+    </div>
+
+    <div class="question-label">Your Question</div>
+    <div class="question-text" id="question-text">What is answer 1?</div>
+
+    <div class="input-row">
+      <input
+        type="number"
+        class="answer-input"
+        id="answer-input"
+        placeholder="Enter number"
+        autocomplete="off"
+      >
+      <button class="submit-btn" onclick="checkAnswer()">Submit</button>
+    </div>
+
+    <div class="message" id="message"></div>
+  </div>
+
+  <div class="footer">
+    <div class="attempts-counter" id="attempts-counter">Attempts remaining: ∞</div>
+    <div class="postmark">EYES<br>ONLY</div>
+  </div>
+</div>
+
+<script>
+  const STEPS = [
+    { image: 'image5.png', question: 'What is answer 1?', answer: 867, label: 'Step 1 of 3', stamp: 'CLUE\n№5' },
+    { image: 'image6.png', question: 'What is answer 2?', answer: 163, label: 'Step 2 of 3', stamp: 'CLUE\n№6' },
+    { image: 'image7.png', question: 'What is answer 3?', answer: 934, label: 'Step 3 of 3', stamp: 'CLUE\n№7' },
+  ];
+
+  let currentStep = 0;
+  let wrongAttempts = 0;
+
+  const img        = document.getElementById('clue-image');
+  const questionEl = document.getElementById('question-text');
+  const inputEl    = document.getElementById('answer-input');
+  const messageEl  = document.getElementById('message');
+  const stampEl    = document.getElementById('stamp-inner');
+  const stepEl     = document.getElementById('step-indicator');
+  const attemptsEl = document.getElementById('attempts-counter');
+  const welcomeEl  = document.getElementById('welcome-banner');
+
+  inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') checkAnswer(); });
+
+  function checkAnswer() {
+    const val = parseInt(inputEl.value.trim(), 10);
+    const step = STEPS[currentStep];
+
+    if (isNaN(val)) {
+      showMessage('Please enter a number.', 'error');
+      return;
+    }
+
+    if (val === step.answer) {
+      if (currentStep === STEPS.length - 1) {
+        showCompletion();
+      } else {
+        currentStep++;
+        wrongAttempts = 0;
+        advanceStep();
+      }
+    } else {
+      wrongAttempts++;
+      inputEl.classList.remove('shake');
+      void inputEl.offsetWidth;
+      inputEl.classList.add('shake');
+      inputEl.addEventListener('animationend', () => inputEl.classList.remove('shake'), { once: true });
+
+      const displayed = Math.max(3, 12 - wrongAttempts);
+      attemptsEl.textContent = `Attempts remaining: ${displayed}`;
+      showMessage(
+        `Incorrect! You will be given a limited number of attempts before you are locked out.`,
+        'error'
+      );
+    }
+
+    inputEl.value = '';
+    inputEl.focus();
+  }
+
+  function advanceStep() {
+    const step = STEPS[currentStep];
+
+    // Hide welcome banner after first step
+    if (welcomeEl) {
+      welcomeEl.style.transition = 'opacity 0.4s';
+      welcomeEl.style.opacity = '0';
+      setTimeout(() => { welcomeEl.style.display = 'none'; }, 400);
+    }
+
+    img.style.opacity = '0';
+    setTimeout(() => {
+      img.src = step.image;
+      img.style.opacity = '1';
+    }, 300);
+
+    questionEl.classList.remove('fade-in');
+    void questionEl.offsetWidth;
+    questionEl.textContent = step.question;
+    questionEl.classList.add('fade-in');
+
+    stampEl.textContent = step.stamp;
+    stepEl.textContent  = step.label;
+    attemptsEl.textContent = 'Attempts remaining: ∞';
+
+    messageEl.textContent = '';
+    messageEl.className = 'message';
+  }
+
+  function showMessage(text, type) {
+    messageEl.textContent = text;
+    messageEl.className = `message ${type} visible`;
+  }
+
+  function showCompletion() {
+    document.getElementById('envelope').innerHTML = `
+      <div class="header">
+        <div class="stamp"><div class="stamp-inner">DONE\n★</div></div>
+        <div class="title-block">
+          <h1>Pop Trivia</h1>
+          <div class="step-indicator">Complete</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="completion fade-in">
+          <div class="completion-icon">🎵</div>
+          <div class="completion-title">Well Done!</div>
+          <div class="completion-msg">Now go follow that next clue!</div>
+        </div>
+      </div>
+      <div class="footer">
+        <div class="postmark" style="width:100%;text-align:center;color:var(--faded);">All steps complete</div>
+      </div>
+    `;
+  }
+
+  inputEl.focus();
+</script>
+</body>
+</html>
