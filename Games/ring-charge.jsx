@@ -1,35 +1,36 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 /* ============================================================
-   RING CHARGE — hex-map ring-merging puzzle (canvas edition)
-   ------------------------------------------------------------
-   Gameplay knobs
+   RING CHARGE — hex-map ring-merging puzzle
    ============================================================ */
 const HEX = 46;                 // hex circumradius (board units)
 const POINTS_PER_DOT = 5;
-const POP_AT = 6;               // dots for a full charge
-const BASE_THRESHOLD = 100;
-const THRESHOLD_STEP = 100;
-const MAX_RINGS = 5;            // rings per tile (also capped by palette size)
+const MAX_RINGS = 5;            // ring slots per hex (also capped by palette size)
 const MIN_TILE_DOTS = 2, MAX_TILE_DOTS = 7, MAX_RING_DOTS = 5;
-const SEED_TILES = 4;
 
-/* Visual knobs — 5 rings must fit inside the hex inradius (HEX*√3/2 ≈ 39.8):
-   innermost hugs the pole, outermost edge = RING_BASE + 4*RING_STEP + RING_W/2 ≈ 37.6 */
-const RING_BASE = 8.5, RING_STEP = 6.6, RING_W = 5.4, DOT_R = 2.3;
-const FLIGHT_MS = 540;          // merge flight duration per dot
-const FLIGHT_STAGGER = 55;      // ms between successive dot launches
-const BROWNIAN = 1.9;           // noise strength on dot angular velocity
-const SPRING = 2.2;             // pull toward evenly-spaced anchor slots
-const DRAG = 1.7;               // velocity damping
+/* Ring slots are anchored to the OUTSIDE: the outermost ring of any tile
+   always sits in the largest slot; inner rings fill inward from there.
+   Slot radii must fit the hex inradius (HEX*sqrt(3)/2 ~ 39.8). */
+const RING_BASE = 8.5, RING_STEP = 6.6;
+const slotRad = (s) => RING_BASE + s * RING_STEP;
+const RING_W_IN = 4.6, RING_W_OUT = 7.0;   // outermost ring is thicker
+const DOT_R_IN = 2.05, DOT_R_OUT = 2.9;    // ...so its dots can be bigger
+
+/* Motion knobs */
+const FLIGHT_MS = 540, FLIGHT_STAGGER = 55;      // ring-to-ring merges
+const BAR_FLIGHT_MS = 680, BAR_STAGGER = 65;     // pops flying to score bar / locks
+const BROWNIAN = 1.9, SPRING = 2.2, DRAG = 1.7;  // dot drift
 const HAND_SIZE = 34;
+const BAR_H = 13;
 
 const PALETTE = [
-  { name: "crimson", ring: "#f43f5e", glow: "#ffb3c0" },
-  { name: "amber",   ring: "#f59e0b", glow: "#ffe08a" },
-  { name: "emerald", ring: "#10b981", glow: "#9df5cf" },
-  { name: "azure",   ring: "#38bdf8", glow: "#cbeeff" },
-  { name: "violet",  ring: "#a78bfa", glow: "#e6ddff" },
+  { name: "crimson", ring: "#ff3355", glow: "#ffaebc" },
+  { name: "amber",   ring: "#ffb300", glow: "#ffe38a" },
+  { name: "emerald", ring: "#00e676", glow: "#a9ffd4" },
+  { name: "blue",    ring: "#2f7bff", glow: "#aac9ff" },
+  { name: "violet",  ring: "#b44cff", glow: "#e4c6ff" },
+  { name: "pearl",   ring: "#e8edf9", glow: "#ffffff" },
+  { name: "magenta", ring: "#ff4fd8", glow: "#ffc0f0" },
 ];
 
 const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
@@ -38,7 +39,6 @@ const parseKey = (k) => k.split(",").map(Number);
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const rand = (n) => Math.floor(Math.random() * n);
 const TAU = Math.PI * 2;
-const ringRad = (i) => RING_BASE + i * RING_STEP;
 
 function wrapA(a) { a = ((a % TAU) + TAU) % TAU; return a > Math.PI ? a - TAU : a; }
 function hexToRgb(h) {
@@ -47,6 +47,15 @@ function hexToRgb(h) {
 function lerpColor(a, b, t) {
   const A = hexToRgb(a), B = hexToRgb(b);
   return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",")})`;
+}
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 /* ---------------- board shapes (axial coords) ---------------- */
@@ -83,6 +92,11 @@ function blobCells(n) {
   return [...cells];
 }
 
+/* ---------------- difficulty progression ----------------
+   Dials, per level: score threshold, palette size, dots needed for a
+   full charge (popAt), tile budget for the level, pre-seeded tiles,
+   and locked cells. Tune freely.                                 */
+
 function levelConfig(level) {
   const shapes = [
     () => hexagonCells(2),
@@ -91,17 +105,23 @@ function levelConfig(level) {
     () => rhombusCells(4, 4),
     () => blobCells(17),
   ];
+  const threshold = 100 + 80 * (level - 1);
+  const numColors = Math.min(PALETTE.length, level < 2 ? 4 : level < 4 ? 5 : level < 6 ? 6 : 7);
+  const popAt = level < 5 ? 6 : level < 9 ? 7 : 8;
+  const dotsNeeded = threshold / POINTS_PER_DOT;
+  // enough tiles to make it winnable, with a margin that shrinks as levels rise
+  const tileBudget = Math.max(10, Math.round(dotsNeeded / 2.4) + 10 - Math.floor(level / 2));
+  const seedTiles = 4 + Math.floor((level - 1) / 3);
+  const lockCount = level >= 3 ? Math.min(3, 1 + Math.floor((level - 3) / 2)) : 0;
   return {
     cells: shapes[(level - 1) % shapes.length](),
-    threshold: BASE_THRESHOLD + (level - 1) * THRESHOLD_STEP,
-    numColors: level === 1 ? 4 : 5,
+    threshold, numColors, popAt, tileBudget, seedTiles, lockCount,
   };
 }
 
 /* ---------------- logical tiles ---------------- */
 
 function genTile(numColors) {
-  // 1..5 rings (can't exceed palette size since colors are distinct per tile)
   const weights = [0.30, 0.26, 0.20, 0.14, 0.10].slice(0, Math.min(MAX_RINGS, numColors));
   const wSum = weights.reduce((a, b) => a + b, 0);
   let nRings = 1, roll = Math.random() * wSum, acc = 0;
@@ -109,13 +129,10 @@ function genTile(numColors) {
     acc += weights[i];
     if (roll < acc) { nRings = i + 1; break; }
   }
-  // distinct colors, random order
   const colors = [...Array(numColors).keys()];
   for (let i = colors.length - 1; i > 0; i--) {
     const j = rand(i + 1); [colors[i], colors[j]] = [colors[j], colors[i]];
   }
-  // total dots in [max(MIN_TILE_DOTS, nRings) .. min(MAX_TILE_DOTS, nRings*MAX_RING_DOTS)],
-  // each ring gets at least 1 and at most MAX_RING_DOTS
   const lo = Math.max(MIN_TILE_DOTS, nRings);
   const hi = Math.min(MAX_TILE_DOTS, nRings * MAX_RING_DOTS);
   let remaining = lo + rand(hi - lo + 1) - nRings;
@@ -132,11 +149,17 @@ const cloneTiles = (tiles) => {
   for (const k in tiles) out[k] = { rings: tiles[k].rings.map((r) => ({ ...r })) };
   return out;
 };
+const cloneLocks = (locks) => {
+  const out = {};
+  for (const k in locks) out[k] = { ...locks[k] };
+  return out;
+};
+const lockBlocks = (lock) => lock && lock.filled < lock.holes;
 
 function seedBoard(cfg) {
   const tiles = {};
   const open = [...cfg.cells];
-  for (let i = 0; i < SEED_TILES && open.length; i++) {
+  for (let i = 0; i < cfg.seedTiles && open.length; i++) {
     const idx = rand(open.length);
     tiles[open[idx]] = genTile(cfg.numColors);
     open.splice(idx, 1);
@@ -155,10 +178,27 @@ function seedBoard(cfg) {
       }
     }
   }
-  return tiles;
+  // locks on cells left empty
+  const locks = {};
+  const free = cfg.cells.filter((k) => !tiles[k]);
+  for (let i = 0; i < cfg.lockCount && free.length > 4; i++) {
+    const idx = rand(free.length);
+    locks[free[idx]] = { color: rand(cfg.numColors), holes: 3 + rand(3), filled: 0 };
+    free.splice(idx, 1);
+  }
+  return { tiles, locks };
 }
 
-/* ---------------- cascade resolution (pure logic) ---------------- */
+/* ---------------- cascade resolution (pure logic) ----------------
+   Merge direction: the more recently modified tile pulls (the placed
+   tile starts most recent, so cascades flow outward from it).
+   Pops happen after merges settle; popped dots first fill same-color
+   locks (nearest first) and only the remainder scores.            */
+
+function hexCenter(k) {
+  const [q, r] = parseKey(k);
+  return { x: HEX * Math.sqrt(3) * (q + r / 2), y: HEX * 1.5 * r };
+}
 
 function findMerge(tiles, recency) {
   let best = null;
@@ -180,8 +220,9 @@ function findMerge(tiles, recency) {
   return best;
 }
 
-function resolvePlacement(startTiles, placedKey) {
+function resolvePlacement(startTiles, placedKey, startLocks, popAt) {
   const tiles = cloneTiles(startTiles);
+  const locks = cloneLocks(startLocks);
   const steps = [];
   const recency = { [placedKey]: 1 };
   let counter = 2, gained = 0;
@@ -194,45 +235,66 @@ function resolvePlacement(startTiles, placedKey) {
       recency[loser] = counter++;
       recency[puller] = counter++;
       if (tiles[loser].rings.length === 0) delete tiles[loser];
-      steps.push({ event: { type: "merge", from: loser, to: puller, dots: lost.dots } });
+      steps.push({ event: { type: "merge", from: loser, to: puller } });
     }
     let popped = false;
     for (const k of Object.keys(tiles)) {
-      while (tiles[k] && tiles[k].rings.length && outer(tiles[k]).dots >= POP_AT) {
+      while (tiles[k] && tiles[k].rings.length && outer(tiles[k]).dots >= popAt) {
         const ring = tiles[k].rings.pop();
-        gained += ring.dots * POINTS_PER_DOT;
         recency[k] = counter++;
         if (tiles[k].rings.length === 0) delete tiles[k];
-        steps.push({ event: { type: "pop", at: k, points: ring.dots * POINTS_PER_DOT, color: ring.color } });
+        // same-color locks absorb dots first, nearest lock first
+        const c0 = hexCenter(k);
+        let remaining = ring.dots;
+        const fills = [];
+        const cand = Object.keys(locks)
+          .filter((lk) => locks[lk].color === ring.color && lockBlocks(locks[lk]))
+          .sort((a, b) => {
+            const A = hexCenter(a), B = hexCenter(b);
+            return ((A.x - c0.x) ** 2 + (A.y - c0.y) ** 2) - ((B.x - c0.x) ** 2 + (B.y - c0.y) ** 2);
+          });
+        for (const lk of cand) {
+          if (!remaining) break;
+          const take = Math.min(locks[lk].holes - locks[lk].filled, remaining);
+          locks[lk].filled += take;
+          remaining -= take;
+          fills.push({ key: lk, count: take });
+        }
+        const points = remaining * POINTS_PER_DOT;
+        gained += points;
+        steps.push({ event: { type: "pop", at: k, color: ring.color, dots: ring.dots, scored: remaining, points, fills } });
         popped = true;
       }
     }
     if (!popped) break;
   }
-  return { final: tiles, steps, gained };
+  return { final: tiles, finalLocks: locks, steps, gained };
 }
 
 /* ---------------- visual model ----------------
-   Dots are particles: each drifts with Brownian noise around an
-   evenly-spaced anchor slot (Ornstein–Uhlenbeck around the anchor),
-   while the whole ring of anchors slowly rotates. */
+   Dots drift with Brownian noise around evenly-spaced anchor slots
+   (OU process) while each ring's anchor frame slowly rotates.
+   Ring radii lerp toward their slot, so when an outer ring is consumed
+   the survivors drift outward into the freed slots.               */
 
-function makeVRing(colorIdx, nDots) {
+function makeVRing(colorIdx, nDots, radius) {
   const base = Math.random() * TAU;
   return {
-    color: colorIdx,
-    base,
+    color: colorIdx, base, rad: radius,
     spin: (Math.random() - 0.5) * 0.26,
     flash: 0,
     dots: Array.from({ length: nDots }, (_, i) => ({
       angle: base + (i * TAU) / nDots + (Math.random() - 0.5) * 0.3,
-      vel: 0,
-      idx: i,
+      vel: 0, idx: i,
     })),
   };
 }
 function makeVTile(tile, now) {
-  return { born: now, rings: tile.rings.map((r) => makeVRing(r.color, r.dots)) };
+  const n = tile.rings.length;
+  return {
+    born: now,
+    rings: tile.rings.map((r, i) => makeVRing(r.color, r.dots, slotRad(MAX_RINGS - n + i))),
+  };
 }
 function reindexRing(ring) {
   const sorted = [...ring.dots].sort(
@@ -240,7 +302,8 @@ function reindexRing(ring) {
   );
   sorted.forEach((d, i) => { d.idx = i; });
 }
-function updateRing(ring, dt, still) {
+function updateRing(ring, dt, still, targetRad) {
+  ring.rad += (targetRad - ring.rad) * Math.min(1, 9 * dt);
   ring.base += ring.spin * dt;
   ring.flash *= Math.exp(-4 * dt);
   const n = ring.dots.length;
@@ -254,12 +317,8 @@ function updateRing(ring, dt, still) {
   }
 }
 
-/* ---------------- geometry ---------------- */
+/* ---------------- geometry & drawing ---------------- */
 
-function hexCenter(k) {
-  const [q, r] = parseKey(k);
-  return { x: HEX * Math.sqrt(3) * (q + r / 2), y: HEX * 1.5 * r };
-}
 function pixelToKey(x, y) {
   const qf = ((Math.sqrt(3) / 3) * x - y / 3) / HEX;
   const rf = ((2 / 3) * y) / HEX;
@@ -278,9 +337,6 @@ function tracePath(ctx, cx, cy, size) {
   }
   ctx.closePath();
 }
-
-/* ---------------- drawing ---------------- */
-
 function drawPole(ctx, cx, cy, scale, lit) {
   ctx.beginPath(); ctx.arc(cx, cy, 3.2 * scale, 0, TAU);
   ctx.fillStyle = lit ? "#94a3b8" : "#3d495e"; ctx.fill();
@@ -288,37 +344,74 @@ function drawPole(ctx, cx, cy, scale, lit) {
   ctx.fillStyle = "#0b0f17"; ctx.fill();
 }
 
-function drawVTile(ctx, cx, cy, vt, scale, now) {
+function drawVTile(ctx, cx, cy, vt, scale, now, popAt) {
   const grow = Math.min(1, (now - vt.born) / 200);
   const s = scale * (0.55 + 0.45 * (1 - (1 - grow) * (1 - grow)));
   drawPole(ctx, cx, cy, scale, true);
   vt.rings.forEach((ring, i) => {
-    const rad = ringRad(i) * s;
+    const rad = ring.rad * s;
     const col = PALETTE[ring.color];
     const n = ring.dots.length;
-    const charge = Math.min(1, Math.max(0, (n - 1) / (POP_AT - 1)));
     const isOuter = i === vt.rings.length - 1;
-    // pulse when one dot away from a full charge
-    const pulse = n === POP_AT - 1 ? 0.5 + 0.5 * Math.sin(now / 160) : 0;
+    const charge = Math.min(1, Math.max(0, (n - 1) / (popAt - 1)));
+    const pulse = n === popAt - 1 ? 0.5 + 0.5 * Math.sin(now / 160) : 0;
     const glowAmt = charge * charge * 15 + pulse * 8 + ring.flash * 16;
 
     ctx.save();
-    ctx.globalAlpha = isOuter ? 1 : 0.8;
+    ctx.globalAlpha = isOuter ? 1 : 0.78;
     if (glowAmt > 0.5) { ctx.shadowColor = col.glow; ctx.shadowBlur = glowAmt * s; }
     ctx.strokeStyle = lerpColor(col.ring, col.glow, charge * 0.45 + pulse * 0.2);
-    ctx.lineWidth = RING_W * s;
+    ctx.lineWidth = (isOuter ? RING_W_OUT : RING_W_IN) * s;
     ctx.beginPath(); ctx.arc(cx, cy, rad, 0, TAU); ctx.stroke();
     ctx.restore();
 
+    const dr = (isOuter ? DOT_R_OUT : DOT_R_IN) * s;
     for (const d of ring.dots) {
       const dx = cx + rad * Math.cos(d.angle), dy = cy + rad * Math.sin(d.angle);
-      ctx.beginPath(); ctx.arc(dx, dy, DOT_R * s, 0, TAU);
+      ctx.beginPath(); ctx.arc(dx, dy, dr, 0, TAU);
       ctx.fillStyle = "#0b0f17"; ctx.fill();
-      ctx.lineWidth = 1.1 * s;
+      ctx.lineWidth = (isOuter ? 1.3 : 1.0) * s;
       ctx.strokeStyle = col.glow;
       ctx.stroke();
     }
   });
+}
+
+const lockHoleX = (cx, i, n) => cx - ((n - 1) * 8) / 2 + i * 8;
+const LOCK_HOLE_Y = 15;
+
+function drawLock(ctx, cx, cy, lock, dt) {
+  lock.flash = (lock.flash || 0) * Math.exp(-4 * dt);
+  const col = PALETTE[lock.color];
+  ctx.save();
+  if (lock.flash > 0.05) { ctx.shadowColor = col.glow; ctx.shadowBlur = lock.flash * 18; }
+  // shackle
+  ctx.strokeStyle = col.ring;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy - 9, 6, Math.PI, 0);
+  ctx.moveTo(cx - 6, cy - 9); ctx.lineTo(cx - 6, cy - 5);
+  ctx.moveTo(cx + 6, cy - 9); ctx.lineTo(cx + 6, cy - 5);
+  ctx.stroke();
+  // body
+  rrect(ctx, cx - 9.5, cy - 5, 19, 14, 3);
+  ctx.fillStyle = col.ring; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy + 1.2, 2.1, 0, TAU);
+  ctx.fillStyle = "#0b0f17"; ctx.fill();
+  ctx.fillRect(cx - 0.9, cy + 1.2, 1.8, 3.6);
+  ctx.restore();
+  // holes: open dots that fill as matching dots are collected
+  for (let i = 0; i < lock.holes; i++) {
+    const hx = lockHoleX(cx, i, lock.holes), hy = cy + LOCK_HOLE_Y;
+    ctx.beginPath(); ctx.arc(hx, hy, 2.7, 0, TAU);
+    if (i < lock.filled) {
+      ctx.fillStyle = col.ring; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = col.glow; ctx.stroke();
+    } else {
+      ctx.fillStyle = "#0b0f17"; ctx.fill();
+      ctx.lineWidth = 1.2; ctx.strokeStyle = col.ring; ctx.stroke();
+    }
+  }
 }
 
 /* ============================================================ */
@@ -327,20 +420,23 @@ export default function RingCharge() {
   const [level, setLevel] = useState(1);
   const [cfg, setCfg] = useState(() => levelConfig(1));
   const [hand, setHand] = useState([null, null, null]);
+  const [deck, setDeck] = useState(0);            // tiles left beyond the hand
   const [selected, setSelected] = useState(null);
   const [levelScore, setLevelScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
+  const [levelStartTotal, setLevelStartTotal] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [levelDone, setLevelDone] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
+  const [gameOver, setGameOver] = useState(null); // null | "board" | "tiles"
 
   const canvasRef = useRef(null);
-  const logicRef = useRef({});      // logical tiles (source of truth for rules)
-  const vRef = useRef({ tiles: {}, flights: [], sparks: [], floats: [], hover: null });
-  const stateRef = useRef({});      // mirror of React state for the draw loop
+  const logicTiles = useRef({});
+  const logicLocks = useRef({});
+  const vRef = useRef({ tiles: {}, locks: {}, flights: [], sparks: [], floats: [], segments: [], hover: null });
+  const stateRef = useRef({});
   const reducedRef = useRef(false);
 
-  /* geometry for the current board (board area + hand row on one canvas) */
+  /* geometry: score bar strip + board + hand row, all on one canvas */
   const geom = useMemo(() => {
     const centers = {};
     cfg.cells.forEach((k) => { centers[k] = hexCenter(k); });
@@ -349,33 +445,38 @@ export default function RingCharge() {
     const pad = HEX + 14;
     const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
     const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+    const top = minY - 46;
     const midX = (minX + maxX) / 2;
     const handY = maxY + HAND_SIZE + 26;
-    const handCenters = [-1, 0, 1].map((o) => ({ x: midX + o * (HAND_SIZE * 3), y: handY }));
     return {
-      centers, minX, minY,
+      centers, minX, top,
       W: maxX - minX,
-      H: handY + HAND_SIZE * 1.25 + 10 - minY,
-      handCenters,
+      H: handY + HAND_SIZE * 1.25 + 10 - top,
+      handCenters: [-1, 0, 1].map((o) => ({ x: midX + o * (HAND_SIZE * 3), y: handY })),
+      barX: minX + 8, barW: maxX - minX - 16, barY: minY - 34,
     };
   }, [cfg]);
 
-  stateRef.current = { cfg, hand, selected, animating, levelDone, gameOver, geom };
+  stateRef.current = { cfg, hand, deck, selected, animating, levelDone, gameOver, geom, levelScore };
 
   const startLevel = useCallback((lv) => {
     const c = levelConfig(lv);
-    const seeded = seedBoard(c);
-    logicRef.current = seeded;
+    const { tiles, locks } = seedBoard(c);
+    logicTiles.current = tiles;
+    logicLocks.current = locks;
     const now = performance.now();
     const vt = {};
-    for (const k in seeded) vt[k] = makeVTile(seeded[k], now - 500);
-    vRef.current = { tiles: vt, flights: [], sparks: [], floats: [], hover: null };
+    for (const k in tiles) vt[k] = makeVTile(tiles[k], now - 500);
+    const vl = {};
+    for (const k in locks) vl[k] = { ...locks[k], flash: 0 };
+    vRef.current = { tiles: vt, locks: vl, flights: [], sparks: [], floats: [], segments: [], hover: null };
     setCfg(c);
     setHand([genTile(c.numColors), genTile(c.numColors), genTile(c.numColors)]);
+    setDeck(c.tileBudget - 3);
     setSelected(null);
     setLevelScore(0);
     setLevelDone(false);
-    setGameOver(false);
+    setGameOver(null);
   }, []);
 
   useEffect(() => {
@@ -383,7 +484,6 @@ export default function RingCharge() {
     startLevel(1);
   }, [startLevel]);
 
-  /* visual hand tiles (rebuilt whenever the hand changes) */
   const vHandRef = useRef([null, null, null]);
   useEffect(() => {
     const now = performance.now();
@@ -408,49 +508,103 @@ export default function RingCharge() {
       const ctx = canvas.getContext("2d");
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, G.W, G.H);
-      ctx.translate(-G.minX, -G.minY);
+      ctx.translate(-G.minX, -G.top);
       const still = reducedRef.current;
+      const popAt = S.cfg.popAt;
 
       const canPlace = S.selected !== null && S.hand[S.selected] &&
                        !S.animating && !S.levelDone && !S.gameOver;
 
-      /* board hexes */
+      /* board hexes + locks */
       for (const k of S.cfg.cells) {
         const { x, y } = G.centers[k];
         const occupied = !!V.tiles[k];
-        const hovered = canPlace && !occupied && V.hover === k;
+        const locked = !!V.locks[k];
+        const open = !occupied && !locked;
+        const hovered = canPlace && open && V.hover === k;
         tracePath(ctx, x, y, HEX - 2);
-        ctx.fillStyle = hovered ? "#233047" : occupied ? "#161d2b" : "#121826";
+        ctx.fillStyle = hovered ? "#233047" : occupied ? "#161d2b" : locked ? "#10141f" : "#121826";
         ctx.fill();
-        ctx.lineWidth = hovered ? 2.4 : canPlace && !occupied ? 1.8 : 1.2;
-        ctx.strokeStyle = hovered ? "#7dd3fc" : canPlace && !occupied ? "#3b82f6" : "#2a3448";
+        ctx.lineWidth = hovered ? 2.4 : canPlace && open ? 1.8 : 1.2;
+        ctx.strokeStyle = hovered ? "#7dd3fc" : canPlace && open ? "#3b82f6" : "#2a3448";
         ctx.stroke();
-        if (!occupied) drawPole(ctx, x, y, 1, false);
+        if (locked) drawLock(ctx, x, y, V.locks[k], dt);
+        else if (!occupied) drawPole(ctx, x, y, 1, false);
       }
 
-      /* tiles: update particle motion, then draw */
+      /* tiles: rings lerp outward into freed slots, dots drift */
       for (const k in V.tiles) {
         const vt = V.tiles[k];
-        for (const ring of vt.rings) updateRing(ring, dt, still);
+        const n = vt.rings.length;
+        vt.rings.forEach((ring, i) => updateRing(ring, dt, still, slotRad(MAX_RINGS - n + i)));
         const { x, y } = G.centers[k];
-        drawVTile(ctx, x, y, vt, 1, now);
+        drawVTile(ctx, x, y, vt, 1, now, popAt);
       }
 
-      /* flights: glowing dots traveling between rings */
+      /* score bar */
+      {
+        const { barX, barW, barY } = G;
+        ctx.font = "600 11px 'Avenir Next','Segoe UI',system-ui,sans-serif";
+        ctx.fillStyle = "#8fa0b8";
+        ctx.textAlign = "left";
+        ctx.fillText(`${S.levelScore} pts`, barX, barY - 5);
+        ctx.textAlign = "right";
+        ctx.fillText(`goal ${S.cfg.threshold}`, barX + barW, barY - 5);
+        rrect(ctx, barX, barY, barW, BAR_H, BAR_H / 2);
+        ctx.fillStyle = "#1c2434"; ctx.fill();
+        ctx.lineWidth = 1; ctx.strokeStyle = "#2a3448"; ctx.stroke();
+        ctx.save();
+        rrect(ctx, barX, barY, barW, BAR_H, BAR_H / 2);
+        ctx.clip();
+        let x = barX;
+        for (const seg of V.segments) {
+          const w = (seg.pts / S.cfg.threshold) * barW;
+          const hot = Math.exp(-(now - seg.born) / 300);
+          const col = PALETTE[seg.color];
+          ctx.fillStyle = lerpColor(col.ring, col.glow, hot * 0.8);
+          ctx.fillRect(x - 0.5, barY, w + 1, BAR_H);
+          x += w;
+          if (x > barX + barW) break;
+        }
+        ctx.restore();
+      }
+
+      /* flights: glowing dots traveling to rings, locks, or the bar */
       V.flights = V.flights.filter((f) => {
         const t = (now - f.t0) / f.dur;
         if (t >= 1) {
-          const ang = Math.atan2(f.y1 - f.tcy, f.x1 - f.tcx);
-          f.ring.dots.push({ angle: ang, vel: f.spinKick, idx: 0 });
-          reindexRing(f.ring);
-          f.ring.flash = 1;
+          if (f.land === "ring") {
+            const ang = Math.atan2(f.y1 - f.tcy, f.x1 - f.tcx);
+            f.ring.dots.push({ angle: ang, vel: f.spinKick, idx: 0 });
+            reindexRing(f.ring);
+            f.ring.flash = 1;
+          } else if (f.land === "bar") {
+            V.segments.push({ color: f.color, pts: POINTS_PER_DOT, born: now });
+          } else if (f.land === "lock") {
+            const L = V.locks[f.lockKey];
+            if (L) {
+              L.filled++; L.flash = 1;
+              if (L.filled >= L.holes) {
+                const c = G.centers[f.lockKey];
+                V.sparks.push({ kind: "ring", x: c.x, y: c.y, r0: 12, color: L.color, t0: now, dur: 550 });
+                for (let i = 0; i < 8; i++) {
+                  const a = (i / 8) * TAU;
+                  V.sparks.push({
+                    kind: "dot", color: L.color, x: c.x, y: c.y,
+                    vx: Math.cos(a) * 110, vy: Math.sin(a) * 110, t0: now, dur: 550,
+                  });
+                }
+                delete V.locks[f.lockKey];
+              }
+            }
+          }
           return false;
         }
         const col = PALETTE[f.color];
         let px, py;
         if (t <= 0) { px = f.x0; py = f.y0; }
         else {
-          const e = t * t * (3 - 2 * t); // smoothstep
+          const e = t * t * (3 - 2 * t);
           const u = 1 - e;
           px = u * u * f.x0 + 2 * u * e * f.cx + e * e * f.x1;
           py = u * u * f.y0 + 2 * u * e * f.cy + e * e * f.y1;
@@ -466,7 +620,7 @@ export default function RingCharge() {
         return true;
       });
 
-      /* sparks: pop debris + expanding ring flash */
+      /* sparks */
       V.sparks = V.sparks.filter((p) => {
         const t = (now - p.t0) / p.dur;
         if (t >= 1) return false;
@@ -498,7 +652,7 @@ export default function RingCharge() {
         ctx.fillStyle = PALETTE[f.color].glow;
         ctx.font = "700 17px 'Avenir Next','Segoe UI',system-ui,sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(`+${f.points}`, f.x, f.y - HEX * 0.55 - 30 * t);
+        ctx.fillText(`+${f.points}`, f.x, f.y - HEX * 0.5 - 30 * t);
         ctx.restore();
         return true;
       });
@@ -509,17 +663,18 @@ export default function RingCharge() {
         const tile = vh[i];
         const isSel = S.selected === i;
         ctx.save();
-        if (isSel) { ctx.shadowColor = "#38bdf8"; ctx.shadowBlur = 12; }
+        if (isSel) { ctx.shadowColor = "#7dd3fc"; ctx.shadowBlur = 12; }
         tracePath(ctx, x, y, HAND_SIZE);
         ctx.fillStyle = tile ? (isSel ? "#22304a" : "#161d2b") : "#0e1420";
         ctx.fill();
         ctx.lineWidth = isSel ? 3 : 1.4;
-        ctx.strokeStyle = isSel ? "#38bdf8" : tile ? "#3a4761" : "#1c2434";
+        ctx.strokeStyle = isSel ? "#7dd3fc" : tile ? "#3a4761" : "#1c2434";
         ctx.stroke();
         ctx.restore();
         if (tile) {
-          for (const ring of tile.rings) updateRing(ring, dt, still);
-          drawVTile(ctx, x, y, tile, HAND_SIZE / HEX, now);
+          const n = tile.rings.length;
+          tile.rings.forEach((ring, ri) => updateRing(ring, dt, still, slotRad(MAX_RINGS - n + ri)));
+          drawVTile(ctx, x, y, tile, HAND_SIZE / HEX, now, popAt);
         } else {
           drawPole(ctx, x, y, HAND_SIZE / HEX, false);
         }
@@ -537,7 +692,7 @@ export default function RingCharge() {
     const G = stateRef.current.geom;
     return {
       x: ((e.clientX - rect.left) / rect.width) * G.W + G.minX,
-      y: ((e.clientY - rect.top) / rect.height) * G.H + G.minY,
+      y: ((e.clientY - rect.top) / rect.height) * G.H + G.top,
     };
   };
 
@@ -551,7 +706,7 @@ export default function RingCharge() {
     if (overHand >= 0 && S.hand[overHand] && !S.animating) cursor = "pointer";
     const k = pixelToKey(x, y);
     V.hover = S.cfg.cells.includes(k) ? k : null;
-    if (V.hover && !V.tiles[V.hover] && S.selected !== null &&
+    if (V.hover && !V.tiles[V.hover] && !V.locks[V.hover] && S.selected !== null &&
         S.hand[S.selected] && !S.animating && !S.levelDone && !S.gameOver)
       cursor = "pointer";
     canvasRef.current.style.cursor = cursor;
@@ -577,11 +732,11 @@ export default function RingCharge() {
     const S = stateRef.current, V = vRef.current, G = S.geom;
     if (S.animating || S.gameOver || S.levelDone) return;
     if (S.selected === null || !S.hand[S.selected]) return;
-    if (logicRef.current[cellKey]) return;
+    if (logicTiles.current[cellKey] || lockBlocks(logicLocks.current[cellKey])) return;
 
     const now0 = performance.now();
     const placedTile = S.hand[S.selected];
-    const withPlaced = cloneTiles(logicRef.current);
+    const withPlaced = cloneTiles(logicTiles.current);
     withPlaced[cellKey] = { rings: placedTile.rings.map((r) => ({ ...r })) };
     V.tiles[cellKey] = makeVTile(placedTile, now0);
 
@@ -592,40 +747,39 @@ export default function RingCharge() {
     setSelected(null);
     setAnimating(true);
 
-    const { final, steps } = resolvePlacement(withPlaced, cellKey);
-    logicRef.current = final;
+    const { final, finalLocks, steps } =
+      resolvePlacement(withPlaced, cellKey, logicLocks.current, S.cfg.popAt);
+    logicTiles.current = final;
+    logicLocks.current = finalLocks;
     const quick = reducedRef.current;
     await sleep(quick ? 120 : 280);
 
-    let sc = levelScore;
+    let sc = S.levelScore;
     for (const st of steps) {
       const ev = st.event;
       if (ev.type === "merge") {
         const from = G.centers[ev.from], to = G.centers[ev.to];
         const loser = V.tiles[ev.from];
-        const ringIdx = loser.rings.length - 1;
         const ring = loser.rings.pop();
         if (!loser.rings.length) delete V.tiles[ev.from];
         const target = V.tiles[ev.to];
         const tring = target.rings[target.rings.length - 1];
-        const tRad = ringRad(target.rings.length - 1);
-        const sRad = ringRad(ringIdx);
         const approach = Math.atan2(from.y - to.y, from.x - to.x);
         const n = ring.dots.length;
         const t0 = performance.now();
         const dur = quick ? 180 : FLIGHT_MS;
         const stag = quick ? 20 : FLIGHT_STAGGER;
         ring.dots.forEach((d, i) => {
-          const x0 = from.x + sRad * Math.cos(d.angle);
-          const y0 = from.y + sRad * Math.sin(d.angle);
+          const x0 = from.x + ring.rad * Math.cos(d.angle);
+          const y0 = from.y + ring.rad * Math.sin(d.angle);
           const tAng = approach + (i - (n - 1) / 2) * 0.45;
-          const x1 = to.x + tRad * Math.cos(tAng);
-          const y1 = to.y + tRad * Math.sin(tAng);
+          const x1 = to.x + tring.rad * Math.cos(tAng);
+          const y1 = to.y + tring.rad * Math.sin(tAng);
           const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
           const len = Math.hypot(x1 - x0, y1 - y0) || 1;
           const bow = (Math.random() < 0.5 ? -1 : 1) * (14 + Math.random() * 18);
           V.flights.push({
-            color: ring.color,
+            land: "ring", color: ring.color,
             x0, y0, x1, y1,
             cx: mx + (-(y1 - y0) / len) * bow,
             cy: my + ((x1 - x0) / len) * bow,
@@ -637,43 +791,82 @@ export default function RingCharge() {
         });
         await sleep(dur + n * stag + (quick ? 60 : 170));
       } else {
-        /* pop: burst the ring */
+        /* pop: ring flash at the cell, dots fly to locks / the score bar */
         const at = G.centers[ev.at];
         const vt = V.tiles[ev.at];
         const ring = vt.rings[vt.rings.length - 1];
-        const rad = ringRad(vt.rings.length - 1);
         const t0 = performance.now();
-        V.sparks.push({ kind: "ring", x: at.x, y: at.y, r0: rad, color: ring.color, t0, dur: 550 });
-        for (const d of ring.dots) {
-          const dx = Math.cos(d.angle), dy = Math.sin(d.angle);
-          const sp = 80 + Math.random() * 80;
-          V.sparks.push({
-            kind: "dot", color: ring.color,
-            x: at.x + rad * dx, y: at.y + rad * dy,
-            vx: dx * sp, vy: dy * sp, t0, dur: 620,
+        const dur = quick ? 220 : BAR_FLIGHT_MS;
+        const stag = quick ? 25 : BAR_STAGGER;
+        V.sparks.push({ kind: "ring", x: at.x, y: at.y, r0: ring.rad, color: ring.color, t0, dur: 550 });
+
+        let di = 0, launched = 0;
+        const launch = (x1, y1, land, extra) => {
+          const d = ring.dots[di++];
+          const x0 = at.x + ring.rad * Math.cos(d.angle);
+          const y0 = at.y + ring.rad * Math.sin(d.angle);
+          const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+          const len = Math.hypot(x1 - x0, y1 - y0) || 1;
+          const bow = (Math.random() < 0.5 ? -1 : 1) * (16 + Math.random() * 22);
+          V.flights.push({
+            land, color: ring.color,
+            x0, y0, x1, y1,
+            cx: mx + (-(y1 - y0) / len) * bow,
+            cy: my + ((x1 - x0) / len) * bow,
+            t0: t0 + launched++ * stag, dur,
+            ...extra,
           });
+        };
+        for (const f of ev.fills) {
+          const lc = G.centers[f.key];
+          const L = V.locks[f.key];
+          for (let j = 0; j < f.count; j++) {
+            const holeIdx = L ? Math.min(L.holes - 1, L.filled + j) : 0;
+            launch(
+              lockHoleX(lc.x, holeIdx, L ? L.holes : 1),
+              lc.y + LOCK_HOLE_Y,
+              "lock", { lockKey: f.key }
+            );
+          }
         }
+        for (let j = 0; j < ev.scored; j++) {
+          const fillX = G.barX + Math.min(1, (sc + j * POINTS_PER_DOT) / S.cfg.threshold) * G.barW;
+          launch(fillX, G.barY + BAR_H / 2, "bar", {});
+        }
+
         vt.rings.pop();
         if (!vt.rings.length) delete V.tiles[ev.at];
-        V.floats.push({ x: at.x, y: at.y, points: ev.points, color: ev.color, t0 });
+        if (ev.points > 0) V.floats.push({ x: at.x, y: at.y, points: ev.points, color: ev.color, t0 });
+        await sleep(dur + ev.dots * stag + (quick ? 60 : 140));
         sc += ev.points;
         setLevelScore(sc);
         setTotalScore((t) => t + ev.points);
-        await sleep(quick ? 200 : 480);
       }
     }
 
+    /* refill from the level's tile budget */
+    let handAfter = newHand;
     if (needRefill) {
-      setHand([genTile(S.cfg.numColors), genTile(S.cfg.numColors), genTile(S.cfg.numColors)]);
+      const draw = Math.min(3, S.deck);
+      handAfter = Array.from({ length: 3 }, (_, i) => (i < draw ? genTile(S.cfg.numColors) : null));
+      setHand(handAfter);
+      setDeck(S.deck - draw);
     }
-    if (sc >= S.cfg.threshold) setLevelDone(true);
-    else if (S.cfg.cells.every((c) => final[c])) setGameOver(true);
+
+    if (sc >= S.cfg.threshold) {
+      setLevelDone(true);
+    } else {
+      const boardFull = S.cfg.cells.every((c) => final[c] || lockBlocks(finalLocks[c]));
+      const outOfTiles = handAfter.every((t) => !t);
+      if (boardFull) setGameOver("board");
+      else if (outOfTiles) setGameOver("tiles");
+    }
     setAnimating(false);
   }
 
   /* ---------------- HTML shell ---------------- */
 
-  const progress = Math.min(1, levelScore / cfg.threshold);
+  const tilesLeft = deck + hand.filter(Boolean).length;
   const canPlaceNow = selected !== null && hand[selected] && !animating && !levelDone && !gameOver;
 
   return (
@@ -683,26 +876,12 @@ export default function RingCharge() {
       display: "flex", flexDirection: "column", alignItems: "center", padding: "16px 12px",
     }}>
       <div style={{ width: "100%", maxWidth: geom.W, display: "flex", alignItems: "baseline",
-                    justifyContent: "space-between", marginBottom: 6 }}>
+                    justifyContent: "space-between", marginBottom: 2 }}>
         <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: ".08em" }}>
           RING<span style={{ color: "#38bdf8" }}>CHARGE</span>
         </div>
         <div style={{ fontSize: 13, color: "#8fa0b8" }}>
-          Level {level} &nbsp;·&nbsp; Total {totalScore}
-        </div>
-      </div>
-
-      <div style={{ width: "100%", maxWidth: geom.W, marginBottom: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12,
-                      color: "#8fa0b8", marginBottom: 3 }}>
-          <span>{levelScore} pts</span><span>goal {cfg.threshold}</span>
-        </div>
-        <div style={{ height: 8, borderRadius: 4, background: "#1c2434", overflow: "hidden" }}>
-          <div style={{
-            height: "100%", width: `${progress * 100}%`, borderRadius: 4,
-            background: "linear-gradient(90deg,#38bdf8,#a78bfa)",
-            transition: "width .4s ease",
-          }} />
+          Level {level} &nbsp;·&nbsp; Tiles {tilesLeft} &nbsp;·&nbsp; Total {totalScore}
         </div>
       </div>
 
@@ -720,17 +899,27 @@ export default function RingCharge() {
             background: "rgba(11,15,23,.82)", borderRadius: 12, gap: 12,
           }}>
             <div style={{ fontSize: 26, fontWeight: 700 }}>
-              {levelDone ? `Level ${level} charged!` : "Board full"}
+              {levelDone ? `Level ${level} charged!`
+                : gameOver === "tiles" ? "Out of tiles" : "Board full"}
             </div>
             <div style={{ color: "#8fa0b8", fontSize: 14 }}>
               {levelDone
                 ? `${levelScore} points — goal was ${cfg.threshold}`
-                : "No empty poles left to place a tile."}
+                : gameOver === "tiles"
+                  ? `${levelScore} of ${cfg.threshold} points — the tile supply ran dry.`
+                  : "No empty poles left to place a tile."}
             </div>
             <button
               onClick={() => {
-                if (levelDone) { const nl = level + 1; setLevel(nl); startLevel(nl); }
-                else { setLevel(1); setTotalScore(0); startLevel(1); }
+                if (levelDone) {
+                  const nl = level + 1;
+                  setLevel(nl);
+                  setLevelStartTotal(totalScore);
+                  startLevel(nl);
+                } else {
+                  setTotalScore(levelStartTotal);
+                  startLevel(level);
+                }
               }}
               style={{
                 padding: "10px 26px", fontSize: 15, fontWeight: 600, borderRadius: 8,
@@ -739,16 +928,16 @@ export default function RingCharge() {
                   ? "linear-gradient(90deg,#38bdf8,#a78bfa)"
                   : "#e2e8f0",
               }}>
-              {levelDone ? `Start level ${level + 1}` : "New game"}
+              {levelDone ? `Start level ${level + 1}` : `Retry level ${level}`}
             </button>
           </div>
         )}
       </div>
 
-      <div style={{ marginTop: 8, fontSize: 12.5, color: "#657894", textAlign: "center", maxWidth: 460 }}>
+      <div style={{ marginTop: 8, fontSize: 12.5, color: "#657894", textAlign: "center", maxWidth: 500 }}>
         {canPlaceNow
           ? "Click an empty hex to place the tile."
-          : "Pick a tile, then place it next to a matching outer ring. Six dots fully charges a ring."}
+          : `Match outer rings to pull dots; ${cfg.popAt} dots fully charges a ring. Locks eat matching dots before they score.`}
       </div>
     </div>
   );
