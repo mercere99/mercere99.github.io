@@ -1,0 +1,1450 @@
+import React, { useState, useEffect, useMemo, useRef } from "react";
+
+/* ============================================================
+   MC Exam Builder — v2
+   - Question library: markdown text, tags, answer pools with
+     "always include" and "pin position" flags, per-question
+     choice counts, points, notes / hint / explanation.
+   - Generation: min/max per-tag constraints, multiple versions
+     (independent | same questions reshuffled | distinct sets).
+   - Export: interactive HTML practice exam, LaTeX, Markdown,
+     D2L Brightspace CSV.
+   - Persistence: window.storage auto-save + JSON export/import.
+   ============================================================ */
+
+const STORAGE_KEY = "mcq-library-v1";
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWX";
+
+/* ---------------- utilities ---------------- */
+
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const sample = (arr, n) => shuffle(arr).slice(0, n);
+const normTag = (t) => t.trim().toLowerCase();
+const hasTag = (q, tag) => q.tags.some((t) => normTag(t) === normTag(tag));
+
+function csvField(s) {
+  const str = String(s ?? "");
+  if (/[",\n\r]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+  return str;
+}
+
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+const slug = (s) => (s.trim().replace(/\s+/g, "-").toLowerCase() || "exam");
+
+/* ---------------- markdown ---------------- */
+/* Supports: ```fenced code```, `inline code`, **bold**, *italic*, ~~strike~~, line breaks. */
+
+function mdToHtml(src) {
+  if (!src) return "";
+  let s = escapeHtml(src);
+  const blocks = [];
+  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) => {
+    blocks.push(`<pre class="md-pre"><code>${code.replace(/\n+$/, "")}</code></pre>`);
+    return `\u0000B${blocks.length - 1}\u0000`;
+  });
+  const inlines = [];
+  s = s.replace(/`([^`\n]+)`/g, (m, code) => {
+    inlines.push(`<code class="md-code">${code}</code>`);
+    return `\u0000I${inlines.length - 1}\u0000`;
+  });
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  s = s.replace(/~~([^~\n]+)~~/g, "<s>$1</s>");
+  s = s.replace(/\n/g, "<br>");
+  s = s.replace(/(<br>)?\u0000B(\d+)\u0000(<br>)?/g, (m, b1, i) => blocks[+i]);
+  s = s.replace(/\u0000I(\d+)\u0000/g, (m, i) => inlines[+i]);
+  return s;
+}
+
+function latexEscape(s) {
+  return s
+    .replace(/\\/g, "\\textbackslash{}")
+    .replace(/([&%$#_{}])/g, "\\$1")
+    .replace(/~/g, "\\textasciitilde{}")
+    .replace(/\^/g, "\\textasciicircum{}");
+}
+
+function mdToLatex(src) {
+  if (!src) return "";
+  const blocks = [];
+  const inlines = [];
+  let s = src.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) => {
+    blocks.push(`\\begin{verbatim}\n${code.replace(/\n+$/, "")}\n\\end{verbatim}`);
+    return `\u0000B${blocks.length - 1}\u0000`;
+  });
+  s = s.replace(/`([^`\n]+)`/g, (m, code) => {
+    const d = ['|', '!', '"', '@', '+', '='].find((ch) => !code.includes(ch));
+    inlines.push(d ? `\\verb${d}${code}${d}` : `\\texttt{${latexEscape(code)}}`);
+    return `\u0000I${inlines.length - 1}\u0000`;
+  });
+  s = latexEscape(s);
+  s = s.replace(/\*\*([^*]+)\*\*/g, "\\textbf{$1}");
+  s = s.replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1\\emph{$2}");
+  s = s.replace(/~~([^~\n]+)~~/g, "\\sout{$1}");
+  s = s.replace(/\u0000B(\d+)\u0000/g, (m, i) => "\n" + blocks[+i] + "\n");
+  s = s.replace(/\u0000I(\d+)\u0000/g, (m, i) => inlines[+i]);
+  return s;
+}
+
+const Md = ({ text, block }) => (
+  <span
+    className="md"
+    style={{ display: block ? "block" : "inline" }}
+    dangerouslySetInnerHTML={{ __html: mdToHtml(text) }}
+  />
+);
+
+/* ---------------- question model ---------------- */
+
+function emptyQuestion() {
+  return {
+    id: uid(),
+    text: "",
+    tags: [],
+    answers: [
+      { id: uid(), text: "", correct: true, always: false, pin: false },
+      { id: uid(), text: "", correct: false, always: false, pin: false },
+      { id: uid(), text: "", correct: false, always: false, pin: false },
+      { id: uid(), text: "", correct: false, always: false, pin: false },
+    ],
+    numChoices: 4,
+    points: 1,
+    notes: "",
+    hint: "",
+    explanation: "",
+  };
+}
+
+function normalizeQuestion(q) {
+  return {
+    ...emptyQuestion(),
+    ...q,
+    id: q.id || uid(),
+    answers: (q.answers || []).map((a) => ({ always: false, pin: false, ...a, id: a.id || uid() })),
+  };
+}
+
+function questionIsUsable(q) {
+  const nCorrect = q.answers.filter((a) => a.correct && a.text.trim()).length;
+  const nWrong = q.answers.filter((a) => !a.correct && a.text.trim()).length;
+  return q.text.trim() && nCorrect >= 1 && nWrong >= q.numChoices - 1;
+}
+
+/* ---------------- generation engine ---------------- */
+
+/* Keep pinned options in their authored slots; shuffle unpinned among the rest. */
+function arrangeOptions(opts) {
+  const sorted = [...opts].sort((a, b) => a.authorIdx - b.authorIdx);
+  const unpinned = shuffle(sorted.filter((o) => !o.pin));
+  let k = 0;
+  return sorted.map((o) => (o.pin ? o : unpinned[k++]));
+}
+
+/* One correct (always-include correct wins) + distractors (always-include first). */
+function buildItem(q) {
+  const correctPool = q.answers.filter((a) => a.correct && a.text.trim());
+  const alwaysCorrect = correctPool.filter((a) => a.always);
+  const correct = (alwaysCorrect.length ? sample(alwaysCorrect, 1) : sample(correctPool, 1))[0];
+
+  const wrongPool = q.answers.filter((a) => !a.correct && a.text.trim());
+  const need = q.numChoices - 1;
+  const alwaysWrong = wrongPool.filter((a) => a.always);
+  const otherWrong = wrongPool.filter((a) => !a.always);
+  const wrong =
+    alwaysWrong.length >= need ? sample(alwaysWrong, need) : [...alwaysWrong, ...sample(otherWrong, need - alwaysWrong.length)];
+
+  const chosen = new Set([correct.id, ...wrong.map((a) => a.id)]);
+  const opts = q.answers
+    .map((a, idx) => ({ authorIdx: idx, pin: !!a.pin, text: a.text, correct: a.id === correct.id }))
+    .filter((o, idx) => chosen.has(q.answers[idx].id));
+  return { question: q, options: arrangeOptions(opts) };
+}
+
+/* Same options, fresh pin-aware ordering (for "same questions, different order"). */
+function rearrangeItem(item) {
+  return { question: item.question, options: arrangeOptions(item.options) };
+}
+
+/* Constraint: { tag, min, max }  (max === null means unlimited).
+   Randomized greedy with restarts: satisfy mins (most-constrained first),
+   then fill respecting maxes. */
+function selectQuestions(all, count, constraints, excludeIds) {
+  const warnings = [];
+  const cons = constraints
+    .filter((c) => c.tag)
+    .map((c) => ({ tag: c.tag, key: normTag(c.tag), min: c.min ?? 0, max: c.max == null ? Infinity : c.max }));
+
+  const pool = all.filter((q) => questionIsUsable(q) && !excludeIds.has(q.id));
+
+  const attempt = () => {
+    const counts = new Map(cons.map((c) => [c.key, 0]));
+    const selected = [];
+    const ids = new Set();
+    const bump = (q) => {
+      cons.forEach((c) => {
+        if (hasTag(q, c.tag)) counts.set(c.key, counts.get(c.key) + 1);
+      });
+      selected.push(q);
+      ids.add(q.id);
+    };
+    const feasible = (q) => cons.every((c) => !hasTag(q, c.tag) || counts.get(c.key) < c.max);
+
+    // Pass 1: satisfy minimums, most-constrained tag first.
+    let guard = 0;
+    while (guard++ < 2000) {
+      const unmet = cons.filter((c) => counts.get(c.key) < c.min);
+      if (unmet.length === 0) break;
+      const open = unmet
+        .map((c) => ({ c, cands: pool.filter((q) => !ids.has(q.id) && hasTag(q, c.tag) && feasible(q)) }))
+        .filter((x) => x.cands.length > 0)
+        .sort((a, b) => a.cands.length - b.cands.length);
+      if (open.length === 0) break; // some minimum is unsatisfiable in this attempt
+      bump(sample(open[0].cands, 1)[0]);
+    }
+
+    // Pass 2: fill remaining slots.
+    while (selected.length < count) {
+      const cands = pool.filter((q) => !ids.has(q.id) && feasible(q));
+      if (cands.length === 0) break;
+      bump(sample(cands, 1)[0]);
+    }
+
+    let violations = Math.max(0, count - selected.length);
+    cons.forEach((c) => {
+      violations += Math.max(0, c.min - counts.get(c.key));
+    });
+    return { selected, counts, violations };
+  };
+
+  let best = null;
+  for (let i = 0; i < 30; i++) {
+    const a = attempt();
+    if (!best || a.violations < best.violations) best = a;
+    if (best.violations === 0) break;
+  }
+
+  cons.forEach((c) => {
+    const n = best.counts.get(c.key);
+    if (n < c.min) warnings.push(`Tag "${c.tag}": needed at least ${c.min}, only placed ${n}.`);
+  });
+  if (best.selected.length < count)
+    warnings.push(`Only ${best.selected.length} of ${count} questions could be selected (pool: ${pool.length} eligible).`);
+  if (best.selected.length > count)
+    warnings.push(`Tag minimums forced ${best.selected.length} questions (exam length was ${count}).`);
+
+  return { selected: best.selected, warnings };
+}
+
+function generateVersions(all, cfg) {
+  const { count, constraints, numVersions, mode } = cfg;
+  const versions = [];
+
+  if (numVersions <= 1 || mode === "independent") {
+    for (let v = 0; v < Math.max(1, numVersions); v++) {
+      const { selected, warnings } = selectQuestions(all, count, constraints, new Set());
+      versions.push({ label: LETTERS[v], items: shuffle(selected).map(buildItem), warnings });
+    }
+  } else if (mode === "shuffle") {
+    const { selected, warnings } = selectQuestions(all, count, constraints, new Set());
+    const base = shuffle(selected).map(buildItem);
+    versions.push({ label: "A", items: base, warnings });
+    for (let v = 1; v < numVersions; v++) {
+      versions.push({ label: LETTERS[v], items: shuffle(base).map(rearrangeItem), warnings: [] });
+    }
+  } else {
+    // distinct question sets
+    const used = new Set();
+    for (let v = 0; v < numVersions; v++) {
+      const { selected, warnings } = selectQuestions(all, count, constraints, used);
+      selected.forEach((q) => used.add(q.id));
+      versions.push({
+        label: LETTERS[v],
+        items: shuffle(selected).map(buildItem),
+        warnings: warnings.map((w) => `Version ${LETTERS[v]}: ${w}`),
+      });
+    }
+  }
+  return versions;
+}
+
+/* ---------------- exporters ---------------- */
+
+function versionTitle(meta, label, many) {
+  return meta.title + (many ? ` — Version ${label}` : "");
+}
+
+/* Interactive practice exam: hints, per-question reveal, Done → grade + explanations.
+   Prints cleanly as a paper exam (interactive chrome hidden in print). */
+function examToHtml(items, meta, label, many) {
+  const title = versionTitle(meta, label, many);
+  const totalPts = items.reduce((s, it) => s + (it.question.points ?? 1), 0);
+
+  const qBlocks = items
+    .map((item, i) => {
+      const pts = item.question.points ?? 1;
+      const cIdx = item.options.findIndex((o) => o.correct);
+      const opts = item.options
+        .map(
+          (o, j) => `      <label class="opt"><input type="radio" name="q${i}" value="${j}"><span class="letter">${LETTERS[j]}.</span><span class="otext">${mdToHtml(o.text)}</span></label>`
+        )
+        .join("\n");
+      const hint = item.question.hint?.trim()
+        ? `<button type="button" class="mini hintbtn" data-q="${i}">Show hint</button><div class="hint hidden" id="hint${i}">${mdToHtml(item.question.hint)}</div>`
+        : "";
+      const expl = item.question.explanation?.trim()
+        ? `<div class="explanation hidden" id="expl${i}"><b>Explanation:</b> ${mdToHtml(item.question.explanation)}</div>`
+        : "";
+      return `  <div class="question" id="q${i}" data-correct="${cIdx}" data-pts="${pts}">
+    <div class="qtext"><span class="qnum">${i + 1}.</span> <span>${mdToHtml(item.question.text)}</span> <span class="pts">(${pts} pt${pts === 1 ? "" : "s"})</span> <span class="verdict" id="v${i}"></span></div>
+    <div class="opts">
+${opts}
+    </div>
+    <div class="qactions">${hint}<button type="button" class="mini revealbtn" data-q="${i}">Reveal answer</button></div>
+    ${expl}
+  </div>`;
+    })
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>
+  body { font-family: Georgia, 'Times New Roman', serif; max-width: 7.5in; margin: 0 auto; padding: 24px 16px 80px; color: #111; }
+  header { border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 24px; }
+  h1 { font-size: 20pt; margin: 0 0 4px; }
+  .meta { font-size: 11pt; color: #333; }
+  .nameline { margin-top: 14px; font-size: 11pt; }
+  .instructions { font-size: 10.5pt; color: #444; margin-top: 8px; font-style: italic; }
+  #score { font-size: 14pt; font-weight: bold; margin-top: 10px; padding: 8px 12px; background: #eef5ef; border: 1px solid #2c6e49; border-radius: 6px; }
+  .question { margin-bottom: 22px; page-break-inside: avoid; }
+  .qtext { font-weight: bold; margin-bottom: 6px; }
+  .qnum { display: inline-block; min-width: 24px; }
+  .pts { font-weight: normal; color: #555; font-size: 10pt; }
+  .verdict { font-weight: bold; font-size: 10.5pt; margin-left: 8px; }
+  .verdict.ok { color: #2c6e49; }
+  .verdict.bad { color: #a03030; }
+  .opts { margin-left: 26px; }
+  .opt { display: block; margin: 3px 0; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+  .opt input { margin-right: 8px; }
+  .letter { display: inline-block; min-width: 22px; font-weight: bold; }
+  .opt.is-correct { background: #dff0e2; outline: 1.5px solid #2c6e49; }
+  .opt.is-wrong { background: #f7e0e0; outline: 1.5px solid #a03030; }
+  .qactions { margin: 6px 0 0 26px; }
+  .mini { font-family: inherit; font-size: 9.5pt; padding: 2px 10px; margin-right: 8px; cursor: pointer; border: 1px solid #888; background: #f6f6f6; border-radius: 4px; }
+  .hint { margin: 6px 0 0 0; padding: 6px 10px; background: #fff8e1; border-left: 3px solid #c8a028; font-size: 10.5pt; }
+  .explanation { margin: 8px 0 0 26px; padding: 6px 10px; background: #eef3f8; border-left: 3px solid #3a6ea5; font-size: 10.5pt; }
+  .hidden { display: none; }
+  #donebtn { display: block; margin: 30px auto 0; font-size: 13pt; padding: 10px 36px; cursor: pointer; background: #18453B; color: #fff; border: none; border-radius: 6px; }
+  .md-pre { background: #f4f4f4; border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; font-family: 'Menlo', 'Consolas', monospace; font-size: 10pt; overflow-x: auto; white-space: pre; }
+  .md-code { background: #f4f4f4; border: 1px solid #ddd; border-radius: 3px; padding: 0 4px; font-family: 'Menlo', 'Consolas', monospace; font-size: 10pt; }
+  @media print {
+    .mini, .qactions, .hint, .explanation, .verdict, #donebtn, #score, .screen-only { display: none !important; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="meta">${escapeHtml(meta.course)}${meta.course && meta.date ? " &mdash; " : ""}${escapeHtml(meta.date)} &mdash; ${items.length} questions, ${totalPts} points</div>
+  <div class="nameline">Name: ________________________________ &nbsp;&nbsp; Section: ________</div>
+  <div class="instructions screen-only">Practice mode: choose one answer per question, then press <b>Done</b> for your grade. Hints and per-question reveals are available. Printing this page produces a clean paper exam.</div>
+  <div id="score" class="hidden"></div>
+</header>
+${qBlocks}
+<button type="button" id="donebtn">Done</button>
+<script>
+(function(){
+  var N = ${items.length};
+  function q(i){ return document.getElementById('q' + i); }
+  function reveal(i){
+    var el = q(i), c = +el.dataset.correct;
+    el.querySelectorAll('.opt')[c].classList.add('is-correct');
+    var ex = document.getElementById('expl' + i);
+    if (ex) ex.classList.remove('hidden');
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.hintbtn'), function(b){
+    b.addEventListener('click', function(){
+      var h = document.getElementById('hint' + b.dataset.q);
+      h.classList.toggle('hidden');
+      b.textContent = h.classList.contains('hidden') ? 'Show hint' : 'Hide hint';
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.revealbtn'), function(b){
+    b.addEventListener('click', function(){ reveal(+b.dataset.q); });
+  });
+  document.getElementById('donebtn').addEventListener('click', function(){
+    var right = 0, earned = 0, total = 0;
+    for (var i = 0; i < N; i++){
+      var el = q(i), c = +el.dataset.correct, pts = +el.dataset.pts;
+      total += pts;
+      var sel = el.querySelector('input:checked');
+      var opts = el.querySelectorAll('.opt');
+      var v = document.getElementById('v' + i);
+      opts[c].classList.add('is-correct');
+      if (sel){
+        if (+sel.value === c){ right++; earned += pts; v.textContent = '\\u2714 correct'; v.className = 'verdict ok'; }
+        else { v.textContent = '\\u2718 incorrect'; v.className = 'verdict bad'; opts[+sel.value].classList.add('is-wrong'); }
+      } else {
+        v.textContent = '\\u2014 unanswered'; v.className = 'verdict bad';
+      }
+      var ex = document.getElementById('expl' + i);
+      if (ex) ex.classList.remove('hidden');
+      Array.prototype.forEach.call(el.querySelectorAll('input'), function(x){ x.disabled = true; });
+    }
+    var s = document.getElementById('score');
+    s.classList.remove('hidden');
+    s.textContent = 'Score: ' + earned + ' / ' + total + ' points (' + right + '/' + N + ' questions, ' + Math.round(100 * earned / (total || 1)) + '%)';
+    this.classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+</script>
+</body>
+</html>`;
+}
+
+function examToLatex(items, meta, label, many) {
+  const title = versionTitle(meta, label, many);
+  const body = items
+    .map((item) => {
+      const pts = item.question.points ?? 1;
+      const opts = item.options.map((o) => `    \\item ${mdToLatex(o.text)}`).join("\n");
+      return `  \\item ${mdToLatex(item.question.text)} \\hfill (${pts} pt${pts === 1 ? "" : "s"})
+  \\begin{enumerate}[label=\\Alph*., itemsep=1pt]
+${opts}
+  \\end{enumerate}
+`;
+    })
+    .join("\n");
+
+  const key = items
+    .map((item, i) => {
+      const idx = item.options.findIndex((o) => o.correct);
+      const expl = item.question.explanation?.trim()
+        ? ` \\\\ {\\small\\emph{Explanation:} ${mdToLatex(item.question.explanation)}}`
+        : "";
+      return `  \\item[${i + 1}.] \\textbf{${LETTERS[idx]}} --- ${mdToLatex(item.options[idx].text)}${expl}`;
+    })
+    .join("\n");
+
+  return `\\documentclass[11pt]{article}
+\\usepackage[margin=1in]{geometry}
+\\usepackage[T1]{fontenc}
+\\usepackage{enumitem}
+\\usepackage[normalem]{ulem}
+\\setlength{\\parindent}{0pt}
+\\begin{document}
+
+{\\LARGE\\bfseries ${latexEscape(title)}}\\\\[2pt]
+${latexEscape(meta.course)}${meta.course && meta.date ? " --- " : ""}${latexEscape(meta.date)}\\\\[10pt]
+Name: \\rule{2.6in}{0.4pt} \\hfill Section: \\rule{0.9in}{0.4pt}
+\\vspace{14pt}
+
+\\begin{enumerate}[itemsep=12pt]
+${body}\\end{enumerate}
+
+\\clearpage
+\\section*{Answer Key --- ${latexEscape(title)}}
+\\begin{itemize}[itemsep=6pt]
+${key}
+\\end{itemize}
+
+\\end{document}
+`;
+}
+
+function examToMarkdown(items, meta, label, many) {
+  const title = versionTitle(meta, label, many);
+  const body = items
+    .map((item, i) => {
+      const pts = item.question.points ?? 1;
+      const opts = item.options.map((o, j) => `- **${LETTERS[j]}.** ${o.text}`).join("\n");
+      return `### ${i + 1}. ${item.question.text} *(${pts} pt${pts === 1 ? "" : "s"})*\n\n${opts}`;
+    })
+    .join("\n\n");
+
+  const key = items
+    .map((item, i) => {
+      const idx = item.options.findIndex((o) => o.correct);
+      const expl = item.question.explanation?.trim() ? `\n   > ${item.question.explanation.replace(/\n/g, "\n   > ")}` : "";
+      return `${i + 1}. **${LETTERS[idx]}** — ${item.options[idx].text}${expl}`;
+    })
+    .join("\n");
+
+  return `# ${title}\n\n${meta.course}${meta.course && meta.date ? " — " : ""}${meta.date}\n\n---\n\n${body}\n\n---\n\n## Answer Key\n\n${key}\n`;
+}
+
+/* D2L Brightspace bulk-question CSV. Markdown is converted to HTML with the
+   HTML flag set; Hint and Feedback rows carry the hint / explanation. */
+function examToD2lCsv(items, meta, label, many) {
+  const rows = [];
+  items.forEach((item, i) => {
+    rows.push(["NewQuestion", "MC", "", "", ""]);
+    rows.push(["ID", `${slug(meta.title)}${many ? "-" + label : ""}-Q${String(i + 1).padStart(3, "0")}`, "", "", ""]);
+    rows.push(["Title", `Question ${i + 1}${many ? ` (Version ${label})` : ""}`, "", "", ""]);
+    rows.push(["QuestionText", mdToHtml(item.question.text), "HTML", "", ""]);
+    rows.push(["Points", String(item.question.points ?? 1), "", "", ""]);
+    rows.push(["Difficulty", "1", "", "", ""]);
+    item.options.forEach((o) => {
+      rows.push(["Option", o.correct ? "100" : "0", mdToHtml(o.text), "HTML", ""]);
+    });
+    if (item.question.hint?.trim()) rows.push(["Hint", mdToHtml(item.question.hint), "HTML", "", ""]);
+    if (item.question.explanation?.trim()) rows.push(["Feedback", mdToHtml(item.question.explanation), "HTML", "", ""]);
+    rows.push(["", "", "", "", ""]);
+  });
+  return rows.map((r) => r.map(csvField).join(",")).join("\r\n");
+}
+
+/* ---------------- UI atoms ---------------- */
+
+const T = {
+  ink: "#1B2621",
+  green: "#18453B",
+  greenSoft: "#E4EEE9",
+  paper: "#F4F6F3",
+  card: "#FFFFFF",
+  line: "#D8DFDA",
+  amber: "#8A5A00",
+  amberBg: "#FFF4DC",
+  red: "#8C2B2B",
+  redSoft: "#F6E3E3",
+  gray: "#5A6660",
+};
+
+function TagChip({ tag, onRemove, mode, onClick, title }) {
+  // mode: undefined (neutral) | "in" | "out"
+  const styles =
+    mode === "in"
+      ? { background: T.green, color: "#fff", border: `1px solid ${T.green}` }
+      : mode === "out"
+      ? { background: T.redSoft, color: T.red, border: `1px solid ${T.red}`, textDecoration: "line-through" }
+      : { background: T.greenSoft, color: T.green, border: `1px solid ${T.line}` };
+  return (
+    <span
+      onClick={onClick}
+      title={title}
+      style={{
+        ...styles,
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 12,
+        padding: "2px 8px",
+        borderRadius: 4,
+        cursor: onClick ? "pointer" : "default",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        userSelect: "none",
+      }}
+    >
+      {mode === "out" && <span style={{ textDecoration: "none" }}>¬</span>}
+      {tag}
+      {onRemove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          style={{ border: "none", background: "none", cursor: "pointer", color: "inherit", padding: 0, fontSize: 12, lineHeight: 1 }}
+          aria-label={`Remove tag ${tag}`}
+        >
+          ×
+        </button>
+      )}
+    </span>
+  );
+}
+
+function Btn({ children, onClick, kind = "primary", small, disabled, title, active }) {
+  const styles = {
+    primary: { background: T.green, color: "#fff", border: `1px solid ${T.green}` },
+    ghost: { background: "transparent", color: T.green, border: `1px solid ${T.green}` },
+    quiet: { background: active ? T.greenSoft : "transparent", color: active ? T.green : T.ink, border: `1px solid ${active ? T.green : T.line}` },
+    danger: { background: "transparent", color: T.red, border: `1px solid ${T.red}` },
+  }[kind];
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        ...styles,
+        opacity: disabled ? 0.45 : 1,
+        cursor: disabled ? "default" : "pointer",
+        borderRadius: 6,
+        padding: small ? "3px 10px" : "8px 16px",
+        fontSize: small ? 13 : 14,
+        fontFamily: "'IBM Plex Sans', sans-serif",
+        fontWeight: 500,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+const inputStyle = {
+  border: `1px solid ${T.line}`,
+  borderRadius: 6,
+  padding: "8px 10px",
+  fontSize: 14,
+  fontFamily: "'IBM Plex Sans', sans-serif",
+  background: "#fff",
+  color: T.ink,
+  width: "100%",
+  boxSizing: "border-box",
+};
+
+const monoInput = { ...inputStyle, fontFamily: "'IBM Plex Mono', monospace", fontSize: 13 };
+
+function Field({ label, children, hint }) {
+  return (
+    <label style={{ display: "block", marginBottom: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: T.green, marginBottom: 4 }}>
+        {label}
+      </div>
+      {children}
+      {hint && <div style={{ fontSize: 12, color: T.gray, marginTop: 4 }}>{hint}</div>}
+    </label>
+  );
+}
+
+/* ---------------- question editor ---------------- */
+
+function QuestionEditor({ initial, allTags, onSave, onCancel }) {
+  const [q, setQ] = useState(() => normalizeQuestion(JSON.parse(JSON.stringify(initial))));
+  const [tagInput, setTagInput] = useState("");
+  const [showOptional, setShowOptional] = useState(!!(initial.notes || initial.hint || initial.explanation));
+  const [showPreview, setShowPreview] = useState(false);
+
+  const nCorrect = q.answers.filter((a) => a.correct && a.text.trim()).length;
+  const wrong = q.answers.filter((a) => !a.correct && a.text.trim());
+  const nWrong = wrong.length;
+  const nAlwaysWrong = wrong.filter((a) => a.always).length;
+
+  const problems = [];
+  if (!q.text.trim()) problems.push("Question text is empty.");
+  if (nCorrect < 1) problems.push("Mark at least one answer as correct.");
+  if (nWrong < q.numChoices - 1)
+    problems.push(`Need at least ${q.numChoices - 1} incorrect answers for ${q.numChoices} choices (have ${nWrong}).`);
+  const notes = [];
+  if (nAlwaysWrong > q.numChoices - 1)
+    notes.push(`${nAlwaysWrong} distractors are marked "always" but only ${q.numChoices - 1} slots exist; a random subset will be used.`);
+  if (q.answers.filter((a) => a.correct && a.always && a.text.trim()).length > 1)
+    notes.push('Multiple correct answers are marked "always"; one of them will be chosen at random each time.');
+
+  const addTag = (raw) => {
+    const t = raw.trim();
+    if (!t) return;
+    if (!q.tags.some((x) => normTag(x) === normTag(t))) setQ({ ...q, tags: [...q.tags, t] });
+    setTagInput("");
+  };
+
+  const setAnswer = (id, patch) => setQ({ ...q, answers: q.answers.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
+
+  const suggestions = allTags
+    .filter((t) => tagInput && normTag(t).includes(normTag(tagInput)) && !q.tags.some((x) => normTag(x) === normTag(t)))
+    .slice(0, 6);
+
+  const flagBtn = (on) => ({
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontSize: 11,
+    padding: "3px 7px",
+    borderRadius: 4,
+    border: `1px solid ${on ? T.green : T.line}`,
+    background: on ? T.green : "transparent",
+    color: on ? "#fff" : T.gray,
+    cursor: "pointer",
+  });
+
+  return (
+    <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 20 }}>
+      <Field label="Question text" hint="Markdown supported: `code`, ```code blocks```, **bold**, *italic*.">
+        <textarea
+          value={q.text}
+          onChange={(e) => setQ({ ...q, text: e.target.value })}
+          rows={3}
+          style={{ ...monoInput, resize: "vertical" }}
+          placeholder="Exactly as it will appear to students…"
+        />
+        {q.text.trim() && (
+          <div style={{ marginTop: 6 }}>
+            <Btn kind="quiet" small onClick={() => setShowPreview(!showPreview)} active={showPreview}>
+              {showPreview ? "Hide preview" : "Preview"}
+            </Btn>
+            {showPreview && (
+              <div style={{ border: `1px dashed ${T.line}`, borderRadius: 6, padding: "8px 12px", marginTop: 6, fontSize: 14 }}>
+                <Md text={q.text} block />
+              </div>
+            )}
+          </div>
+        )}
+      </Field>
+
+      <Field label="Tags" hint="Press Enter or comma to add.">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+          {q.tags.map((t) => (
+            <TagChip key={t} tag={t} onRemove={() => setQ({ ...q, tags: q.tags.filter((x) => x !== t) })} />
+          ))}
+        </div>
+        <input
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              addTag(tagInput);
+            }
+          }}
+          style={inputStyle}
+          placeholder="e.g. templates, midterm-only, hard"
+        />
+        {suggestions.length > 0 && (
+          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+            {suggestions.map((t) => (
+              <TagChip key={t} tag={t} onClick={() => addTag(t)} />
+            ))}
+          </div>
+        )}
+      </Field>
+
+      <Field
+        label="Answer pool"
+        hint='Markdown works here too. "Always" answers are never dropped when sampling; "Pin" answers keep their slot in the list while others shuffle (e.g. keep "All of the above" last).'
+      >
+        {q.answers.map((a) => (
+          <div key={a.id} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+            <input
+              type="checkbox"
+              checked={a.correct}
+              onChange={(e) => setAnswer(a.id, { correct: e.target.checked })}
+              title="Correct answer"
+              style={{ width: 18, height: 18, accentColor: T.green, flexShrink: 0 }}
+            />
+            <input
+              value={a.text}
+              onChange={(e) => setAnswer(a.id, { text: e.target.value })}
+              style={{
+                ...monoInput,
+                borderColor: a.correct ? T.green : T.line,
+                background: a.correct ? T.greenSoft : "#fff",
+              }}
+              placeholder={a.correct ? "Correct answer…" : "Incorrect answer (distractor)…"}
+            />
+            <button style={flagBtn(a.always)} onClick={() => setAnswer(a.id, { always: !a.always })} title="Always include this answer when sampling options">
+              always
+            </button>
+            <button style={flagBtn(a.pin)} onClick={() => setAnswer(a.id, { pin: !a.pin })} title="Pin this answer to its relative position in the list">
+              pin
+            </button>
+            <Btn kind="quiet" small onClick={() => setQ({ ...q, answers: q.answers.filter((x) => x.id !== a.id) })} title="Remove">
+              ✕
+            </Btn>
+          </div>
+        ))}
+        <Btn
+          kind="ghost"
+          small
+          onClick={() => setQ({ ...q, answers: [...q.answers, { id: uid(), text: "", correct: false, always: false, pin: false }] })}
+        >
+          + Add answer
+        </Btn>
+      </Field>
+
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        <Field label="Choices shown to student" hint="1 correct + rest incorrect.">
+          <input
+            type="number"
+            min={2}
+            max={16}
+            value={q.numChoices}
+            onChange={(e) => setQ({ ...q, numChoices: Math.max(2, parseInt(e.target.value) || 2) })}
+            style={{ ...inputStyle, width: 90 }}
+          />
+        </Field>
+        <Field label="Points">
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={q.points ?? 1}
+            onChange={(e) => setQ({ ...q, points: parseFloat(e.target.value) || 0 })}
+            style={{ ...inputStyle, width: 90 }}
+          />
+        </Field>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <Btn kind="quiet" small onClick={() => setShowOptional(!showOptional)} active={showOptional}>
+          {showOptional ? "▾" : "▸"} Optional sections (notes, hint, explanation)
+        </Btn>
+        {showOptional && (
+          <div style={{ border: `1px solid ${T.line}`, borderRadius: 8, padding: 14, marginTop: 8 }}>
+            <Field label="Notes (author-only)" hint="Never exported; for your own bookkeeping.">
+              <textarea value={q.notes} onChange={(e) => setQ({ ...q, notes: e.target.value })} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
+            </Field>
+            <Field label="Hint (shown on request in practice exams)">
+              <textarea value={q.hint} onChange={(e) => setQ({ ...q, hint: e.target.value })} rows={2} style={{ ...monoInput, resize: "vertical" }} />
+            </Field>
+            <Field label="Explanation (shown after the exam is finished)">
+              <textarea
+                value={q.explanation}
+                onChange={(e) => setQ({ ...q, explanation: e.target.value })}
+                rows={2}
+                style={{ ...monoInput, resize: "vertical" }}
+              />
+            </Field>
+          </div>
+        )}
+      </div>
+
+      {problems.length > 0 && (
+        <div style={{ background: T.amberBg, color: T.amber, borderRadius: 6, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>
+          {problems.map((p, i) => (
+            <div key={i}>• {p}</div>
+          ))}
+        </div>
+      )}
+      {notes.length > 0 && (
+        <div style={{ background: "#EEF3F8", color: "#3A6EA5", borderRadius: 6, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>
+          {notes.map((p, i) => (
+            <div key={i}>• {p}</div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn onClick={() => onSave({ ...q, answers: q.answers.filter((a) => a.text.trim()) })} disabled={problems.length > 0}>
+          Save question
+        </Btn>
+        <Btn kind="quiet" onClick={onCancel}>
+          Cancel
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- library view ---------------- */
+
+function LibraryView({ questions, setQuestions, allTags }) {
+  const [editingId, setEditingId] = useState(null); // null | "new" | question id
+  const [search, setSearch] = useState("");
+  const [tagFilter, setTagFilter] = useState({}); // { normTag: "in" | "out" }
+  const fileRef = useRef(null);
+
+  const filtered = questions.filter((q) => {
+    const s = search.trim().toLowerCase();
+    const matchesSearch =
+      !s ||
+      q.text.toLowerCase().includes(s) ||
+      q.answers.some((a) => a.text.toLowerCase().includes(s)) ||
+      q.tags.some((t) => t.toLowerCase().includes(s)) ||
+      (q.notes || "").toLowerCase().includes(s);
+    const matchesTags = Object.entries(tagFilter).every(([key, mode]) =>
+      mode === "in" ? q.tags.some((t) => normTag(t) === key) : !q.tags.some((t) => normTag(t) === key)
+    );
+    return matchesSearch && matchesTags;
+  });
+
+  const cycleFilter = (t) => {
+    const key = normTag(t);
+    setTagFilter((prev) => {
+      const next = { ...prev };
+      if (!next[key]) next[key] = "in";
+      else if (next[key] === "in") next[key] = "out";
+      else delete next[key];
+      return next;
+    });
+  };
+
+  const saveQuestion = (q) => {
+    setQuestions((prev) => {
+      const exists = prev.some((x) => x.id === q.id);
+      return exists ? prev.map((x) => (x.id === q.id ? q : x)) : [...prev, q];
+    });
+    setEditingId(null);
+  };
+
+  const duplicate = (q) => {
+    const copy = normalizeQuestion(JSON.parse(JSON.stringify(q)));
+    copy.id = uid();
+    copy.answers.forEach((a) => (a.id = uid()));
+    copy.text = q.text + " (copy)";
+    setQuestions((prev) => [...prev, copy]);
+  };
+
+  const exportJson = () => {
+    downloadFile(
+      `question-library-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify({ format: "mcq-library", version: 2, questions }, null, 2),
+      "application/json"
+    );
+  };
+
+  const importJson = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        const incoming = Array.isArray(data) ? data : data.questions;
+        if (!Array.isArray(incoming)) throw new Error("No questions array found.");
+        setQuestions((prev) => {
+          const byId = new Map(prev.map((q) => [q.id, q]));
+          incoming.forEach((raw) => {
+            const q = normalizeQuestion(raw);
+            byId.set(q.id, q);
+          });
+          return [...byId.values()];
+        });
+        alert(`Imported ${incoming.length} questions (merged by ID).`);
+      } catch (e) {
+        alert("Import failed: " + e.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const anyFilter = Object.keys(tagFilter).length > 0;
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search questions, answers, tags, notes…"
+          style={{ ...inputStyle, maxWidth: 340, flex: 1 }}
+        />
+        <Btn onClick={() => setEditingId("new")}>+ New question</Btn>
+        <Btn kind="ghost" onClick={exportJson} title="Download the library as a JSON backup">
+          Export library
+        </Btn>
+        <Btn kind="ghost" onClick={() => fileRef.current?.click()} title="Merge a JSON backup into this library">
+          Import
+        </Btn>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            if (e.target.files?.[0]) importJson(e.target.files[0]);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      {allTags.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: T.gray, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            Filter (click: include → exclude → off):
+          </span>
+          {allTags.map((t) => (
+            <TagChip
+              key={t}
+              tag={t}
+              mode={tagFilter[normTag(t)]}
+              onClick={() => cycleFilter(t)}
+              title={
+                tagFilter[normTag(t)] === "in"
+                  ? "Showing only questions with this tag — click to exclude it instead"
+                  : tagFilter[normTag(t)] === "out"
+                  ? "Hiding questions with this tag — click to clear"
+                  : "Click to show only questions with this tag"
+              }
+            />
+          ))}
+          {anyFilter && (
+            <Btn kind="quiet" small onClick={() => setTagFilter({})}>
+              Clear filters
+            </Btn>
+          )}
+        </div>
+      )}
+
+      {editingId === "new" && (
+        <div style={{ marginBottom: 20 }}>
+          <QuestionEditor initial={emptyQuestion()} allTags={allTags} onSave={saveQuestion} onCancel={() => setEditingId(null)} />
+        </div>
+      )}
+
+      {filtered.length === 0 && editingId !== "new" && (
+        <div style={{ textAlign: "center", padding: 48, color: T.gray, background: T.card, border: `1px dashed ${T.line}`, borderRadius: 10 }}>
+          {questions.length === 0
+            ? "The library is empty. Add your first question, or import a JSON backup."
+            : "No questions match the current search/filter."}
+        </div>
+      )}
+
+      {filtered.map((q) =>
+        editingId === q.id ? (
+          <div key={q.id} style={{ marginBottom: 12 }}>
+            <QuestionEditor initial={q} allTags={allTags} onSave={saveQuestion} onCancel={() => setEditingId(null)} />
+          </div>
+        ) : (
+          <div key={q.id} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: "14px 18px", marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  <Md text={q.text} />
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                  {q.tags.map((t) => (
+                    <TagChip key={t} tag={t} />
+                  ))}
+                </div>
+                <div style={{ fontSize: 13, color: T.gray }}>
+                  {q.answers.filter((a) => a.correct).length} correct · {q.answers.filter((a) => !a.correct).length} distractors ·{" "}
+                  shows {q.numChoices} choices · {q.points ?? 1} pt{(q.points ?? 1) === 1 ? "" : "s"}
+                  {q.hint?.trim() && " · hint"}
+                  {q.explanation?.trim() && " · explanation"}
+                  {q.notes?.trim() && " · notes"}
+                  {!questionIsUsable(q) && <span style={{ color: T.amber, fontWeight: 600 }}> · needs more answers for its choice count</span>}
+                </div>
+                {q.notes?.trim() && (
+                  <div style={{ fontSize: 12, color: T.gray, marginTop: 6, fontStyle: "italic" }}>
+                    ✎ <Md text={q.notes} />
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <Btn kind="quiet" small onClick={() => setEditingId(q.id)}>
+                  Edit
+                </Btn>
+                <Btn kind="quiet" small onClick={() => duplicate(q)}>
+                  Duplicate
+                </Btn>
+                <Btn
+                  kind="danger"
+                  small
+                  onClick={() => {
+                    if (window.confirm("Delete this question permanently?")) setQuestions((prev) => prev.filter((x) => x.id !== q.id));
+                  }}
+                >
+                  Delete
+                </Btn>
+              </div>
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+/* ---------------- generate view ---------------- */
+
+function GenerateView({ questions, allTags }) {
+  const [count, setCount] = useState(10);
+  const [numVersions, setNumVersions] = useState(1);
+  const [mode, setMode] = useState("independent"); // independent | shuffle | distinct
+  const [constraints, setConstraints] = useState([]); // {id, tag, min, max|null}
+  const [newTag, setNewTag] = useState("");
+  const [versions, setVersions] = useState(null);
+  const [active, setActive] = useState(0);
+  const [meta, setMeta] = useState({ title: "Exam", course: "", date: new Date().toLocaleDateString() });
+  const [showKey, setShowKey] = useState(true);
+
+  // Pool size: usable questions not excluded by a max=0 constraint.
+  const hardExcluded = constraints.filter((c) => c.max === 0).map((c) => c.tag);
+  const poolSize = questions.filter((q) => questionIsUsable(q) && !hardExcluded.some((t) => hasTag(q, t))).length;
+
+  const run = () => {
+    const v = generateVersions(questions, { count, constraints, numVersions, mode });
+    setVersions(v);
+    setActive(0);
+  };
+
+  const setConstraint = (id, patch) => setConstraints((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+
+  const exporters = {
+    html: { fn: examToHtml, ext: "html", mime: "text/html", label: "HTML (practice)" },
+    tex: { fn: examToLatex, ext: "tex", mime: "application/x-tex", label: "LaTeX" },
+    md: { fn: examToMarkdown, ext: "md", mime: "text/markdown", label: "Markdown" },
+    csv: { fn: examToD2lCsv, ext: "csv", mime: "text/csv", label: "D2L CSV" },
+  };
+
+  const many = versions && versions.length > 1;
+
+  const exportVersion = (fmt, v) => {
+    const e = exporters[fmt];
+    const name = `${slug(meta.title)}${many ? "-v" + v.label : ""}${fmt === "csv" ? "-d2l" : ""}.${e.ext}`;
+    downloadFile(name, e.fn(v.items, meta, v.label, many), e.mime);
+  };
+
+  const exportAll = (fmt) => {
+    versions.forEach((v, i) => setTimeout(() => exportVersion(fmt, v), i * 400));
+  };
+
+  const current = versions?.[active];
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 380px) 1fr", gap: 20, alignItems: "start" }}>
+      {/* ---- config column ---- */}
+      <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 20 }}>
+        <div style={{ display: "flex", gap: 16 }}>
+          <Field label="Questions">
+            <input
+              type="number"
+              min={1}
+              value={count}
+              onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))}
+              style={{ ...inputStyle, width: 80 }}
+            />
+          </Field>
+          <Field label="Versions">
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={numVersions}
+              onChange={(e) => setNumVersions(Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
+              style={{ ...inputStyle, width: 80 }}
+            />
+          </Field>
+        </div>
+
+        {numVersions > 1 && (
+          <Field label="Version mode">
+            {[
+              ["independent", "Generate independently", "Each version is drawn fresh; overlap possible."],
+              ["shuffle", "Same questions, different order", "One question set; question and answer order reshuffled per version."],
+              ["distinct", "Different questions", `Disjoint sets — needs ≥ ${count * numVersions} eligible questions.`],
+            ].map(([val, label, hint]) => (
+              <label key={val} style={{ display: "block", fontSize: 14, marginBottom: 6, cursor: "pointer" }}>
+                <input type="radio" name="vmode" checked={mode === val} onChange={() => setMode(val)} style={{ accentColor: T.green, marginRight: 8 }} />
+                {label}
+                <div style={{ fontSize: 12, color: T.gray, marginLeft: 24 }}>{hint}</div>
+              </label>
+            ))}
+          </Field>
+        )}
+
+        <Field
+          label="Tag constraints (min / max per exam)"
+          hint="Blank max = no limit. min 0 / max 0 excludes a tag entirely; min = exam length makes it required on every question."
+        >
+          {constraints.map((c) => (
+            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <span
+                style={{
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 12,
+                  background: T.greenSoft,
+                  color: T.green,
+                  padding: "4px 8px",
+                  borderRadius: 4,
+                  flex: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {c.tag}
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={c.min}
+                onChange={(e) => setConstraint(c.id, { min: Math.max(0, parseInt(e.target.value) || 0) })}
+                style={{ ...inputStyle, width: 58 }}
+                title="Minimum"
+              />
+              <span style={{ color: T.gray, fontSize: 13 }}>–</span>
+              <input
+                type="number"
+                min={0}
+                value={c.max ?? ""}
+                placeholder="∞"
+                onChange={(e) => setConstraint(c.id, { max: e.target.value === "" ? null : Math.max(0, parseInt(e.target.value) || 0) })}
+                style={{ ...inputStyle, width: 58 }}
+                title="Maximum (blank = unlimited)"
+              />
+              <Btn kind="quiet" small onClick={() => setConstraints((prev) => prev.filter((x) => x.id !== c.id))}>
+                ✕
+              </Btn>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 6 }}>
+            <select value={newTag} onChange={(e) => setNewTag(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+              <option value="">— add tag constraint —</option>
+              {allTags
+                .filter((t) => !constraints.some((c) => normTag(c.tag) === normTag(t)))
+                .map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+            </select>
+            <Btn
+              kind="ghost"
+              small
+              disabled={!newTag}
+              onClick={() => {
+                setConstraints((prev) => [...prev, { id: uid(), tag: newTag, min: 1, max: null }]);
+                setNewTag("");
+              }}
+            >
+              Add
+            </Btn>
+          </div>
+        </Field>
+
+        <div style={{ fontSize: 13, color: T.gray, marginBottom: 14 }}>
+          Eligible pool: <b style={{ color: T.ink }}>{poolSize}</b> question{poolSize === 1 ? "" : "s"}
+          {numVersions > 1 && mode === "distinct" && (
+            <span style={{ color: poolSize >= count * numVersions ? T.gray : T.red }}>
+              {" "}
+              (need {count * numVersions} for {numVersions} distinct versions)
+            </span>
+          )}
+        </div>
+
+        <Btn onClick={run} disabled={questions.length === 0}>
+          {versions ? "Regenerate" : "Generate"}
+          {numVersions > 1 ? ` ${numVersions} versions` : " exam"}
+        </Btn>
+      </div>
+
+      {/* ---- result column ---- */}
+      <div>
+        {!versions && (
+          <div style={{ textAlign: "center", padding: 48, color: T.gray, background: T.card, border: `1px dashed ${T.line}`, borderRadius: 10 }}>
+            Configure the exam on the left, then generate. Each generation re-samples questions, correct answers, distractors,
+            and ordering — regenerate for a fresh draw with the same settings.
+          </div>
+        )}
+
+        {versions && (
+          <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 10, padding: 20 }}>
+            {/* meta + exports */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+              <input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} style={{ ...inputStyle, width: 170 }} placeholder="Exam title" />
+              <input value={meta.course} onChange={(e) => setMeta({ ...meta, course: e.target.value })} style={{ ...inputStyle, width: 150 }} placeholder="Course (e.g. CSE 336)" />
+              <input value={meta.date} onChange={(e) => setMeta({ ...meta, date: e.target.value })} style={{ ...inputStyle, width: 115 }} placeholder="Date" />
+              <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", cursor: "pointer" }}>
+                <input type="checkbox" checked={showKey} onChange={(e) => setShowKey(e.target.checked)} style={{ accentColor: T.green }} />
+                Show key
+              </label>
+            </div>
+
+            {/* version tabs */}
+            {many && (
+              <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                {versions.map((v, i) => (
+                  <Btn key={v.label} kind="quiet" small active={i === active} onClick={() => setActive(i)}>
+                    Version {v.label}
+                  </Btn>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 16, borderBottom: `1px solid ${T.line}`, paddingBottom: 14 }}>
+              <span style={{ fontSize: 12, color: T.gray, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Download{many ? ` version ${current.label}` : ""}:
+              </span>
+              {Object.entries(exporters).map(([fmt, e]) => (
+                <Btn key={fmt} kind="ghost" small onClick={() => exportVersion(fmt, current)}>
+                  ⬇ {e.label}
+                </Btn>
+              ))}
+              {many && (
+                <>
+                  <span style={{ fontSize: 12, color: T.gray, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginLeft: 10 }}>
+                    All versions:
+                  </span>
+                  {Object.entries(exporters).map(([fmt, e]) => (
+                    <Btn key={fmt} kind="quiet" small onClick={() => exportAll(fmt)} title={`Download every version as ${e.label}`}>
+                      {e.ext}
+                    </Btn>
+                  ))}
+                </>
+              )}
+            </div>
+
+            {current.warnings.map((w, i) => (
+              <div key={i} style={{ background: T.amberBg, color: T.amber, borderRadius: 6, padding: "8px 12px", fontSize: 13, marginBottom: 8 }}>
+                ⚠ {w}
+              </div>
+            ))}
+
+            {/* preview */}
+            {current.items.map((item, i) => (
+              <div key={i} style={{ marginBottom: 20 }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  {i + 1}. <Md text={item.question.text} />{" "}
+                  <span style={{ fontWeight: 400, color: T.gray, fontSize: 13 }}>
+                    ({item.question.points ?? 1} pt{(item.question.points ?? 1) === 1 ? "" : "s"})
+                  </span>
+                </div>
+                {item.options.map((o, j) => (
+                  <div
+                    key={j}
+                    style={{
+                      marginLeft: 24,
+                      padding: "3px 8px",
+                      borderRadius: 4,
+                      fontSize: 14,
+                      background: showKey && o.correct ? T.greenSoft : "transparent",
+                      color: showKey && o.correct ? T.green : T.ink,
+                      fontWeight: showKey && o.correct ? 600 : 400,
+                    }}
+                  >
+                    <span style={{ display: "inline-block", minWidth: 22, fontWeight: 600 }}>{LETTERS[j]}.</span>
+                    <Md text={o.text} />
+                    {showKey && o.correct && " ✓"}
+                  </div>
+                ))}
+                {showKey && item.question.explanation?.trim() && (
+                  <div style={{ marginLeft: 24, marginTop: 4, fontSize: 13, color: "#3A6EA5" }}>
+                    ↳ <Md text={item.question.explanation} />
+                  </div>
+                )}
+                <div style={{ marginLeft: 24, marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {item.question.tags.map((t) => (
+                    <span key={t} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#7A867F" }}>
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- root ---------------- */
+
+export default function App() {
+  const [questions, setQuestions] = useState([]);
+  const [view, setView] = useState("library");
+  const [loaded, setLoaded] = useState(false);
+  const [saveState, setSaveState] = useState("idle");
+  const saveTimer = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await window.storage.get(STORAGE_KEY);
+        if (result?.value) {
+          const data = JSON.parse(result.value);
+          if (Array.isArray(data.questions)) setQuestions(data.questions.map(normalizeQuestion));
+        }
+      } catch {
+        // No saved library yet — start fresh.
+      }
+      setLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    setSaveState("saving");
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await window.storage.set(STORAGE_KEY, JSON.stringify({ questions }));
+        setSaveState("saved");
+      } catch {
+        setSaveState("error");
+      }
+    }, 600);
+    return () => clearTimeout(saveTimer.current);
+  }, [questions, loaded]);
+
+  const allTags = useMemo(() => {
+    const seen = new Map();
+    questions.forEach((q) => q.tags.forEach((t) => seen.set(normTag(t), t)));
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [questions]);
+
+  const tabStyle = (isActive) => ({
+    padding: "10px 20px",
+    border: "none",
+    borderBottom: isActive ? `3px solid ${T.green}` : "3px solid transparent",
+    background: "none",
+    fontSize: 15,
+    fontWeight: isActive ? 700 : 500,
+    color: isActive ? T.green : T.gray,
+    cursor: "pointer",
+    fontFamily: "'IBM Plex Sans', sans-serif",
+  });
+
+  return (
+    <div style={{ minHeight: "100vh", background: T.paper, color: T.ink, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@600;700&display=swap');
+        input:focus, textarea:focus, select:focus { outline: 2px solid ${T.green}; outline-offset: 1px; }
+        button:focus-visible { outline: 2px solid ${T.green}; outline-offset: 2px; }
+        .md .md-pre { background: #F0F2EF; border: 1px solid ${T.line}; border-radius: 6px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; overflow-x: auto; white-space: pre; margin: 6px 0; display: block; }
+        .md .md-code { background: #F0F2EF; border: 1px solid ${T.line}; border-radius: 4px; padding: 0 4px; font-family: 'IBM Plex Mono', monospace; font-size: 0.92em; }`}</style>
+
+      <header style={{ background: T.green, color: "#fff", padding: "18px 28px" }}>
+        <div style={{ maxWidth: 1150, margin: "0 auto", display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+          <h1 style={{ fontFamily: "'IBM Plex Serif', serif", fontSize: 24, margin: 0 }}>QBL</h1>
+          <span style={{ fontSize: 13, opacity: 0.8 }}>multiple-choice question bank &amp; generator</span>
+          <span style={{ marginLeft: "auto", fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, opacity: 0.85 }}>
+            {questions.length} questions ·{" "}
+            {saveState === "saving" ? "saving…" : saveState === "error" ? "⚠ save failed" : saveState === "saved" ? "saved" : ""}
+          </span>
+        </div>
+      </header>
+
+      <nav style={{ background: T.card, borderBottom: `1px solid ${T.line}` }}>
+        <div style={{ maxWidth: 1150, margin: "0 auto", display: "flex", padding: "0 16px" }}>
+          <button style={tabStyle(view === "library")} onClick={() => setView("library")}>
+            Question Library
+          </button>
+          <button style={tabStyle(view === "generate")} onClick={() => setView("generate")}>
+            Generate Exam
+          </button>
+        </div>
+      </nav>
+
+      <main style={{ maxWidth: 1150, margin: "0 auto", padding: "24px 16px 64px" }}>
+        {!loaded ? (
+          <div style={{ textAlign: "center", padding: 48, color: T.gray }}>Loading library…</div>
+        ) : view === "library" ? (
+          <LibraryView questions={questions} setQuestions={setQuestions} allTags={allTags} />
+        ) : (
+          <GenerateView questions={questions} allTags={allTags} />
+        )}
+      </main>
+    </div>
+  );
+}
