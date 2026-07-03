@@ -7,6 +7,7 @@ const HEX = 46;                 // hex circumradius (board units)
 const POINTS_PER_DOT = 5;
 const MAX_RINGS = 5;            // ring slots per hex (also capped by palette size)
 const MIN_TILE_DOTS = 2, MAX_TILE_DOTS = 7, MAX_RING_DOTS = 5;
+const SEARCH_BUDGET = 20000;    // node cap for the cascade-direction search
 
 /* Ring slots are anchored to the OUTSIDE: the outermost ring of any tile
    always sits in the largest slot; inner rings fill inward from there.
@@ -91,35 +92,126 @@ function blobCells(n) {
   }
   return [...cells];
 }
-
-/* ---------------- difficulty progression ----------------
-   Dials, per level: score threshold, palette size, dots needed for a
-   full charge (popAt), tile budget for the level, pre-seeded tiles,
-   and locked cells. Tune freely.                                 */
-
-function levelConfig(level) {
-  const shapes = [
-    () => hexagonCells(2),
-    () => triangleCells(5),
-    () => donutCells(2),
-    () => rhombusCells(4, 4),
-    () => blobCells(17),
-  ];
-  const threshold = 100 + 80 * (level - 1);
-  const numColors = Math.min(PALETTE.length, level < 2 ? 4 : level < 4 ? 5 : level < 6 ? 6 : 7);
-  const popAt = level < 5 ? 6 : level < 9 ? 7 : 8;
-  const dotsNeeded = threshold / POINTS_PER_DOT;
-  // enough tiles to make it winnable, with a margin that shrinks as levels rise
-  const tileBudget = Math.max(10, Math.round(dotsNeeded / 2.4) + 10 - Math.floor(level / 2));
-  const seedTiles = 4 + Math.floor((level - 1) / 3);
-  const lockCount = level >= 3 ? Math.min(3, 1 + Math.floor((level - 3) / 2)) : 0;
-  return {
-    cells: shapes[(level - 1) % shapes.length](),
-    threshold, numColors, popAt, tileBudget, seedTiles, lockCount,
-  };
+function hexRingCells(radius) {
+  return hexagonCells(radius).filter((k) => {
+    const [q, r] = parseKey(k);
+    return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)) === radius;
+  });
+}
+function flowerCells() {  // hexagon(1) plus six petal tips
+  return [...hexagonCells(1), "2,0", "-2,0", "0,2", "0,-2", "2,-2", "-2,2"];
+}
+function bowtieCells() {  // two 7-hex clusters joined by a single choke cell
+  const cells = new Set(["2,0"]);
+  for (const k of hexagonCells(1)) {
+    const [q, r] = parseKey(k);
+    cells.add(keyOf(q, r));
+    cells.add(keyOf(q + 4, r));
+  }
+  return [...cells];
+}
+function isConnected(cells) {
+  const set = new Set(cells);
+  const seen = new Set([cells[0]]);
+  const stack = [cells[0]];
+  while (stack.length) {
+    const [q, r] = parseKey(stack.pop());
+    for (const [dq, dr] of DIRS) {
+      const nk = keyOf(q + dq, r + dr);
+      if (set.has(nk) && !seen.has(nk)) { seen.add(nk); stack.push(nk); }
+    }
+  }
+  return seen.size === cells.length;
+}
+function holeyHexCells() {  // hexagon(2) with three cells knocked out
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const cells = hexagonCells(2);
+    for (let i = 0; i < 3; i++) cells.splice(rand(cells.length), 1);
+    if (isConnected(cells)) return cells;
+  }
+  return hexagonCells(2);
 }
 
-/* ---------------- logical tiles ---------------- */
+/* ---------------- difficulty progression ----------------
+   The schedule works in six-level ERAS. Each era begins with one big
+   change — a new color, a higher charge threshold, or (in "obstacle"
+   eras) a jump in locks and pre-filled tiles. Big-change levels are
+   deliberately soft on every other dial: a roomy board, few or no
+   locks, few seeds. Within an era each level ratchets gently, mainly
+   by working down a ladder of smaller, thinner, more awkward boards
+   and by growing the obstacles.
+   Hard floors, regardless of schedule: every level has at least 12
+   non-locked cells and at least 8 cells that start empty.          */
+
+const ERAS = [
+  { start: 1,  colors: 4, popAt: 6, obstacles: 0 },
+  { start: 7,  colors: 5, popAt: 6, obstacles: 0 },  // big change: 5th color
+  { start: 13, colors: 5, popAt: 6, obstacles: 1 },  // big change: obstacle era
+  { start: 19, colors: 5, popAt: 7, obstacles: 0 },  // big change: charge at 7
+  { start: 25, colors: 6, popAt: 7, obstacles: 0 },  // big change: 6th color
+  { start: 31, colors: 6, popAt: 7, obstacles: 2 },  // big change: heavy obstacles
+  { start: 37, colors: 6, popAt: 8, obstacles: 0 },  // big change: charge at 8
+  { start: 43, colors: 7, popAt: 8, obstacles: 1 },  // big change: 7th color
+];
+
+/* Boards, ordered easiest (roomy + well-connected) to hardest
+   (small, thin, choked). Largest is 25 hexes. */
+const BOARD_LADDER = [
+  () => rhombusCells(5, 5),   // 25
+  () => blobCells(23),
+  () => hexagonCells(2),      // 19
+  () => rhombusCells(4, 5),   // 20, lower connectivity
+  () => triangleCells(6),     // 21, thin corners
+  () => blobCells(18),
+  () => donutCells(2),        // 18, hole in the middle
+  () => holeyHexCells(),      // 16, scattered holes
+  () => rhombusCells(4, 4),   // 16
+  () => bowtieCells(),        // 15, single choke point
+  () => triangleCells(5),     // 15
+  () => flowerCells(),        // 13, spindly petals
+  () => hexRingCells(2),      // 12, thin loop
+];
+
+function levelConfig(level) {
+  let era = ERAS[0];
+  ERAS.forEach((e) => { if (level >= e.start) era = e; });
+  const since = level - era.start;             // levels into the current era
+  const { colors: numColors, popAt, obstacles: ob } = era;
+
+  const threshold = 100 + 30 * (level - 1);
+
+  // board: era starts on roomy shapes, then work down the ladder;
+  // obstacle eras stay on middling shapes and let locks/seeds carry it
+  const maxIdx = BOARD_LADDER.length - 1;
+  const idx = ob > 0
+    ? Math.min(8, since + rand(2))
+    : Math.min(maxIdx, since * 2 + rand(2));
+  const cells = BOARD_LADDER[idx]();
+
+  // locks: total hole count; regular eras start clean and ramp gently,
+  // obstacle eras start locked and ramp hard; split into <=3 locks with
+  // <=3 holes each, never leaving fewer than 12 unlocked cells
+  const lockUnits = ob > 0
+    ? Math.min(7, 1 + ob + since)
+    : Math.max(0, Math.min(5, since - 1));
+  const lockSpecs = [];
+  if (lockUnits > 0) {
+    const nLocks = Math.min(3, lockUnits, Math.max(0, cells.length - 12));
+    if (nLocks > 0) {
+      const base = Math.floor(lockUnits / nLocks), extra = lockUnits % nLocks;
+      for (let i = 0; i < nLocks; i++)
+        lockSpecs.push(Math.min(3, base + (i < extra ? 1 : 0)));
+    }
+  }
+
+  // pre-filled tiles, never leaving fewer than 8 empty cells
+  const desiredSeeds = ob > 0 ? 3 + since : (since === 0 ? 2 : Math.min(6, 2 + since));
+  const seedTiles = Math.max(0, Math.min(desiredSeeds, cells.length - lockSpecs.length - 8));
+
+  return { cells, threshold, numColors, popAt, seedTiles, lockSpecs };
+}
+
+/* ---------------- logical tiles & locks ---------------- */
 
 function genTile(numColors) {
   const weights = [0.30, 0.26, 0.20, 0.14, 0.10].slice(0, Math.min(MAX_RINGS, numColors));
@@ -149,12 +241,14 @@ const cloneTiles = (tiles) => {
   for (const k in tiles) out[k] = { rings: tiles[k].rings.map((r) => ({ ...r })) };
   return out;
 };
+/* lock = { holes: [colorIdx,...], filled: [bool,...] } — each hole is an
+   open circle in its own color; clearing a ring of that color closes one */
 const cloneLocks = (locks) => {
   const out = {};
-  for (const k in locks) out[k] = { ...locks[k] };
+  for (const k in locks) out[k] = { holes: [...locks[k].holes], filled: [...locks[k].filled] };
   return out;
 };
-const lockBlocks = (lock) => lock && lock.filled < lock.holes;
+const lockBlocks = (lock) => !!lock && lock.filled.some((f) => !f);
 
 function seedBoard(cfg) {
   const tiles = {};
@@ -178,97 +272,149 @@ function seedBoard(cfg) {
       }
     }
   }
-  // locks on cells left empty
   const locks = {};
   const free = cfg.cells.filter((k) => !tiles[k]);
-  for (let i = 0; i < cfg.lockCount && free.length > 4; i++) {
+  for (const holeCount of cfg.lockSpecs) {
+    if (free.length < 9) break;   // keep at least 8 cells empty
     const idx = rand(free.length);
-    locks[free[idx]] = { color: rand(cfg.numColors), holes: 3 + rand(3), filled: 0 };
+    locks[free[idx]] = {
+      holes: Array.from({ length: holeCount }, () => rand(cfg.numColors)),
+      filled: Array(holeCount).fill(false),
+    };
     free.splice(idx, 1);
   }
   return { tiles, locks };
 }
 
 /* ---------------- cascade resolution (pure logic) ----------------
-   Merge direction: the more recently modified tile pulls (the placed
-   tile starts most recent, so cascades flow outward from it).
-   Pops happen after merges settle; popped dots first fill same-color
-   locks (nearest first) and only the remainder scores.            */
+   When two neighboring tiles share an outer-ring color, the dots could
+   be pulled in either direction. We search the (small) tree of choices
+   and take the direction producing the LONGEST cascade (most merge+pop
+   events), tie-broken by points, then by pulling toward the placed
+   tile, then toward the ring already holding more dots.
+   Pops are forced moves: once no merges remain, every outer ring at or
+   above the charge threshold pops. A popped ring closes at most ONE
+   matching hole in the nearest lock; the remaining dots score.       */
 
 function hexCenter(k) {
   const [q, r] = parseKey(k);
   return { x: HEX * Math.sqrt(3) * (q + r / 2), y: HEX * 1.5 * r };
 }
 
-function findMerge(tiles, recency) {
-  let best = null;
-  for (const k in tiles) {
+function listPairs(tiles) {
+  const pairs = [];
+  for (const k of Object.keys(tiles).sort()) {
     const [q, r] = parseKey(k);
-    const ocK = outer(tiles[k]).color;
+    const c = outer(tiles[k]).color;
     for (const [dq, dr] of DIRS) {
       const nk = keyOf(q + dq, r + dr);
-      if (!tiles[nk] || outer(tiles[nk]).color !== ocK) continue;
-      const ra = recency[k] || 0, rb = recency[nk] || 0;
-      let puller, loser;
-      if (ra !== rb) [puller, loser] = ra > rb ? [k, nk] : [nk, k];
-      else [puller, loser] =
-        outer(tiles[k]).dots >= outer(tiles[nk]).dots ? [k, nk] : [nk, k];
-      const prio = Math.max(ra, rb);
-      if (!best || prio > best.prio) best = { puller, loser, prio };
+      if (!tiles[nk] || nk < k) continue;          // each unordered pair once
+      if (outer(tiles[nk]).color === c) pairs.push([k, nk]);
+    }
+  }
+  return pairs;
+}
+
+function doPops(tiles0, locks0, popAt) {
+  const tiles = cloneTiles(tiles0), locks = cloneLocks(locks0);
+  const steps = [];
+  let gained = 0;
+  for (const k of Object.keys(tiles).sort()) {
+    while (tiles[k] && tiles[k].rings.length && outer(tiles[k]).dots >= popAt) {
+      const ring = tiles[k].rings.pop();
+      if (!tiles[k].rings.length) delete tiles[k];
+      // one dot may close one matching hole in the nearest lock
+      const c0 = hexCenter(k);
+      let fill = null, bestD = Infinity;
+      for (const lk in locks) {
+        const L = locks[lk];
+        const hi = L.holes.findIndex((c, i) => c === ring.color && !L.filled[i]);
+        if (hi < 0) continue;
+        const C = hexCenter(lk);
+        const d = (C.x - c0.x) ** 2 + (C.y - c0.y) ** 2;
+        if (d < bestD) { bestD = d; fill = { key: lk, holeIdx: hi }; }
+      }
+      if (fill) locks[fill.key].filled[fill.holeIdx] = true;
+      const scored = ring.dots - (fill ? 1 : 0);
+      const points = scored * POINTS_PER_DOT;
+      gained += points;
+      steps.push({ event: { type: "pop", at: k, color: ring.color, dots: ring.dots, scored, points, fill } });
+    }
+  }
+  return { tiles, locks, steps, gained };
+}
+
+function applyMerge(tiles, puller, loser) {
+  const t2 = cloneTiles(tiles);
+  const lost = t2[loser].rings.pop();
+  outer(t2[puller]).dots += lost.dots;
+  if (!t2[loser].rings.length) delete t2[loser];
+  return t2;
+}
+
+function betterBranch(a, b, placedKey) {
+  if (a.steps.length !== b.steps.length) return a.steps.length > b.steps.length;
+  if (a.gained !== b.gained) return a.gained > b.gained;
+  if ((a.puller === placedKey) !== (b.puller === placedKey)) return a.puller === placedKey;
+  return a.pullerDots > b.pullerDots;
+}
+
+function greedyResolve(tiles, locks, popAt) {
+  let steps = [], gained = 0;
+  for (;;) {
+    const pairs = listPairs(tiles);
+    if (pairs.length) {
+      const [a, b] = pairs[0];
+      const [puller, loser] =
+        outer(tiles[a]).dots >= outer(tiles[b]).dots ? [a, b] : [b, a];
+      tiles = applyMerge(tiles, puller, loser);
+      steps.push({ event: { type: "merge", from: loser, to: puller } });
+      continue;
+    }
+    const p = doPops(tiles, locks, popAt);
+    if (!p.steps.length) break;
+    tiles = p.tiles; locks = p.locks;
+    steps = steps.concat(p.steps); gained += p.gained;
+  }
+  return { steps, gained, tiles, locks };
+}
+
+function searchResolve(tiles, locks, popAt, placedKey, budget) {
+  const pairs = listPairs(tiles);
+  if (!pairs.length) {
+    const p = doPops(tiles, locks, popAt);
+    if (!p.steps.length) return { steps: [], gained: 0, tiles, locks };
+    const sub = searchResolve(p.tiles, p.locks, popAt, placedKey, budget);
+    return {
+      steps: p.steps.concat(sub.steps), gained: p.gained + sub.gained,
+      tiles: sub.tiles, locks: sub.locks,
+    };
+  }
+  let best = null;
+  for (const [a, b] of pairs) {
+    for (const [puller, loser] of [[a, b], [b, a]]) {
+      const t2 = applyMerge(tiles, puller, loser);
+      const step = { event: { type: "merge", from: loser, to: puller } };
+      const sub = --budget.n > 0
+        ? searchResolve(t2, locks, popAt, placedKey, budget)
+        : greedyResolve(t2, locks, popAt);
+      const cand = {
+        steps: [step].concat(sub.steps), gained: sub.gained,
+        tiles: sub.tiles, locks: sub.locks,
+        puller, pullerDots: outer(tiles[puller]).dots,
+      };
+      if (!best || betterBranch(cand, best, placedKey)) best = cand;
     }
   }
   return best;
 }
 
 function resolvePlacement(startTiles, placedKey, startLocks, popAt) {
-  const tiles = cloneTiles(startTiles);
-  const locks = cloneLocks(startLocks);
-  const steps = [];
-  const recency = { [placedKey]: 1 };
-  let counter = 2, gained = 0;
-  for (;;) {
-    let m;
-    while ((m = findMerge(tiles, recency))) {
-      const { puller, loser } = m;
-      const lost = tiles[loser].rings.pop();
-      outer(tiles[puller]).dots += lost.dots;
-      recency[loser] = counter++;
-      recency[puller] = counter++;
-      if (tiles[loser].rings.length === 0) delete tiles[loser];
-      steps.push({ event: { type: "merge", from: loser, to: puller } });
-    }
-    let popped = false;
-    for (const k of Object.keys(tiles)) {
-      while (tiles[k] && tiles[k].rings.length && outer(tiles[k]).dots >= popAt) {
-        const ring = tiles[k].rings.pop();
-        recency[k] = counter++;
-        if (tiles[k].rings.length === 0) delete tiles[k];
-        // same-color locks absorb dots first, nearest lock first
-        const c0 = hexCenter(k);
-        let remaining = ring.dots;
-        const fills = [];
-        const cand = Object.keys(locks)
-          .filter((lk) => locks[lk].color === ring.color && lockBlocks(locks[lk]))
-          .sort((a, b) => {
-            const A = hexCenter(a), B = hexCenter(b);
-            return ((A.x - c0.x) ** 2 + (A.y - c0.y) ** 2) - ((B.x - c0.x) ** 2 + (B.y - c0.y) ** 2);
-          });
-        for (const lk of cand) {
-          if (!remaining) break;
-          const take = Math.min(locks[lk].holes - locks[lk].filled, remaining);
-          locks[lk].filled += take;
-          remaining -= take;
-          fills.push({ key: lk, count: take });
-        }
-        const points = remaining * POINTS_PER_DOT;
-        gained += points;
-        steps.push({ event: { type: "pop", at: k, color: ring.color, dots: ring.dots, scored: remaining, points, fills } });
-        popped = true;
-      }
-    }
-    if (!popped) break;
-  }
-  return { final: tiles, finalLocks: locks, steps, gained };
+  const res = searchResolve(
+    cloneTiles(startTiles), cloneLocks(startLocks), popAt, placedKey,
+    { n: SEARCH_BUDGET }
+  );
+  return { final: res.tiles, finalLocks: res.locks, steps: res.steps, gained: res.gained };
 }
 
 /* ---------------- visual model ----------------
@@ -377,16 +523,15 @@ function drawVTile(ctx, cx, cy, vt, scale, now, popAt) {
   });
 }
 
-const lockHoleX = (cx, i, n) => cx - ((n - 1) * 8) / 2 + i * 8;
+const lockHoleX = (cx, i, n) => cx - ((n - 1) * 10) / 2 + i * 10;
 const LOCK_HOLE_Y = 15;
 
 function drawLock(ctx, cx, cy, lock, dt) {
   lock.flash = (lock.flash || 0) * Math.exp(-4 * dt);
-  const col = PALETTE[lock.color];
   ctx.save();
-  if (lock.flash > 0.05) { ctx.shadowColor = col.glow; ctx.shadowBlur = lock.flash * 18; }
+  if (lock.flash > 0.05) { ctx.shadowColor = "#cbd5e1"; ctx.shadowBlur = lock.flash * 18; }
   // shackle
-  ctx.strokeStyle = col.ring;
+  ctx.strokeStyle = "#8494ad";
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.arc(cx, cy - 9, 6, Math.PI, 0);
@@ -395,21 +540,24 @@ function drawLock(ctx, cx, cy, lock, dt) {
   ctx.stroke();
   // body
   rrect(ctx, cx - 9.5, cy - 5, 19, 14, 3);
-  ctx.fillStyle = col.ring; ctx.fill();
+  ctx.fillStyle = "#5b6a85"; ctx.fill();
+  ctx.lineWidth = 1; ctx.strokeStyle = "#8494ad"; ctx.stroke();
   ctx.beginPath(); ctx.arc(cx, cy + 1.2, 2.1, 0, TAU);
   ctx.fillStyle = "#0b0f17"; ctx.fill();
   ctx.fillRect(cx - 0.9, cy + 1.2, 1.8, 3.6);
   ctx.restore();
-  // holes: open dots that fill as matching dots are collected
-  for (let i = 0; i < lock.holes; i++) {
-    const hx = lockHoleX(cx, i, lock.holes), hy = cy + LOCK_HOLE_Y;
-    ctx.beginPath(); ctx.arc(hx, hy, 2.7, 0, TAU);
-    if (i < lock.filled) {
+  // holes: one open circle per required color; closes when filled
+  const n = lock.holes.length;
+  for (let i = 0; i < n; i++) {
+    const col = PALETTE[lock.holes[i]];
+    const hx = lockHoleX(cx, i, n), hy = cy + LOCK_HOLE_Y;
+    ctx.beginPath(); ctx.arc(hx, hy, 3.1, 0, TAU);
+    if (lock.filled[i]) {
       ctx.fillStyle = col.ring; ctx.fill();
-      ctx.lineWidth = 1; ctx.strokeStyle = col.glow; ctx.stroke();
+      ctx.lineWidth = 1.1; ctx.strokeStyle = col.glow; ctx.stroke();
     } else {
       ctx.fillStyle = "#0b0f17"; ctx.fill();
-      ctx.lineWidth = 1.2; ctx.strokeStyle = col.ring; ctx.stroke();
+      ctx.lineWidth = 1.6; ctx.strokeStyle = col.ring; ctx.stroke();
     }
   }
 }
@@ -420,7 +568,6 @@ export default function RingCharge() {
   const [level, setLevel] = useState(1);
   const [cfg, setCfg] = useState(() => levelConfig(1));
   const [hand, setHand] = useState([null, null, null]);
-  const [deck, setDeck] = useState(0);            // tiles left beyond the hand
   const [selected, setSelected] = useState(null);
   const [levelScore, setLevelScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
@@ -445,7 +592,8 @@ export default function RingCharge() {
     const pad = HEX + 14;
     const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
     const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
-    const top = minY - 46;
+    const barY = minY - 26;
+    const top = barY - 27;      // room above the bar for labels + charge icon
     const midX = (minX + maxX) / 2;
     const handY = maxY + HAND_SIZE + 26;
     return {
@@ -453,11 +601,11 @@ export default function RingCharge() {
       W: maxX - minX,
       H: handY + HAND_SIZE * 1.25 + 10 - top,
       handCenters: [-1, 0, 1].map((o) => ({ x: midX + o * (HAND_SIZE * 3), y: handY })),
-      barX: minX + 8, barW: maxX - minX - 16, barY: minY - 34,
+      barX: minX + 8, barW: maxX - minX - 16, barY,
     };
   }, [cfg]);
 
-  stateRef.current = { cfg, hand, deck, selected, animating, levelDone, gameOver, geom, levelScore };
+  stateRef.current = { cfg, hand, selected, animating, levelDone, gameOver, geom, levelScore };
 
   const startLevel = useCallback((lv) => {
     const c = levelConfig(lv);
@@ -468,11 +616,11 @@ export default function RingCharge() {
     const vt = {};
     for (const k in tiles) vt[k] = makeVTile(tiles[k], now - 500);
     const vl = {};
-    for (const k in locks) vl[k] = { ...locks[k], flash: 0 };
+    for (const k in locks)
+      vl[k] = { holes: [...locks[k].holes], filled: [...locks[k].filled], flash: 0 };
     vRef.current = { tiles: vt, locks: vl, flights: [], sparks: [], floats: [], segments: [], hover: null };
     setCfg(c);
     setHand([genTile(c.numColors), genTile(c.numColors), genTile(c.numColors)]);
-    setDeck(c.tileBudget - 3);
     setSelected(null);
     setLevelScore(0);
     setLevelDone(false);
@@ -541,15 +689,30 @@ export default function RingCharge() {
         drawVTile(ctx, x, y, vt, 1, now, popAt);
       }
 
-      /* score bar */
+      /* score bar + charge-threshold indicator */
       {
         const { barX, barW, barY } = G;
         ctx.font = "600 11px 'Avenir Next','Segoe UI',system-ui,sans-serif";
         ctx.fillStyle = "#8fa0b8";
         ctx.textAlign = "left";
-        ctx.fillText(`${S.levelScore} pts`, barX, barY - 5);
+        ctx.fillText(`${S.levelScore} pts`, barX, barY - 8);
         ctx.textAlign = "right";
-        ctx.fillText(`goal ${S.cfg.threshold}`, barX + barW, barY - 5);
+        ctx.fillText(`goal ${S.cfg.threshold}`, barX + barW, barY - 8);
+        // mini ring showing how many dots make a full charge
+        {
+          const icx = barX + barW / 2 - 16, icy = barY - 13, ir = 5.5;
+          ctx.strokeStyle = "#8fa0b8"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(icx, icy, ir, 0, TAU); ctx.stroke();
+          for (let i = 0; i < popAt; i++) {
+            const a = -Math.PI / 2 + (i * TAU) / popAt;
+            ctx.beginPath();
+            ctx.arc(icx + ir * Math.cos(a), icy + ir * Math.sin(a), 1.3, 0, TAU);
+            ctx.fillStyle = "#dbe3f0"; ctx.fill();
+          }
+          ctx.textAlign = "left";
+          ctx.fillStyle = "#8fa0b8";
+          ctx.fillText(`= ${popAt} dots`, icx + ir + 5, icy + 3.5);
+        }
         rrect(ctx, barX, barY, barW, BAR_H, BAR_H / 2);
         ctx.fillStyle = "#1c2434"; ctx.fill();
         ctx.lineWidth = 1; ctx.strokeStyle = "#2a3448"; ctx.stroke();
@@ -583,14 +746,15 @@ export default function RingCharge() {
           } else if (f.land === "lock") {
             const L = V.locks[f.lockKey];
             if (L) {
-              L.filled++; L.flash = 1;
-              if (L.filled >= L.holes) {
+              L.filled[f.holeIdx] = true;
+              L.flash = 1;
+              if (L.filled.every(Boolean)) {
                 const c = G.centers[f.lockKey];
-                V.sparks.push({ kind: "ring", x: c.x, y: c.y, r0: 12, color: L.color, t0: now, dur: 550 });
+                V.sparks.push({ kind: "ring", x: c.x, y: c.y, r0: 12, color: f.color, t0: now, dur: 550 });
                 for (let i = 0; i < 8; i++) {
                   const a = (i / 8) * TAU;
                   V.sparks.push({
-                    kind: "dot", color: L.color, x: c.x, y: c.y,
+                    kind: "dot", color: f.color, x: c.x, y: c.y,
                     vx: Math.cos(a) * 110, vy: Math.sin(a) * 110, t0: now, dur: 550,
                   });
                 }
@@ -657,7 +821,7 @@ export default function RingCharge() {
         return true;
       });
 
-      /* hand row */
+      /* hand row + remaining-deck count */
       const vh = vHandRef.current;
       G.handCenters.forEach(({ x, y }, i) => {
         const tile = vh[i];
@@ -791,7 +955,8 @@ export default function RingCharge() {
         });
         await sleep(dur + n * stag + (quick ? 60 : 170));
       } else {
-        /* pop: ring flash at the cell, dots fly to locks / the score bar */
+        /* pop: ring flash at the cell; one dot may close a lock hole,
+           the rest arc up to the score bar */
         const at = G.centers[ev.at];
         const vt = V.tiles[ev.at];
         const ring = vt.rings[vt.rings.length - 1];
@@ -817,17 +982,15 @@ export default function RingCharge() {
             ...extra,
           });
         };
-        for (const f of ev.fills) {
-          const lc = G.centers[f.key];
-          const L = V.locks[f.key];
-          for (let j = 0; j < f.count; j++) {
-            const holeIdx = L ? Math.min(L.holes - 1, L.filled + j) : 0;
-            launch(
-              lockHoleX(lc.x, holeIdx, L ? L.holes : 1),
-              lc.y + LOCK_HOLE_Y,
-              "lock", { lockKey: f.key }
-            );
-          }
+        if (ev.fill) {
+          const lc = G.centers[ev.fill.key];
+          const L = V.locks[ev.fill.key];
+          const nHoles = L ? L.holes.length : 1;
+          launch(
+            lockHoleX(lc.x, ev.fill.holeIdx, nHoles),
+            lc.y + LOCK_HOLE_Y,
+            "lock", { lockKey: ev.fill.key, holeIdx: ev.fill.holeIdx }
+          );
         }
         for (let j = 0; j < ev.scored; j++) {
           const fillX = G.barX + Math.min(1, (sc + j * POINTS_PER_DOT) / S.cfg.threshold) * G.barW;
@@ -844,29 +1007,21 @@ export default function RingCharge() {
       }
     }
 
-    /* refill from the level's tile budget */
-    let handAfter = newHand;
+    /* refill the hand — the tile supply is unlimited */
     if (needRefill) {
-      const draw = Math.min(3, S.deck);
-      handAfter = Array.from({ length: 3 }, (_, i) => (i < draw ? genTile(S.cfg.numColors) : null));
-      setHand(handAfter);
-      setDeck(S.deck - draw);
+      setHand([genTile(S.cfg.numColors), genTile(S.cfg.numColors), genTile(S.cfg.numColors)]);
     }
 
     if (sc >= S.cfg.threshold) {
       setLevelDone(true);
-    } else {
-      const boardFull = S.cfg.cells.every((c) => final[c] || lockBlocks(finalLocks[c]));
-      const outOfTiles = handAfter.every((t) => !t);
-      if (boardFull) setGameOver("board");
-      else if (outOfTiles) setGameOver("tiles");
+    } else if (S.cfg.cells.every((c) => final[c] || lockBlocks(finalLocks[c]))) {
+      setGameOver("board");
     }
     setAnimating(false);
   }
 
   /* ---------------- HTML shell ---------------- */
 
-  const tilesLeft = deck + hand.filter(Boolean).length;
   const canPlaceNow = selected !== null && hand[selected] && !animating && !levelDone && !gameOver;
 
   return (
@@ -881,7 +1036,7 @@ export default function RingCharge() {
           RING<span style={{ color: "#38bdf8" }}>CHARGE</span>
         </div>
         <div style={{ fontSize: 13, color: "#8fa0b8" }}>
-          Level {level} &nbsp;·&nbsp; Tiles {tilesLeft} &nbsp;·&nbsp; Total {totalScore}
+          Level {level} &nbsp;·&nbsp; Total {totalScore}
         </div>
       </div>
 
@@ -899,15 +1054,12 @@ export default function RingCharge() {
             background: "rgba(11,15,23,.82)", borderRadius: 12, gap: 12,
           }}>
             <div style={{ fontSize: 26, fontWeight: 700 }}>
-              {levelDone ? `Level ${level} charged!`
-                : gameOver === "tiles" ? "Out of tiles" : "Board full"}
+              {levelDone ? `Level ${level} charged!` : "Board full"}
             </div>
             <div style={{ color: "#8fa0b8", fontSize: 14 }}>
               {levelDone
                 ? `${levelScore} points — goal was ${cfg.threshold}`
-                : gameOver === "tiles"
-                  ? `${levelScore} of ${cfg.threshold} points — the tile supply ran dry.`
-                  : "No empty poles left to place a tile."}
+                : "No empty poles left to place a tile."}
             </div>
             <button
               onClick={() => {
@@ -934,10 +1086,10 @@ export default function RingCharge() {
         )}
       </div>
 
-      <div style={{ marginTop: 8, fontSize: 12.5, color: "#657894", textAlign: "center", maxWidth: 500 }}>
+      <div style={{ marginTop: 8, fontSize: 12.5, color: "#657894", textAlign: "center", maxWidth: 520 }}>
         {canPlaceNow
           ? "Click an empty hex to place the tile."
-          : `Match outer rings to pull dots; ${cfg.popAt} dots fully charges a ring. Locks eat matching dots before they score.`}
+          : `Match outer rings to pull dots together; ${cfg.popAt} dots fully charges a ring. Clearing a ring closes one matching hole on a lock.`}
       </div>
     </div>
   );
