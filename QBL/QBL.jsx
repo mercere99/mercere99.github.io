@@ -30,7 +30,7 @@ function shuffle(arr) {
 
 const sample = (arr, n) => shuffle(arr).slice(0, n);
 const normTag = (t) => t.trim().toLowerCase();
-const hasTag = (q, tag) => q.tags.some((t) => normTag(t) === normTag(tag));
+const hasTag = (q, tag) => [...q.tags, ...(q.xtags || [])].some((t) => normTag(t) === normTag(tag));
 
 function csvField(s) {
   const str = String(s ?? "");
@@ -71,9 +71,24 @@ function mdToHtml(src) {
     blocks.push(`<pre class="md-pre"><code>${code.replace(/\n+$/, "")}</code></pre>`);
     return `\u0000B${blocks.length - 1}\u0000`;
   });
+  // Lines indented by 4+ spaces form a code block (QBL convention).
+  s = s.replace(/(^|\n)((?: {4}[^\n]*(?:\n|$))+)/g, (m, lead, block) => {
+    blocks.push(`<pre class="md-pre"><code>${block.replace(/^ {4}/gm, "").replace(/\n+$/, "")}</code></pre>`);
+    return `${lead}\u0000B${blocks.length - 1}\u0000`;
+  });
   const inlines = [];
   s = s.replace(/`([^`\n]+)`/g, (m, code) => {
     inlines.push(`<code class="md-code">${code}</code>`);
+    return `\u0000I${inlines.length - 1}\u0000`;
+  });
+  // Images before links (both operate on already-HTML-escaped text, so the
+  // escaped quotes/ampersands are attribute-safe as-is).
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, url) => {
+    inlines.push(`<img class="md-img" src="${url}" alt="${alt}">`);
+    return `\u0000I${inlines.length - 1}\u0000`;
+  });
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, text, url) => {
+    inlines.push(`<a href="${url}" target="_blank" rel="noopener">${text}</a>`);
     return `\u0000I${inlines.length - 1}\u0000`;
   });
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -101,9 +116,22 @@ function mdToLatex(src) {
     blocks.push(`\\begin{verbatim}\n${code.replace(/\n+$/, "")}\n\\end{verbatim}`);
     return `\u0000B${blocks.length - 1}\u0000`;
   });
+  s = s.replace(/(^|\n)((?: {4}[^\n]*(?:\n|$))+)/g, (m, lead, block) => {
+    blocks.push(`\\begin{verbatim}\n${block.replace(/^ {4}/gm, "").replace(/\n+$/, "")}\n\\end{verbatim}`);
+    return `${lead}\u0000B${blocks.length - 1}\u0000`;
+  });
   s = s.replace(/`([^`\n]+)`/g, (m, code) => {
     const d = ['|', '!', '"', '@', '+', '='].find((ch) => !code.includes(ch));
     inlines.push(d ? `\\verb${d}${code}${d}` : `\\texttt{${latexEscape(code)}}`);
+    return `\u0000I${inlines.length - 1}\u0000`;
+  });
+  const urlEsc = (u) => u.replace(/([%#&_{}])/g, "\\$1");
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, url) => {
+    inlines.push(`\\emph{[image${alt ? ": " + latexEscape(alt) : ""}]} (\\url{${urlEsc(url)}})`);
+    return `\u0000I${inlines.length - 1}\u0000`;
+  });
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, text, url) => {
+    inlines.push(`\\href{${urlEsc(url)}}{${latexEscape(text)}}`);
     return `\u0000I${inlines.length - 1}\u0000`;
   });
   s = latexEscape(s);
@@ -141,6 +169,8 @@ function emptyQuestion() {
     notes: "",
     hint: "",
     explanation: "",
+    xtags: [], // exclusive-or tags (QBL ^tag): at most one such question per exam
+    extraSettings: {}, // unrecognized QBL :settings, preserved for round-tripping
   };
 }
 
@@ -157,6 +187,149 @@ function questionIsUsable(q) {
   const nCorrect = q.answers.filter((a) => a.correct && a.text.trim()).length;
   const nWrong = q.answers.filter((a) => !a.correct && a.text.trim()).length;
   return q.text.trim() && nCorrect >= 1 && nWrong >= q.numChoices - 1;
+}
+
+/* ---------------- QBL format ----------------
+   Blocks separated by blank lines. First char of each line:
+     (text)  question, or continuation of the question/answer above
+     #tag    regular tag        ^tag  exclusive-or tag (max one per exam)
+     :k=v    setting (options=N -> choices shown; points, hint, explanation,
+             notes are recognized; everything else round-trips untouched)
+     %       comment (whole line; or trailing on tag/setting lines)
+     *  [    incorrect / correct answer; > pins position, + always includes
+     Lines indented 1-3 spaces continue the previous entity; 4+ spaces = code. */
+
+const escNL = (v) => String(v).replace(/\r?\n/g, "\\n");
+const unescNL = (v) => String(v).replace(/\\n/g, "\n");
+const QBL_KNOWN_SETTINGS = ["options", "points", "hint", "explanation", "notes"];
+
+function parseQbl(text) {
+  const questions = [];
+  let cur = null;
+  let lastAnswer = null;
+
+  const flush = () => {
+    if (cur && (cur.textLines.length || cur.answers.length)) {
+      const s = cur.settings;
+      const wrongCount = cur.answers.filter((a) => !a.correct).length;
+      questions.push(
+        normalizeQuestion({
+          text: cur.textLines.join("\n"),
+          tags: cur.tags,
+          xtags: cur.xtags,
+          answers: cur.answers,
+          // No :options setting -> show every distractor plus one correct.
+          numChoices: s.options != null ? Math.max(2, parseInt(s.options) || 2) : Math.max(2, wrongCount + 1),
+          points: s.points != null ? parseFloat(s.points) || 1 : 1,
+          hint: s.hint != null ? unescNL(s.hint) : "",
+          explanation: s.explanation != null ? unescNL(s.explanation) : "",
+          notes: s.notes != null ? unescNL(s.notes) : "",
+          extraSettings: Object.fromEntries(Object.entries(s).filter(([k]) => !QBL_KNOWN_SETTINGS.includes(k))),
+        })
+      );
+    }
+    cur = null;
+    lastAnswer = null;
+  };
+
+  for (const raw of text.split(/\r?\n/)) {
+    if (raw.trim() === "") {
+      flush();
+      continue;
+    }
+    const c = raw[0];
+    if (c === "%") continue; // comment line (does not end the block)
+    if (!cur) cur = { textLines: [], tags: [], xtags: [], answers: [], settings: {} };
+
+    if (c === ":") {
+      // Whole-line setting; the value may contain spaces. Trailing % comment stripped.
+      const line = raw.replace(/\s+%.*$/, "").trim();
+      const eq = line.indexOf("=");
+      if (eq > 1) cur.settings[line.slice(1, eq).trim()] = line.slice(eq + 1).trim();
+      else if (line.length > 1) cur.settings[line.slice(1).trim()] = "true";
+      lastAnswer = null;
+      continue;
+    }
+    if (c === "#" || c === "^") {
+      const line = raw.split(/(?:^|\s)%/)[0]; // strip trailing comment
+      for (const tok of line.trim().split(/\s+/)) {
+        if (tok.startsWith("#") && tok.length > 1) cur.tags.push(tok.slice(1));
+        else if (tok.startsWith("^") && tok.length > 1) cur.xtags.push(tok.slice(1));
+        else if (tok.startsWith(":")) {
+          const eq = tok.indexOf("=");
+          if (eq > 1) cur.settings[tok.slice(1, eq)] = tok.slice(eq + 1);
+        }
+      }
+      lastAnswer = null;
+      continue;
+    }
+    if (c === "*" || c === "[" || c === "+" || c === ">") {
+      let correct = false,
+        pin = false,
+        always = false,
+        rest;
+      if (c === "[") {
+        correct = true;
+        const close = raw.indexOf("]");
+        const inner = close > 0 ? raw.slice(1, close) : "";
+        rest = close > 0 ? raw.slice(close + 1) : raw.slice(1);
+        pin = inner.includes(">");
+        always = inner.includes("+");
+      } else {
+        let i = 0;
+        while (i < raw.length && "*>+".includes(raw[i])) {
+          if (raw[i] === ">") pin = true;
+          if (raw[i] === "+") always = true;
+          i++;
+        }
+        rest = raw.slice(i);
+      }
+      lastAnswer = { id: uid(), text: rest.trim(), correct, pin, always };
+      cur.answers.push(lastAnswer);
+      continue;
+    }
+    // Continuation: 1-3 leading spaces are stripped; 4+ means code, kept verbatim.
+    const line = /^ {1,3}\S/.test(raw) ? raw.trimStart() : raw;
+    if (lastAnswer) lastAnswer.text += "\n" + line;
+    else cur.textLines.push(line);
+  }
+  flush();
+  return questions;
+}
+
+function toQbl(questions) {
+  const qblTag = (t) => t.trim().replace(/\s+/g, "-"); // QBL tags cannot contain spaces
+  const protectFirst = (ln) => (/^[#:^*\[%+> ]/.test(ln) ? " " + ln : ln);
+  const contLine = (ln) => (/^ {4,}/.test(ln) ? ln : "  " + ln);
+  const emitText = (text, out, first) => {
+    // Interior blank lines would terminate the block, so they are dropped.
+    const lines = text.split("\n").filter((ln, i) => i === 0 || ln.trim() !== "");
+    lines.forEach((ln, i) => out.push(i === 0 ? first(ln) : contLine(ln)));
+  };
+
+  return (
+    questions
+      .map((q) => {
+        const out = [];
+        emitText(q.text, out, protectFirst);
+        const tagBits = [...q.tags.map((t) => "#" + qblTag(t)), ...(q.xtags || []).map((t) => "^" + qblTag(t))];
+        if (tagBits.length) out.push(tagBits.join(" "));
+        out.push(`:options=${q.numChoices}`);
+        if ((q.points ?? 1) !== 1) out.push(`:points=${q.points}`);
+        if (q.hint?.trim()) out.push(`:hint=${escNL(q.hint)}`);
+        if (q.explanation?.trim()) out.push(`:explanation=${escNL(q.explanation)}`);
+        if (q.notes?.trim()) out.push(`:notes=${escNL(q.notes)}`);
+        Object.entries(q.extraSettings || {}).forEach(([k, v]) => out.push(`:${k}=${v}`));
+        q.answers.forEach((a) => {
+          const marker = a.correct
+            ? `[*${a.pin ? ">" : ""}${a.always ? "+" : ""}]`
+            : `*${a.pin ? ">" : ""}${a.always ? "+" : ""}`;
+          emitText(a.text, out, (ln) => `${marker} ${ln}`);
+        });
+        return out.join("\n");
+      })
+      .join("\n\n") + "\n"
+  );
 }
 
 /* ---------------- generation engine ---------------- */
@@ -265,7 +438,18 @@ function selectQuestions(all, count, constraints, excludeIds) {
 }
 
 function generateVersions(all, cfg) {
-  const { count, constraints, numVersions, mode } = cfg;
+  const { count, numVersions, mode } = cfg;
+  // Exclusive-or (^) tags get an implicit max-1 constraint unless the user
+  // has set an explicit constraint on that tag.
+  const explicit = new Set(cfg.constraints.map((c) => normTag(c.tag)));
+  const xorTags = new Map();
+  all.forEach((q) => (q.xtags || []).forEach((t) => xorTags.set(normTag(t), t)));
+  const constraints = [
+    ...cfg.constraints,
+    ...[...xorTags.values()]
+      .filter((t) => !explicit.has(normTag(t)))
+      .map((t) => ({ tag: t, min: 0, max: 1 })),
+  ];
   const versions = [];
 
   if (numVersions <= 1 || mode === "independent") {
@@ -369,6 +553,8 @@ ${opts}
   #donebtn { display: block; margin: 30px auto 0; font-size: 13pt; padding: 10px 36px; cursor: pointer; background: #18453B; color: #fff; border: none; border-radius: 6px; }
   .md-pre { background: #f4f4f4; border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; font-family: 'Menlo', 'Consolas', monospace; font-size: 10pt; overflow-x: auto; white-space: pre; }
   .md-code { background: #f4f4f4; border: 1px solid #ddd; border-radius: 3px; padding: 0 4px; font-family: 'Menlo', 'Consolas', monospace; font-size: 10pt; }
+  .md-img { max-width: 100%; max-height: 4in; border: 1px solid #ddd; border-radius: 4px; display: block; margin: 6px 0; }
+  a { color: #18453B; }
   @media print {
     .mini, .qactions, .hint, .explanation, .verdict, #donebtn, #score, .screen-only { display: none !important; }
     body { padding: 0; }
@@ -465,6 +651,7 @@ ${opts}
 \\usepackage[T1]{fontenc}
 \\usepackage{enumitem}
 \\usepackage[normalem]{ulem}
+\\usepackage[hidelinks]{hyperref}
 \\setlength{\\parindent}{0pt}
 \\begin{document}
 
@@ -544,14 +731,14 @@ const T = {
   gray: "#5A6660",
 };
 
-function TagChip({ tag, onRemove, mode, onClick, title }) {
-  // mode: undefined (neutral) | "in" | "out"
+function TagChip({ tag, onRemove, mode, onClick, title, xor }) {
+  // mode: undefined (neutral) | "in" | "out"; xor renders with ^ and a dashed border
   const styles =
     mode === "in"
-      ? { background: T.green, color: "#fff", border: `1px solid ${T.green}` }
+      ? { background: T.green, color: "#fff", border: `1px ${xor ? "dashed" : "solid"} ${T.green}` }
       : mode === "out"
-      ? { background: T.redSoft, color: T.red, border: `1px solid ${T.red}`, textDecoration: "line-through" }
-      : { background: T.greenSoft, color: T.green, border: `1px solid ${T.line}` };
+      ? { background: T.redSoft, color: T.red, border: `1px ${xor ? "dashed" : "solid"} ${T.red}`, textDecoration: "line-through" }
+      : { background: T.greenSoft, color: T.green, border: `1px ${xor ? "dashed" : "solid"} ${xor ? T.green : T.line}` };
   return (
     <span
       onClick={onClick}
@@ -570,6 +757,7 @@ function TagChip({ tag, onRemove, mode, onClick, title }) {
       }}
     >
       {mode === "out" && <span style={{ textDecoration: "none" }}>¬</span>}
+      {xor && "^"}
       {tag}
       {onRemove && (
         <button
@@ -669,11 +857,29 @@ function QuestionEditor({ initial, allTags, onSave, onCancel }) {
   const addTag = (raw) => {
     const t = raw.trim();
     if (!t) return;
-    if (!q.tags.some((x) => normTag(x) === normTag(t))) setQ({ ...q, tags: [...q.tags, t] });
+    if (t.startsWith("^")) {
+      const x = t.slice(1).trim();
+      if (x && !q.xtags.some((y) => normTag(y) === normTag(x))) setQ({ ...q, xtags: [...q.xtags, x] });
+    } else if (!q.tags.some((x) => normTag(x) === normTag(t))) {
+      setQ({ ...q, tags: [...q.tags, t] });
+    }
     setTagInput("");
   };
 
   const setAnswer = (id, patch) => setQ({ ...q, answers: q.answers.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
+
+  // Drag-to-reorder answers.
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const moveAnswer = (from, to) => {
+    if (from == null || to == null || from === to) return;
+    setQ((prev) => {
+      const answers = [...prev.answers];
+      const [row] = answers.splice(from, 1);
+      answers.splice(to, 0, row);
+      return { ...prev, answers };
+    });
+  };
 
   const suggestions = allTags
     .filter((t) => tagInput && normTag(t).includes(normTag(tagInput)) && !q.tags.some((x) => normTag(x) === normTag(t)))
@@ -714,10 +920,13 @@ function QuestionEditor({ initial, allTags, onSave, onCancel }) {
         )}
       </Field>
 
-      <Field label="Tags" hint="Press Enter or comma to add.">
+      <Field label="Tags" hint="Press Enter or comma to add. Prefix with ^ for an exclusive tag: at most one question carrying it appears per exam.">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
           {q.tags.map((t) => (
             <TagChip key={t} tag={t} onRemove={() => setQ({ ...q, tags: q.tags.filter((x) => x !== t) })} />
+          ))}
+          {q.xtags.map((t) => (
+            <TagChip key={"^" + t} tag={t} xor onRemove={() => setQ({ ...q, xtags: q.xtags.filter((x) => x !== t) })} />
           ))}
         </div>
         <input
@@ -745,8 +954,44 @@ function QuestionEditor({ initial, allTags, onSave, onCancel }) {
         label="Answer pool"
         hint='Markdown works here too. "Always" answers are never dropped when sampling; "Pin" answers keep their slot in the list while others shuffle (e.g. keep "All of the above" last).'
       >
-        {q.answers.map((a) => (
-          <div key={a.id} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+        {q.answers.map((a, i) => (
+          <div
+            key={a.id}
+            onDragOver={(e) => {
+              if (dragIdx == null) return;
+              e.preventDefault();
+              setOverIdx(i);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              moveAnswer(dragIdx, i);
+              setDragIdx(null);
+              setOverIdx(null);
+            }}
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              marginBottom: 6,
+              opacity: dragIdx === i ? 0.4 : 1,
+              borderTop: overIdx === i && dragIdx != null && dragIdx !== i ? `2px solid ${T.green}` : "2px solid transparent",
+            }}
+          >
+            <span
+              draggable
+              onDragStart={(e) => {
+                setDragIdx(i);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragEnd={() => {
+                setDragIdx(null);
+                setOverIdx(null);
+              }}
+              title="Drag to reorder"
+              style={{ cursor: "grab", color: T.gray, fontSize: 15, userSelect: "none", padding: "0 2px", flexShrink: 0 }}
+            >
+              ⠿
+            </span>
             <input
               type="checkbox"
               checked={a.correct}
@@ -860,7 +1105,7 @@ function QuestionEditor({ initial, allTags, onSave, onCancel }) {
 
 /* ---------------- library view ---------------- */
 
-function LibraryView({ questions, setQuestions, allTags }) {
+function LibraryView({ questions, setQuestions, allTags, xorSet }) {
   const [editingId, setEditingId] = useState(null); // null | "new" | question id
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState({}); // { normTag: "in" | "out" }
@@ -868,15 +1113,17 @@ function LibraryView({ questions, setQuestions, allTags }) {
 
   const filtered = questions.filter((q) => {
     const s = search.trim().toLowerCase();
+    const allQTags = [...q.tags, ...(q.xtags || [])];
     const matchesSearch =
       !s ||
       q.text.toLowerCase().includes(s) ||
       q.answers.some((a) => a.text.toLowerCase().includes(s)) ||
-      q.tags.some((t) => t.toLowerCase().includes(s)) ||
+      allQTags.some((t) => t.toLowerCase().includes(s)) ||
       (q.notes || "").toLowerCase().includes(s);
-    const matchesTags = Object.entries(tagFilter).every(([key, mode]) =>
-      mode === "in" ? q.tags.some((t) => normTag(t) === key) : !q.tags.some((t) => normTag(t) === key)
-    );
+    const matchesTags = Object.entries(tagFilter).every(([key, mode]) => {
+      const has = allQTags.some((t) => normTag(t) === key);
+      return mode === "in" ? has : !has;
+    });
     return matchesSearch && matchesTags;
   });
 
@@ -910,27 +1157,52 @@ function LibraryView({ questions, setQuestions, allTags }) {
   const exportJson = () => {
     downloadFile(
       `question-library-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify({ format: "mcq-library", version: 2, questions }, null, 2),
+      JSON.stringify({ format: "mcq-library", version: 3, questions }, null, 2),
       "application/json"
     );
   };
 
-  const importJson = (file) => {
+  const exportQbl = () => {
+    downloadFile(`question-library-${new Date().toISOString().slice(0, 10)}.qbl`, toQbl(questions), "text/plain");
+  };
+
+  /* Import: JSON (merged by question ID) or QBL (matched by exact question
+     text — replaces the match, otherwise appended). Format auto-detected. */
+  const importFile = (file) => {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result);
-        const incoming = Array.isArray(data) ? data : data.questions;
-        if (!Array.isArray(incoming)) throw new Error("No questions array found.");
+        const txt = reader.result;
+        let incoming = null;
+        let byIdMerge = false;
+        try {
+          const data = JSON.parse(txt);
+          const arr = Array.isArray(data) ? data : data.questions;
+          if (Array.isArray(arr)) {
+            incoming = arr.map(normalizeQuestion);
+            byIdMerge = true;
+          }
+        } catch {
+          /* not JSON — fall through to QBL */
+        }
+        if (!incoming) incoming = parseQbl(txt);
+        if (!incoming.length) throw new Error("No questions found in file.");
         setQuestions((prev) => {
-          const byId = new Map(prev.map((q) => [q.id, q]));
-          incoming.forEach((raw) => {
-            const q = normalizeQuestion(raw);
-            byId.set(q.id, q);
+          if (byIdMerge) {
+            const byId = new Map(prev.map((q) => [q.id, q]));
+            incoming.forEach((q) => byId.set(q.id, q));
+            return [...byId.values()];
+          }
+          const byText = new Map(prev.map((q, i) => [q.text.trim(), i]));
+          const next = [...prev];
+          incoming.forEach((q) => {
+            const at = byText.get(q.text.trim());
+            if (at != null) next[at] = { ...q, id: next[at].id };
+            else next.push(q);
           });
-          return [...byId.values()];
+          return next;
         });
-        alert(`Imported ${incoming.length} questions (merged by ID).`);
+        alert(`Imported ${incoming.length} question${incoming.length === 1 ? "" : "s"} (${byIdMerge ? "JSON, merged by ID" : "QBL, matched by question text"}).`);
       } catch (e) {
         alert("Import failed: " + e.message);
       }
@@ -950,19 +1222,22 @@ function LibraryView({ questions, setQuestions, allTags }) {
           style={{ ...inputStyle, maxWidth: 340, flex: 1 }}
         />
         <Btn onClick={() => setEditingId("new")}>+ New question</Btn>
-        <Btn kind="ghost" onClick={exportJson} title="Download the library as a JSON backup">
-          Export library
+        <Btn kind="ghost" onClick={exportJson} title="Full-fidelity JSON backup of the library">
+          Export JSON
         </Btn>
-        <Btn kind="ghost" onClick={() => fileRef.current?.click()} title="Merge a JSON backup into this library">
+        <Btn kind="ghost" onClick={exportQbl} title="Export the library in QBL text format">
+          Export QBL
+        </Btn>
+        <Btn kind="ghost" onClick={() => fileRef.current?.click()} title="Import a JSON backup or a QBL file (format auto-detected)">
           Import
         </Btn>
         <input
           ref={fileRef}
           type="file"
-          accept=".json,application/json"
+          accept=".json,.qbl,.txt,application/json,text/plain"
           style={{ display: "none" }}
           onChange={(e) => {
-            if (e.target.files?.[0]) importJson(e.target.files[0]);
+            if (e.target.files?.[0]) importFile(e.target.files[0]);
             e.target.value = "";
           }}
         />
@@ -977,6 +1252,7 @@ function LibraryView({ questions, setQuestions, allTags }) {
             <TagChip
               key={t}
               tag={t}
+              xor={xorSet.has(normTag(t))}
               mode={tagFilter[normTag(t)]}
               onClick={() => cycleFilter(t)}
               title={
@@ -1026,6 +1302,9 @@ function LibraryView({ questions, setQuestions, allTags }) {
                   {q.tags.map((t) => (
                     <TagChip key={t} tag={t} />
                   ))}
+                  {(q.xtags || []).map((t) => (
+                    <TagChip key={"^" + t} tag={t} xor />
+                  ))}
                 </div>
                 <div style={{ fontSize: 13, color: T.gray }}>
                   {q.answers.filter((a) => a.correct).length} correct · {q.answers.filter((a) => !a.correct).length} distractors ·{" "}
@@ -1068,7 +1347,7 @@ function LibraryView({ questions, setQuestions, allTags }) {
 
 /* ---------------- generate view ---------------- */
 
-function GenerateView({ questions, allTags }) {
+function GenerateView({ questions, allTags, xorSet }) {
   const [count, setCount] = useState(10);
   const [numVersions, setNumVersions] = useState(1);
   const [mode, setMode] = useState("independent"); // independent | shuffle | distinct
@@ -1156,7 +1435,12 @@ function GenerateView({ questions, allTags }) {
 
         <Field
           label="Tag constraints (min / max per exam)"
-          hint="Blank max = no limit. min 0 / max 0 excludes a tag entirely; min = exam length makes it required on every question."
+          hint={
+            "Blank max = no limit. min 0 / max 0 excludes a tag entirely; min = exam length makes it required on every question." +
+            (xorSet.size > 0
+              ? ` Exclusive ^tags (${xorSet.size}) are automatically capped at 1 per exam; add an explicit constraint to override.`
+              : "")
+          }
         >
           {constraints.map((c) => (
             <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -1334,9 +1618,9 @@ function GenerateView({ questions, allTags }) {
                   </div>
                 )}
                 <div style={{ marginLeft: 24, marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {item.question.tags.map((t) => (
+                  {[...item.question.tags.map((t) => "#" + t), ...(item.question.xtags || []).map((t) => "^" + t)].map((t) => (
                     <span key={t} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#7A867F" }}>
-                      #{t}
+                      {t}
                     </span>
                   ))}
                 </div>
@@ -1388,10 +1672,17 @@ export default function App() {
     return () => clearTimeout(saveTimer.current);
   }, [questions, loaded]);
 
-  const allTags = useMemo(() => {
+  const { allTags, xorSet } = useMemo(() => {
     const seen = new Map();
-    questions.forEach((q) => q.tags.forEach((t) => seen.set(normTag(t), t)));
-    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+    const xor = new Set();
+    questions.forEach((q) => {
+      q.tags.forEach((t) => seen.set(normTag(t), t));
+      (q.xtags || []).forEach((t) => {
+        seen.set(normTag(t), t);
+        xor.add(normTag(t));
+      });
+    });
+    return { allTags: [...seen.values()].sort((a, b) => a.localeCompare(b)), xorSet: xor };
   }, [questions]);
 
   const tabStyle = (isActive) => ({
@@ -1412,7 +1703,9 @@ export default function App() {
         input:focus, textarea:focus, select:focus { outline: 2px solid ${T.green}; outline-offset: 1px; }
         button:focus-visible { outline: 2px solid ${T.green}; outline-offset: 2px; }
         .md .md-pre { background: #F0F2EF; border: 1px solid ${T.line}; border-radius: 6px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; overflow-x: auto; white-space: pre; margin: 6px 0; display: block; }
-        .md .md-code { background: #F0F2EF; border: 1px solid ${T.line}; border-radius: 4px; padding: 0 4px; font-family: 'IBM Plex Mono', monospace; font-size: 0.92em; }`}</style>
+        .md .md-code { background: #F0F2EF; border: 1px solid ${T.line}; border-radius: 4px; padding: 0 4px; font-family: 'IBM Plex Mono', monospace; font-size: 0.92em; }
+        .md .md-img { max-width: 100%; max-height: 320px; border: 1px solid ${T.line}; border-radius: 6px; display: block; margin: 6px 0; }
+        .md a { color: ${T.green}; text-decoration: underline; }`}</style>
 
       <header style={{ background: T.green, color: "#fff", padding: "18px 28px" }}>
         <div style={{ maxWidth: 1150, margin: "0 auto", display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
@@ -1440,9 +1733,9 @@ export default function App() {
         {!loaded ? (
           <div style={{ textAlign: "center", padding: 48, color: T.gray }}>Loading library…</div>
         ) : view === "library" ? (
-          <LibraryView questions={questions} setQuestions={setQuestions} allTags={allTags} />
+          <LibraryView questions={questions} setQuestions={setQuestions} allTags={allTags} xorSet={xorSet} />
         ) : (
-          <GenerateView questions={questions} allTags={allTags} />
+          <GenerateView questions={questions} allTags={allTags} xorSet={xorSet} />
         )}
       </main>
     </div>
