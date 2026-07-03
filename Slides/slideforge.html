@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlideForge — script-driven presentations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#171c24;         /* app chrome background */
+  --panel:#1e2530;
+  --panel2:#232b38;
+  --line:#2e3846;
+  --chrome-text:#d9dee7;
+  --chrome-dim:#8b95a5;
+  --amber:#e2a84b;       /* chrome accent (HUD, controls) */
+  --amber-dim:#9b7333;
+  --paper:#fbf9f4;       /* default slide background */
+  --slide-ink:#232830;   /* default slide text */
+  --teal:#1f6f6b;        /* default slide accent (title rule, bullets) */
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ui:"Inter",-apple-system,"Segoe UI",sans-serif;
+  --display:"Spectral",Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--chrome-text);font-family:var(--ui);font-size:14px;overflow:hidden}
+button{font-family:var(--ui)}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:baseline;gap:8px;margin-right:8px;user-select:none}
+.brand b{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.02em;color:var(--chrome-text)}
+.brand b em{font-style:normal;color:var(--amber)}
+.brand span{color:var(--chrome-dim);font-size:11.5px}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--chrome-text);border-radius:7px;padding:7px 12px;font-size:13px;cursor:pointer;transition:border-color .15s,background .15s}
+.btn:hover{border-color:var(--amber-dim)}
+.btn:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.btn.primary{background:var(--amber);border-color:var(--amber);color:#241a08;font-weight:600}
+.btn.primary:hover{background:#eeb75e}
+.spacer{flex:1}
+.kbd-hint{color:var(--chrome-dim);font-size:12px}
+kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--chrome-text)}
+
+/* ---------- editor layout ---------- */
+.split{display:flex;height:calc(100% - 52px)}
+.editor-pane{width:44%;min-width:340px;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.editor-pane textarea{flex:1;resize:none;border:0;outline:none;background:var(--ink);color:#cdd6e4;font-family:var(--mono);font-size:13.5px;line-height:1.55;padding:16px 18px;tab-size:2;white-space:pre;overflow:auto}
+.editor-pane textarea::selection{background:#3b4a61}
+.warnbar{max-height:90px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:11.5px;color:#d9a05a;padding:6px 12px;display:none}
+.warnbar.on{display:block}
+.preview-pane{flex:1;display:flex;min-width:0}
+.thumb-rail{width:168px;overflow-y:auto;padding:12px 10px;border-right:1px solid var(--line);background:var(--panel)}
+.thumb{position:relative;margin:0 0 12px;cursor:pointer;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:#000}
+.thumb.sel{border-color:var(--amber)}
+.thumb .num{position:absolute;left:5px;top:4px;z-index:2;font-family:var(--mono);font-size:10px;color:#fff;background:rgba(20,24,32,.72);border-radius:4px;padding:1px 5px}
+.thumb .frame{width:144px;height:81px;overflow:hidden;position:relative}
+.stage-wrap{flex:1;display:flex;flex-direction:column;min-width:0}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;padding:22px;min-height:0}
+.stage-holder{position:relative;box-shadow:0 10px 34px rgba(0,0,0,.5);border-radius:4px;overflow:hidden}
+.stage-note{padding:6px 14px 12px;color:var(--chrome-dim);font-size:12px;text-align:center}
+
+/* ---------- the slide itself (1280 x 720 logical) ---------- */
+.slide{position:absolute;left:0;top:0;width:1280px;height:720px;background:var(--paper);color:var(--slide-ink);transform-origin:0 0;font-family:var(--ui);overflow:hidden;background-size:cover;background-position:center}
+.slide .flow{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;padding:64px 84px;align-items:flex-start}
+.slide .flow.title-slide{justify-content:center;align-items:center;text-align:center}
+.slide .abs-layer{position:absolute;inset:0;pointer-events:none}
+.slide .abs-layer>*{pointer-events:auto}
+.slide svg.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.s-h1{font-family:var(--display);font-weight:700;font-size:72px;line-height:1.12;letter-spacing:-.01em}
+.s-h2{font-family:var(--display);font-weight:400;font-style:italic;font-size:38px;color:#4c5566;margin-top:6px}
+.s-h3{font-family:var(--display);font-weight:600;font-size:48px;line-height:1.15;padding-bottom:14px;border-bottom:3px solid var(--teal);margin-bottom:14px;align-self:stretch}
+.s-p{font-size:30px;line-height:1.45}
+.s-li{font-size:30px;line-height:1.42;display:flex;gap:14px;align-items:baseline}
+.s-li .mk{flex:none;color:var(--teal);font-weight:700}
+.s-li.lv1{margin-left:52px;font-size:27px}
+.s-li.lv2{margin-left:104px;font-size:25px}
+.s-li.lv1 .mk,.s-li.lv2 .mk{color:#6b7482;font-weight:400}
+.s-img img{display:block;max-width:100%;border-radius:3px}
+.slide .abs-item{position:absolute;max-width:760px}
+.slide code{font-family:var(--mono);font-size:.85em;background:rgba(31,111,107,.10);border:1px solid rgba(31,111,107,.25);border-radius:4px;padding:1px 6px}
+.hidden-item{visibility:hidden}
+
+/* ---------- presentation mode ---------- */
+.present{position:fixed;inset:0;background:#0b0e13;display:none;z-index:50}
+.present.on{display:block}
+.present .pstage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.present .pholder{position:relative;overflow:hidden}
+.hud{position:absolute;right:18px;bottom:14px;display:flex;align-items:center;gap:12px;background:rgba(17,21,28,.82);border:1px solid var(--line);border-radius:20px;padding:6px 14px;z-index:5;transition:opacity .3s}
+.hud .count{font-family:var(--mono);font-size:12.5px;color:var(--chrome-text)}
+.hud .dots{display:flex;gap:5px}
+.hud .dot{width:7px;height:7px;border-radius:50%;background:#3a4556}
+.hud .dot.done{background:var(--amber)}
+.blackout{position:absolute;inset:0;background:#000;z-index:8;display:none}
+.blackout.on{display:block}
+
+/* ---------- overview (v) ---------- */
+.overview{position:absolute;left:0;top:0;bottom:0;width:220px;background:rgba(17,21,28,.95);border-right:1px solid var(--line);overflow-y:auto;padding:14px 12px;z-index:9;transform:translateX(-100%);transition:transform .22s ease}
+.overview.on{transform:none}
+.overview h4{margin:2px 4px 10px;font-size:12px;font-weight:600;color:var(--chrome-dim);text-transform:uppercase;letter-spacing:.08em}
+
+/* ---------- help overlay ---------- */
+.help{position:fixed;inset:0;background:rgba(10,13,18,.78);display:none;z-index:80;align-items:center;justify-content:center}
+.help.on{display:flex}
+.help .card{width:min(880px,92vw);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:26px 32px}
+.help h2{font-family:var(--display);margin:0 0 4px;font-size:24px}
+.help h2 em{font-style:normal;color:var(--amber)}
+.help p.sub{margin:0 0 18px;color:var(--chrome-dim)}
+.help h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--amber);margin:20px 0 8px}
+.help table{width:100%;border-collapse:collapse;font-size:13px}
+.help td{padding:5px 10px 5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.help td:first-child{font-family:var(--mono);white-space:pre;color:#9fd0c0;width:44%}
+.help .close{float:right}
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><b>Slide<em>Forge</em></b><span>script-driven slides</span></div>
+  <button class="btn" id="btnOpen">Open script…</button>
+  <button class="btn" id="btnSave">Save script</button>
+  <button class="btn" id="btnSample">Load sample deck</button>
+  <button class="btn" id="btnHelp">Syntax reference</button>
+  <div class="spacer"></div>
+  <span class="kbd-hint"><kbd>space</kbd> advance · <kbd>n</kbd>/<kbd>p</kbd> slide · <kbd>v</kbd> overview · <kbd>b</kbd> black · <kbd>esc</kbd> exit</span>
+  <button class="btn" id="btnPresentHere">Present from selected</button>
+  <button class="btn primary" id="btnPresent">▶ Present</button>
+  <input type="file" id="fileIn" accept=".txt,.md,.slides,.slideforge" style="display:none">
+</div>
+
+<div class="split">
+  <div class="editor-pane">
+    <textarea id="src" spellcheck="false" aria-label="Slide script"></textarea>
+    <div class="warnbar" id="warnbar"></div>
+  </div>
+  <div class="preview-pane">
+    <div class="thumb-rail" id="thumbRail"></div>
+    <div class="stage-wrap">
+      <div class="stage"><div class="stage-holder" id="stageHolder"></div></div>
+      <div class="stage-note">Preview shows the selected slide fully advanced. Double-click a thumbnail to present from it.</div>
+    </div>
+  </div>
+</div>
+
+<div class="present" id="present">
+  <div class="pstage"><div class="pholder" id="pholder"></div></div>
+  <div class="blackout" id="blackout"></div>
+  <div class="overview" id="overview"><h4>Slides — click to jump</h4><div id="overviewList"></div></div>
+  <div class="hud" id="hud"><span class="count" id="hudCount"></span><span class="dots" id="hudDots"></span></div>
+</div>
+
+<div class="help" id="help">
+  <div class="card">
+    <button class="btn close" id="btnHelpClose">Close</button>
+    <h2>Slide<em>Forge</em> script reference</h2>
+    <p class="sub">Coordinates may be fractions of the slide (0–1) or pixels in a 1280×720 space. Values ≤ 1 are treated as fractions.</p>
+
+    <h3>Structure</h3>
+    <table>
+      <tr><td>---</td><td>Start a new slide.</td></tr>
+      <tr><td># Title / ## Subtitle</td><td>Big centered title and subtitle (title slides).</td></tr>
+      <tr><td>### Slide title</td><td>Heading at the top of a regular slide.</td></tr>
+      <tr><td>- item / &nbsp;&nbsp;- sub-item</td><td>Bullets; indent 2 spaces per level. <code>**bold**</code>, <code>*italic*</code>, <code>`code`</code> work in any text.</td></tr>
+      <tr><td>% a comment</td><td>Ignored.</td></tr>
+      <tr><td>...</td><td>Pause point — wait for spacebar before revealing what follows.</td></tr>
+      <tr><td>&gt;&gt;&gt;</td><td>Chain — run what follows automatically when the previous animations finish.</td></tr>
+    </table>
+
+    <h3>Placement, labels, styling (prefixes, any order, before content)</h3>
+    <table>
+      <tr><td>@(0.55, 0.1) text or element</td><td>Absolute position: top-left anchor at 55% across, 10% down. Add <code>{anchor=center}</code> to center on the point.</td></tr>
+      <tr><td>[mylabel] element</td><td>Name an element so animations can target it.</td></tr>
+      <tr><td>{size=44px, color=crimson} text</td><td>Style overrides. Keys: <code>size</code> <code>color</code> <code>fill</code> <code>w</code> <code>h</code> <code>thick</code> <code>align</code> <code>anchor</code> <code>opacity</code>.</td></tr>
+    </table>
+
+    <h3>Images &amp; backgrounds</h3>
+    <table>
+      <tr><td>![caption](url)</td><td>Image. Size with <code>{w=0.3}</code> (fraction of slide width) or pixels.</td></tr>
+      <tr><td>!bg(url)  ·  !bg(#123456)</td><td>Slide background image (covers slide) or color.</td></tr>
+    </table>
+
+    <h3>Shapes</h3>
+    <table>
+      <tr><td>!line (x1,y1) (x2,y2)</td><td>Line. Style with <code>{color=…, thick=…}</code>.</td></tr>
+      <tr><td>!arrow (x1,y1) (x2,y2)</td><td>Arrow (head at second point).</td></tr>
+      <tr><td>!circle (cx,cy) r</td><td>Circle; r is a fraction of slide height or pixels.</td></tr>
+      <tr><td>!ellipse (cx,cy) (rx,ry)</td><td>Ellipse.</td></tr>
+      <tr><td>!rect (x,y) (w,h)</td><td>Rectangle, top-left at (x,y).</td></tr>
+    </table>
+
+    <h3>Animations (target a [label]; duration optional, default 0.7s)</h3>
+    <table>
+      <tr><td>!anim pic hide 0.5s   ·   !anim pic show</td><td>Fade out / fade in.</td></tr>
+      <tr><td>!anim pic move (0.6, 0.2) 1s</td><td>Move to a new position. Shapes move by their first-listed point; flow text is lifted out of flow.</td></tr>
+      <tr><td>!anim arrow1 point 2 (0.8, 0.5) 1s</td><td>Move just point 1 or 2 of a line/arrow.</td></tr>
+      <tr><td>!anim pic size 0.45 1s</td><td>Animate an image to a new width.</td></tr>
+      <tr><td>!anim pic scale 1.6 0.5s</td><td>Scale any element about its center.</td></tr>
+      <tr><td>!anim word color #cc2244 0.5s</td><td>Animate text color / shape stroke.</td></tr>
+      <tr><td>!anim word textsize 54px 0.7s</td><td>Animate font size.</td></tr>
+    </table>
+    <p class="sub" style="margin-top:14px">Consecutive <code>!anim</code> lines run <b>simultaneously</b>. Separate with <code>...</code> to wait for a keypress, or <code>&gt;&gt;&gt;</code> to auto-run in sequence.</p>
+
+    <h3>Presenting</h3>
+    <table>
+      <tr><td>space / → / click</td><td>Advance one step (past a … or on to the next slide). Pressing during an animation finishes it instantly.</td></tr>
+      <tr><td>← </td><td>Back one step.</td></tr>
+      <tr><td>n / p</td><td>Next / previous slide (skipping remaining steps).</td></tr>
+      <tr><td>v</td><td>Slide overview sidebar; click a slide to jump.</td></tr>
+      <tr><td>b · f · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit.</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   SlideForge — a script-driven presentation manager.
+   Logical slide space: 1280 x 720. Values <= 1 are fractions.
+   ============================================================ */
+const SW = 1280, SH = 720;
+const DEFAULT_DUR = 0.7;
+
+/* ---------- tiny helpers ---------- */
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+const easeInOut = t => t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+const px = (v, span) => (Math.abs(v) <= 1 ? v*span : v);   // fraction or pixels
+const cx = v => px(v, SW), cy = v => px(v, SH);
+
+function escapeHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function inlineMd(s){
+  let h = escapeHtml(s);
+  h = h.replace(/`([^`]+)`/g,"<code>$1</code>");
+  h = h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  h = h.replace(/\*([^*]+)\*/g,"<i>$1</i>");
+  return h;
+}
+let _colorProbe=null;
+function resolveColor(c){
+  if(!_colorProbe){_colorProbe=document.createElement("span");_colorProbe.style.display="none";document.body.appendChild(_colorProbe);}
+  _colorProbe.style.color=""; _colorProbe.style.color=c;
+  const m=getComputedStyle(_colorProbe).color.match(/[\d.]+/g)||[0,0,0,1];
+  return {r:+m[0],g:+m[1],b:+m[2],a:m.length>3?+m[3]:1};
+}
+const mixColor=(A,B,t)=>`rgba(${Math.round(A.r+(B.r-A.r)*t)},${Math.round(A.g+(B.g-A.g)*t)},${Math.round(A.b+(B.b-A.b)*t)},${(A.a+(B.a-A.a)*t).toFixed(3)})`;
+
+/* ============================================================
+   PARSER
+   ============================================================ */
+function parseScript(text){
+  const warnings=[];
+  const slabs = text.replace(/\r\n?/g,"\n").split(/^\s*---\s*$/m);
+  const slides = slabs.map((body,si)=>parseSlide(body, si, warnings));
+  return {slides, warnings};
+}
+
+const RE_POS   = /^@\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)\s*/;
+const RE_LABEL = /^\[([A-Za-z_][\w-]*)\]\s*/;
+const RE_STYLE = /^\{([^}]*)\}\s*/;
+const RE_PAIR  = /\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)/g;
+const RE_DUR   = /(?:^|\s)([\d.]+)\s*s\s*$/;
+
+function parseStyle(s){
+  const st={};
+  for(const part of s.split(/[,;]/)){
+    const m=part.split("=");
+    if(m.length===2) st[m[0].trim().toLowerCase()]=m[1].trim();
+    else if(part.trim()) st[part.trim().toLowerCase()]=true;
+  }
+  return st;
+}
+function takeDur(s){ // returns [restString, durationSeconds]
+  const m=s.match(RE_DUR);
+  return m ? [s.slice(0,m.index).trim(), parseFloat(m[1])] : [s.trim(), DEFAULT_DUR];
+}
+function pairs(s){
+  const out=[]; let m; RE_PAIR.lastIndex=0;
+  while((m=RE_PAIR.exec(s))) out.push([parseFloat(m[1]),parseFloat(m[2])]);
+  return out;
+}
+
+function parseSlide(body, slideIndex, warnings){
+  const slide={items:[], steps:[[newPhase()]], bg:null, hasH1:false, hasH3:false};
+  let step=0, phase=0, nextId=0;
+  function cur(){ return slide.steps[step][phase]; }
+
+  const lines=body.split("\n");
+  for(let ln=0; ln<lines.length; ln++){
+    const raw=lines[ln];
+    if(!raw.trim()) continue;
+    const indent=(raw.match(/^ */)[0].length);
+    let line=raw.trim();
+    if(line.startsWith("%")) continue;
+
+    if(line==="..."){ step++; phase=0; slide.steps[step]=[newPhase()]; continue; }
+    if(line===">>>"){ phase++; slide.steps[step][phase]=newPhase(); continue; }
+
+    // --- prefixes: @(x,y), [label], {style} — any order ---
+    let {pos,label,style,rest}=extractPrefixes(line);
+    line=rest;
+    if(!line) continue;
+
+    // --- animation lines ---
+    let m;
+    if((m=line.match(/^!anim\s+([\w-]+)\s+(\w+)\s*(.*)$/i))){
+      const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,slideIndex,ln+1);
+      if(a) cur().anims.push(a);
+      continue;
+    }
+    // --- background ---
+    if((m=line.match(/^!bg\((.+)\)\s*$/i))){
+      const v=m[1].trim();
+      slide.bg = (/[./\\]|^data:|^https?:/i.test(v)) ? {image:v} : {color:v};
+      continue;
+    }
+    // --- shapes ---
+    if((m=line.match(/^!(line|arrow|circle|ellipse|rect)\b(.*)$/i))){
+      const kind=m[1].toLowerCase(), rest=m[2], pts=pairs(rest);
+      const item={id:nextId++, kind, label, style, pos:null};
+      let ok=true;
+      if(kind==="line"||kind==="arrow"){
+        if(pts.length<2){ok=false;} else item.coords=[[cx(pts[0][0]),cy(pts[0][1])],[cx(pts[1][0]),cy(pts[1][1])]];
+      }else if(kind==="circle"){
+        const rm=rest.replace(RE_PAIR,"").match(/(-?[\d.]+)/);
+        if(pts.length<1||!rm){ok=false;} else {item.coords=[[cx(pts[0][0]),cy(pts[0][1])]]; item.r=px(parseFloat(rm[1]),SH);}
+      }else if(kind==="ellipse"){
+        if(pts.length<2){ok=false;} else {item.coords=[[cx(pts[0][0]),cy(pts[0][1])]]; item.rx=cx(pts[1][0]); item.ry=cy(pts[1][1]);}
+      }else if(kind==="rect"){
+        if(pts.length<2){ok=false;} else {item.coords=[[cx(pts[0][0]),cy(pts[0][1])]]; item.w=cx(pts[1][0]); item.h=cy(pts[1][1]);}
+      }
+      if(!ok){ warnings.push(`slide ${slideIndex+1}, line ${ln+1}: could not read !${kind} coordinates`); continue; }
+      slide.items.push(item); cur().reveals.push(item.id);
+      continue;
+    }
+    if(line.startsWith("!") && !line.startsWith("![")){ warnings.push(`slide ${slideIndex+1}, line ${ln+1}: unknown directive “${line.split(/\s/)[0]}”`); continue; }
+
+    // --- images ---
+    if((m=line.match(/^!\[([^\]]*)\]\((.+)\)\s*$/))){
+      const item={id:nextId++, kind:"img", alt:m[1], src:m[2].trim(), label, style, pos};
+      slide.items.push(item); cur().reveals.push(item.id);
+      continue;
+    }
+    // --- headings, bullets, paragraphs ---
+    // (prefixes may also follow the marker, e.g. "- {color=red} text")
+    let item;
+    if((m=line.match(/^(#{1,3})\s+(.*)$/))){
+      const lvl=m[1].length, inner=extractPrefixes(m[2]);
+      item={id:nextId++, kind:"h"+lvl, text:inner.rest, label:inner.label||label,
+            style:Object.assign(style,inner.style), pos:inner.pos||pos};
+      if(lvl===1) slide.hasH1=true; if(lvl===3) slide.hasH3=true;
+    }else if((m=line.match(/^-\s+(.*)$/))){
+      const inner=extractPrefixes(m[1]);
+      item={id:nextId++, kind:"li", lv:clamp(Math.floor(indent/2),0,2), text:inner.rest,
+            label:inner.label||label, style:Object.assign(style,inner.style), pos:inner.pos||pos};
+    }else{
+      item={id:nextId++, kind:"p", text:line, label, style, pos};
+    }
+    slide.items.push(item); cur().reveals.push(item.id);
+  }
+  return slide;
+}
+function newPhase(){ return {reveals:[], anims:[]}; }
+
+function extractPrefixes(line){
+  let pos=null, label=null, style={}, moved=true;
+  while(moved){
+    moved=false; let m;
+    if((m=line.match(RE_POS)))  { pos={x:parseFloat(m[1]),y:parseFloat(m[2])}; line=line.slice(m[0].length); moved=true; }
+    if((m=line.match(RE_LABEL))){ label=m[1]; line=line.slice(m[0].length); moved=true; }
+    if((m=line.match(RE_STYLE))){ Object.assign(style,parseStyle(m[1])); line=line.slice(m[0].length); moved=true; }
+  }
+  return {pos,label,style,rest:line};
+}
+
+function parseAnim(target, verb, argsRaw, warnings, si, ln){
+  let [args,dur]=takeDur(argsRaw);
+  const bad=msg=>{warnings.push(`slide ${si+1}, line ${ln}: ${msg}`); return null;};
+  switch(verb){
+    case "hide": case "show": return {target,verb,dur};
+    case "move":{ const p=pairs(args); if(!p.length) return bad("move needs (x,y)");
+      return {target,verb,dur,x:cx(p[0][0]),y:cy(p[0][1])}; }
+    case "point":{ const n=parseInt(args); const p=pairs(args);
+      if(!(n===1||n===2)||!p.length) return bad("point needs an index (1 or 2) and (x,y)");
+      return {target,verb,dur,n,x:cx(p[0][0]),y:cy(p[0][1])}; }
+    case "size":{ const v=parseFloat(args); if(isNaN(v)) return bad("size needs a width");
+      return {target,verb,dur,w:px(v,SW)}; }
+    case "scale":{ const v=parseFloat(args); if(isNaN(v)) return bad("scale needs a factor");
+      return {target,verb,dur,f:v}; }
+    case "color": return args ? {target,verb,dur,color:args} : bad("color needs a value");
+    case "textsize": return args ? {target,verb,dur,size:args} : bad("textsize needs a size");
+    default: return bad(`unknown animation “${verb}”`);
+  }
+}
+</script>
+<script>
+/* ============================================================
+   RENDERER — builds DOM for one slide; Player drives steps.
+   ============================================================ */
+"use strict";
+function sizeToPx(v, span){          // "44px" | "2em" | "0.4" | "512"
+  if(v==null) return null;
+  const s=String(v).trim();
+  if(s.endsWith("px")) return parseFloat(s);
+  if(s.endsWith("em")) return parseFloat(s)*30;      // 30px = default body size
+  const n=parseFloat(s);
+  return isNaN(n)?null:px(n,span);
+}
+const SVGNS="http://www.w3.org/2000/svg";
+
+function renderSlide(slideDef){
+  const root=document.createElement("div"); root.className="slide";
+  if(slideDef.bg){
+    if(slideDef.bg.color) root.style.background=slideDef.bg.color;
+    if(slideDef.bg.image) root.style.backgroundImage=`url("${slideDef.bg.image.replace(/"/g,'%22')}")`;
+  }
+  const flow=document.createElement("div"); flow.className="flow";
+  if(slideDef.hasH1 && !slideDef.hasH3) flow.classList.add("title-slide");
+  const absLayer=document.createElement("div"); absLayer.className="abs-layer";
+  const svg=document.createElementNS(SVGNS,"svg");
+  svg.setAttribute("class","overlay"); svg.setAttribute("viewBox",`0 0 ${SW} ${SH}`);
+  root.append(flow,absLayer,svg);
+
+  const items=new Map();       // id -> runtime item
+  const labels=new Map();      // label -> runtime item
+
+  for(const def of slideDef.items){
+    const it={def, el:null, shape:null, coords:def.coords?def.coords.map(c=>c.slice()):null,
+              r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false, scale:1};
+    if(["h1","h2","h3","p","li"].includes(def.kind))      buildText(it,flow,absLayer);
+    else if(def.kind==="img")                             buildImg(it,flow,absLayer);
+    else                                                  buildShape(it,svg);
+    setVisible(it,false);
+    items.set(def.id,it);
+    if(def.label) labels.set(def.label,it);
+  }
+  return {root,flow,absLayer,svg,items,labels,def:slideDef};
+}
+
+function applyTextStyle(el,style){
+  if(style.size)  el.style.fontSize=sizeToPx(style.size,SW)+"px";
+  if(style.color) el.style.color=style.color;
+  if(style.align) el.style.textAlign=style.align;
+  if(style.w)     el.style.width=sizeToPx(style.w,SW)+"px";
+  if(style.opacity) el.style.opacity=style.opacity;
+}
+function placeItem(it,flow,absLayer,el){
+  if(it.def.pos){
+    const wrap=document.createElement("div"); wrap.className="abs-item";
+    wrap.style.left=cx(it.def.pos.x)+"px"; wrap.style.top=cy(it.def.pos.y)+"px";
+    if(it.def.style.anchor==="center") wrap.style.transform="translate(-50%,-50%)";
+    wrap.appendChild(el); absLayer.appendChild(wrap);
+    it.el=wrap; it.x=cx(it.def.pos.x); it.y=cy(it.def.pos.y); it.inner=el;
+  }else{
+    flow.appendChild(el); it.el=el; it.inner=el;
+  }
+}
+function buildText(it,flow,absLayer){
+  const d=it.def, el=document.createElement("div");
+  if(d.kind==="li"){
+    el.className=`s-li lv${d.lv}`;
+    el.innerHTML=`<span class="mk">${d.lv===0?"▸":"–"}</span><span class="tx">${inlineMd(d.text)}</span>`;
+  }else{
+    el.className={h1:"s-h1",h2:"s-h2",h3:"s-h3",p:"s-p"}[d.kind];
+    el.innerHTML=inlineMd(d.text);
+  }
+  applyTextStyle(el,d.style);
+  placeItem(it,flow,absLayer,el);
+}
+function buildImg(it,flow,absLayer){
+  const d=it.def, box=document.createElement("div"); box.className="s-img";
+  const img=document.createElement("img"); img.src=d.src; img.alt=d.alt||"";
+  const w=d.style.w?sizeToPx(d.style.w,SW):null, h=d.style.h?sizeToPx(d.style.h,SH):null;
+  if(w) img.style.width=w+"px"; else if(!h) img.style.width="500px";
+  if(h) img.style.height=h+"px";
+  if(d.style.opacity) img.style.opacity=d.style.opacity;
+  box.appendChild(img); it.img=img;
+  placeItem(it,flow,absLayer,box);
+}
+function buildShape(it,svg){
+  const d=it.def, st=d.style;
+  const stroke=st.color||"#232830", thick=st.thick?parseFloat(st.thick):4;
+  const fill=st.fill|| (d.kind==="line"||d.kind==="arrow" ? "none" : "none");
+  const g=document.createElementNS(SVGNS,"g");
+  it.stroke=stroke; it.thick=thick;
+  if(d.kind==="line"||d.kind==="arrow"){
+    const ln=document.createElementNS(SVGNS,"line");
+    ln.setAttribute("stroke",stroke); ln.setAttribute("stroke-width",thick); ln.setAttribute("stroke-linecap","round");
+    g.appendChild(ln); it.lineEl=ln;
+    if(d.kind==="arrow"){ const head=document.createElementNS(SVGNS,"polygon"); head.setAttribute("fill",stroke); g.appendChild(head); it.headEl=head; }
+  }else{
+    const tag={circle:"circle",ellipse:"ellipse",rect:"rect"}[d.kind];
+    const sh=document.createElementNS(SVGNS,tag);
+    sh.setAttribute("stroke",stroke); sh.setAttribute("stroke-width",thick); sh.setAttribute("fill",fill);
+    if(d.kind==="rect") sh.setAttribute("rx",6);
+    g.appendChild(sh); it.shapeEl=sh;
+  }
+  if(st.opacity) g.setAttribute("opacity",st.opacity);
+  svg.appendChild(g); it.el=g; it.shape=true;
+  updateShape(it);
+}
+function updateShape(it){
+  const d=it.def;
+  if(d.kind==="line"||d.kind==="arrow"){
+    const [[x1,y1],[x2,y2]]=it.coords;
+    it.lineEl.setAttribute("x1",x1); it.lineEl.setAttribute("y1",y1);
+    let ex=x2, ey=y2;
+    if(it.headEl){
+      const ang=Math.atan2(y2-y1,x2-x1), L=Math.max(14,it.thick*4.2), Wd=Math.max(9,it.thick*2.6);
+      ex=x2-Math.cos(ang)*L*0.8; ey=y2-Math.sin(ang)*L*0.8;   // shorten shaft under the head
+      const bx=x2-Math.cos(ang)*L, by=y2-Math.sin(ang)*L;
+      const nx=-Math.sin(ang), ny=Math.cos(ang);
+      it.headEl.setAttribute("points",
+        `${x2},${y2} ${bx+nx*Wd},${by+ny*Wd} ${bx-nx*Wd},${by-ny*Wd}`);
+    }
+    it.lineEl.setAttribute("x2",ex); it.lineEl.setAttribute("y2",ey);
+  }else if(d.kind==="circle"){
+    const [[x,y]]=it.coords; it.shapeEl.setAttribute("cx",x); it.shapeEl.setAttribute("cy",y); it.shapeEl.setAttribute("r",it.r);
+  }else if(d.kind==="ellipse"){
+    const [[x,y]]=it.coords; it.shapeEl.setAttribute("cx",x); it.shapeEl.setAttribute("cy",y);
+    it.shapeEl.setAttribute("rx",it.rx); it.shapeEl.setAttribute("ry",it.ry);
+  }else if(d.kind==="rect"){
+    const [[x,y]]=it.coords; it.shapeEl.setAttribute("x",x); it.shapeEl.setAttribute("y",y);
+    it.shapeEl.setAttribute("width",it.w); it.shapeEl.setAttribute("height",it.h);
+  }
+}
+function setVisible(it,on){
+  it.visible=on;
+  it.el.classList.toggle("hidden-item",!on);
+  if(it.shape) it.el.style.visibility=on?"visible":"hidden";
+}
+
+/* ============================================================
+   ANIMATION ENGINE
+   ============================================================ */
+class Tween{
+  constructor(dur,onUpdate){ this.dur=Math.max(0.01,dur)*1000; this.onUpdate=onUpdate; this.done=false; }
+  start(){ return new Promise(res=>{
+    this.resolve=res; this.t0=performance.now();
+    const tick=now=>{ if(this.done) return;
+      const t=clamp((now-this.t0)/this.dur,0,1);
+      this.onUpdate(easeInOut(t));
+      if(t>=1){ this.done=true; res(); } else this.raf=requestAnimationFrame(tick);
+    };
+    this.raf=requestAnimationFrame(tick);
+  });}
+  finish(){ if(this.done) return; this.done=true; cancelAnimationFrame(this.raf); this.onUpdate(1); this.resolve&&this.resolve(); }
+}
+
+/* Build a Tween (or instant applier) for one animation on a rendered slide. */
+function makeAnim(a, render, warnings){
+  const it=render.labels.get(a.target);
+  if(!it){ warnings&&warnings.push(`animation targets unknown label “${a.target}”`); return null; }
+  const el=it.el;
+  switch(a.verb){
+    case "hide": return new Tween(a.dur,t=>{ el.style.opacity=String(1-t); if(t>=1){setVisible(it,false); el.style.opacity="";} });
+    case "show": return new Tween(a.dur,t=>{ if(!it.visible) setVisible(it,true); el.style.opacity=String(t); if(t>=1) el.style.opacity=""; });
+    case "move":{
+      if(it.shape){
+        const start=it.coords.map(c=>c.slice());
+        const dx=a.x-start[0][0], dy=a.y-start[0][1];
+        return new Tween(a.dur,t=>{ it.coords=start.map(c=>[c[0]+dx*t,c[1]+dy*t]); updateShape(it); });
+      }
+      liftOutOfFlow(it,render);
+      const x0=it.x,y0=it.y;
+      return new Tween(a.dur,t=>{ it.x=x0+(a.x-x0)*t; it.y=y0+(a.y-y0)*t;
+        el.style.left=it.x+"px"; el.style.top=it.y+"px"; });
+    }
+    case "point":{
+      if(!it.coords||it.coords.length<2) return null;
+      const i=a.n-1, s=it.coords[i].slice();
+      return new Tween(a.dur,t=>{ it.coords[i]=[s[0]+(a.x-s[0])*t, s[1]+(a.y-s[1])*t]; updateShape(it); });
+    }
+    case "size":{
+      const img=it.img||it.inner.querySelector&&it.inner.querySelector("img");
+      if(!img) return null;
+      const w0=img.getBoundingClientRect().width/currentScale(render);
+      return new Tween(a.dur,t=>{ img.style.width=(w0+(a.w-w0)*t)+"px"; });
+    }
+    case "scale":{
+      const f0=it.scale;
+      const base=it.def.pos&&it.def.style.anchor==="center" ? "translate(-50%,-50%) " : "";
+      if(it.shape){
+        const bb=el.getBBox(), ox=bb.x+bb.width/2, oy=bb.y+bb.height/2;
+        return new Tween(a.dur,t=>{ it.scale=f0+(a.f-f0)*t;
+          el.setAttribute("transform",`translate(${ox} ${oy}) scale(${it.scale}) translate(${-ox} ${-oy})`); });
+      }
+      el.style.transformOrigin="center center";
+      return new Tween(a.dur,t=>{ it.scale=f0+(a.f-f0)*t; el.style.transform=base+`scale(${it.scale})`; });
+    }
+    case "color":{
+      const B=resolveColor(a.color);
+      if(it.shape){
+        const A=resolveColor(it.stroke);
+        return new Tween(a.dur,t=>{ const c=mixColor(A,B,t); it.stroke=t>=1?a.color:it.stroke;
+          it.lineEl&&it.lineEl.setAttribute("stroke",c);
+          it.headEl&&it.headEl.setAttribute("fill",c);
+          it.shapeEl&&it.shapeEl.setAttribute("stroke",c); });
+      }
+      const tgt=it.inner||el, A=resolveColor(getComputedStyle(tgt).color);
+      return new Tween(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
+    }
+    case "textsize":{
+      const tgt=it.inner||el;
+      const s0=parseFloat(getComputedStyle(tgt).fontSize);
+      const s1=sizeToPx(a.size,SW);
+      if(s1==null) return null;
+      return new Tween(a.dur,t=>{ tgt.style.fontSize=(s0+(s1-s0)*t)+"px"; });
+    }
+  }
+  return null;
+}
+function currentScale(render){ const r=render.root.getBoundingClientRect(); return r.width/SW || 1; }
+function liftOutOfFlow(it,render){
+  if(it.def.pos || it.lifted) return;
+  const s=currentScale(render);
+  const r=it.el.getBoundingClientRect(), sr=render.root.getBoundingClientRect();
+  const x=(r.left-sr.left)/s, y=(r.top-sr.top)/s, w=r.width/s;
+  const ph=document.createElement("div"); ph.style.height=(r.height/s)+"px"; ph.style.width=w+"px"; ph.style.visibility="hidden";
+  it.el.parentNode.insertBefore(ph,it.el);
+  it.el.style.position="absolute"; it.el.style.left=x+"px"; it.el.style.top=y+"px"; it.el.style.width=w+"px"; it.el.style.margin="0";
+  render.absLayer.appendChild(it.el);
+  it.x=x; it.y=y; it.lifted=true;
+}
+
+/* ============================================================
+   PLAYER — owns one rendered slide and walks its steps.
+   ============================================================ */
+class Player{
+  constructor(slideDef, holder){
+    this.def=slideDef;
+    this.render=renderSlide(slideDef);
+    holder.innerHTML=""; holder.appendChild(this.render.root);
+    this.step=-1;           // no step applied yet
+    this.busy=false; this.ff=false; this.live=[];
+  }
+  get stepCount(){ return this.def.steps.length; }
+
+  applyPhaseInstant(ph){
+    for(const id of ph.reveals){ const it=this.render.items.get(id); it&&setVisible(it,true); }
+    for(const a of ph.anims){ const tw=makeAnim(a,this.render); tw&&tw.finish(); }
+  }
+  jumpToStep(target){                      // instant, deterministic
+    for(let s=this.step+1; s<=target && s<this.stepCount; s++)
+      for(const ph of this.def.steps[s]) this.applyPhaseInstant(ph);
+    this.step=Math.min(target,this.stepCount-1);
+  }
+  async runStep(s,onDone){                 // animated, honoring >>> chains
+    if(s>=this.stepCount) return;
+    this.busy=true; this.ff=false; this.step=s;
+    for(const ph of this.def.steps[s]){
+      if(this.ff){ this.applyPhaseInstant(ph); continue; }
+      for(const id of ph.reveals){
+        const it=this.render.items.get(id);
+        if(it){ setVisible(it,true); if(!it.shape){ it.el.animate([{opacity:0},{opacity:1}],{duration:220}); } }
+      }
+      const tws=ph.anims.map(a=>makeAnim(a,this.render)).filter(Boolean);
+      this.live=tws;
+      await Promise.all(tws.map(t=>t.start()));
+      this.live=[];
+    }
+    this.busy=false; onDone&&onDone();
+  }
+  fastForward(){ this.ff=true; for(const t of this.live) t.finish(); }
+  /* advance() -> true if it consumed the keypress, false if slide is finished */
+  advance(){
+    if(this.busy){ this.fastForward(); return true; }
+    if(this.step+1<this.stepCount){ this.runStep(this.step+1); return true; }
+    return false;
+  }
+}
+</script>
+<script>
+/* ============================================================
+   APP — editor, preview, presentation mode, keyboard, files.
+   ============================================================ */
+"use strict";
+let deck={slides:[],warnings:[]};
+let selected=0;
+
+/* ---------- fitting a slide into a holder ---------- */
+function fitInto(holder, maxW, maxH){
+  const s=Math.min(maxW/SW, maxH/SH);
+  holder.style.width=(SW*s)+"px"; holder.style.height=(SH*s)+"px";
+  const slide=holder.querySelector(".slide");
+  if(slide) slide.style.transform=`scale(${s})`;
+  return s;
+}
+
+/* ---------- editor preview ---------- */
+const srcEl=$("#src"), thumbRail=$("#thumbRail"), stageHolder=$("#stageHolder"), warnbar=$("#warnbar");
+let parseTimer=null;
+srcEl.addEventListener("input",()=>{ clearTimeout(parseTimer); parseTimer=setTimeout(refresh,300); });
+srcEl.addEventListener("keydown",e=>{
+  if(e.key==="Tab"){ e.preventDefault();
+    const {selectionStart:a,selectionEnd:b,value:v}=srcEl;
+    srcEl.value=v.slice(0,a)+"  "+v.slice(b); srcEl.selectionStart=srcEl.selectionEnd=a+2;
+    srcEl.dispatchEvent(new Event("input"));
+  }
+});
+
+function refresh(){
+  deck=parseScript(srcEl.value);
+  selected=clamp(selected,0,deck.slides.length-1);
+  warnbar.className="warnbar"+(deck.warnings.length?" on":"");
+  warnbar.innerHTML=deck.warnings.map(w=>"⚠ "+escapeHtml(w)).join("<br>");
+  rebuildEditorThumbs();
+  showPreview();
+}
+function buildThumbs(container,onPick,markSelected){
+  container.innerHTML="";
+  deck.slides.forEach((sd,i)=>{
+    const t=document.createElement("div"); t.className="thumb"+((markSelected&&i===selected)?" sel":"");
+    t.innerHTML=`<span class="num">${i+1}</span>`;
+    const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
+    const p=new Player(sd,frame); p.jumpToStep(sd.steps.length-1);
+    fitInto(frame,144,81);
+    t.addEventListener("click",()=>onPick(i));
+    t.addEventListener("dblclick",()=>startPresent(i));
+    container.appendChild(t);
+  });
+}
+function showPreview(){
+  if(!deck.slides.length){ stageHolder.innerHTML=""; return; }
+  const sd=deck.slides[selected];
+  const p=new Player(sd,stageHolder); p.jumpToStep(sd.steps.length-1);
+  const stage=stageHolder.parentElement, r=stage.getBoundingClientRect();
+  fitInto(stageHolder, r.width-44, r.height-44);
+  // refresh selection ring
+  [...thumbRail.children].forEach((el,i)=>el.classList.toggle("sel",i===selected));
+}
+window.addEventListener("resize",()=>{ if(presentOn) layoutPresent(); else showPreview(); });
+
+/* thumbnails need a stable click handler (rebuild-free selection) */
+function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>{selected=i;showPreview();},true); }
+
+/* ---------- presentation mode ---------- */
+const presentEl=$("#present"), pholder=$("#pholder"), hudCount=$("#hudCount"),
+      hudDots=$("#hudDots"), overviewEl=$("#overview"), overviewList=$("#overviewList"),
+      blackout=$("#blackout");
+let presentOn=false, curSlide=0, player=null;
+
+function startPresent(fromIndex){
+  refresh();
+  if(!deck.slides.length) return;
+  srcEl.blur();
+  presentOn=true; presentEl.classList.add("on");
+  gotoSlide(clamp(fromIndex,0,deck.slides.length-1),{animate:true});
+}
+function exitPresent(){
+  presentOn=false; presentEl.classList.remove("on");
+  overviewEl.classList.remove("on"); blackout.classList.remove("on");
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+}
+function layoutPresent(){
+  fitInto(pholder, window.innerWidth-24, window.innerHeight-24);
+}
+function gotoSlide(i,{animate=false,lastStep=false}={}){
+  curSlide=clamp(i,0,deck.slides.length-1);
+  player=new Player(deck.slides[curSlide],pholder);
+  layoutPresent();
+  const last=player.stepCount-1;
+  if(lastStep) player.jumpToStep(last);
+  else if(animate) player.runStep(0,updateHud);
+  else player.jumpToStep(0);
+  updateHud();
+}
+function updateHud(){
+  hudCount.textContent=`${curSlide+1} / ${deck.slides.length}`;
+  hudDots.innerHTML="";
+  if(player.stepCount>1)
+    for(let s=0;s<player.stepCount;s++){
+      const d=document.createElement("span");
+      d.className="dot"+(s<=player.step?" done":"");
+      hudDots.appendChild(d);
+    }
+}
+function advance(){
+  if(!player) return;
+  if(player.advance()){ updateHud(); return; }
+  if(curSlide+1<deck.slides.length) gotoSlide(curSlide+1,{animate:true});
+}
+function backStep(){
+  if(!player) return;
+  if(player.busy){ player.fastForward(); updateHud(); return; }
+  if(player.step>0){ const target=player.step-1; gotoSlide(curSlide); player.jumpToStep(target); }
+  else if(curSlide>0) gotoSlide(curSlide-1,{lastStep:true});
+  updateHud();
+}
+function toggleOverview(){
+  const on=!overviewEl.classList.contains("on");
+  overviewEl.classList.toggle("on",on);
+  if(on) buildThumbs(overviewList,i=>{ overviewEl.classList.remove("on"); gotoSlide(i); },false);
+}
+
+/* ---------- keyboard ---------- */
+document.addEventListener("keydown",e=>{
+  if($("#help").classList.contains("on")){ if(e.key==="Escape")toggleHelp(false); return; }
+  if(!presentOn){
+    if(e.key==="F5"){ e.preventDefault(); startPresent(0); }
+    return;
+  }
+  if(e.target===srcEl) return;
+  switch(e.key){
+    case " ": case "ArrowRight": case "PageDown": e.preventDefault(); advance(); break;
+    case "ArrowLeft": case "PageUp": e.preventDefault(); backStep(); break;
+    case "n": case "N": gotoSlide(curSlide+1,{animate:true}); break;
+    case "p": case "P": gotoSlide(Math.max(0,curSlide-1)); break;
+    case "v": case "V": toggleOverview(); break;
+    case "b": case "B": blackout.classList.toggle("on"); break;
+    case "f": case "F": (document.fullscreenElement?document.exitFullscreen():presentEl.requestFullscreen()).catch(()=>{}); break;
+    case "Home": gotoSlide(0); break;
+    case "End": gotoSlide(deck.slides.length-1,{lastStep:true}); break;
+    case "?": toggleHelp(true); break;
+    case "Escape": overviewEl.classList.contains("on")?overviewEl.classList.remove("on"):exitPresent(); break;
+  }
+});
+presentEl.addEventListener("click",e=>{
+  if(overviewEl.contains(e.target)||$("#hud").contains(e.target)) return;
+  advance();
+});
+
+/* ---------- files, buttons ---------- */
+$("#btnPresent").addEventListener("click",()=>startPresent(0));
+$("#btnPresentHere").addEventListener("click",()=>startPresent(selected));
+$("#btnOpen").addEventListener("click",()=>$("#fileIn").click());
+$("#fileIn").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ srcEl.value=rd.result; selected=0; refresh(); };
+  rd.readAsText(f); e.target.value="";
+});
+$("#btnSave").addEventListener("click",()=>{
+  const blob=new Blob([srcEl.value],{type:"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download="presentation.slides.txt"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+});
+$("#btnSample").addEventListener("click",()=>{ srcEl.value=SAMPLE; selected=0; refresh(); });
+function toggleHelp(on){ $("#help").classList.toggle("on",on); }
+$("#btnHelp").addEventListener("click",()=>toggleHelp(true));
+$("#btnHelpClose").addEventListener("click",()=>toggleHelp(false));
+$("#help").addEventListener("click",e=>{ if(e.target===$("#help")) toggleHelp(false); });
+
+/* ---------- sample deck (doubles as a tutorial) ---------- */
+const DEMO_IMG="data:image/svg+xml;utf8,"+encodeURIComponent(
+`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+<rect width="400" height="300" rx="10" fill="#1f6f6b"/>
+<circle cx="200" cy="128" r="70" fill="#fbf9f4"/>
+<circle cx="176" cy="112" r="10" fill="#232830"/><circle cx="224" cy="112" r="10" fill="#232830"/>
+<path d="M168 152 q32 26 64 0" stroke="#232830" stroke-width="7" fill="none" stroke-linecap="round"/>
+<text x="200" y="252" font-family="Georgia,serif" font-size="26" fill="#fbf9f4" text-anchor="middle">specimen #42</text>
+</svg>`);
+
+const SAMPLE=`# The Ultimate Slideshow
+## Built from a plain-text script.
+---
+### Basics
+Plain lines become paragraphs. Inline **bold**, *italic*, and \`code\` all work.
+Here is a simple list:
+- Bullet one
+- Bullet two
+  - An indented sub-bullet (2 spaces)
+- Bullet three showing **bold** and *italic* text
+---
+### Pauses with ...
+% Lines starting with % are comments and are ignored.
+Each press of the spacebar reveals the next chunk:
+...
+- Bullet one appears
+...
+- Bullet two appears
+...
+- Bullet three appears
+  - This sub-bullet comes with it (no ... above it)
+...
+  - But this one waits for its own keypress
+---
+### Placement, images, and styling
+% Position anything with @(x,y) — fractions of the slide, or pixels.
+@(0.55, 0.18) {w=0.34} ![A friendly specimen](${DEMO_IMG})
+- Bullets still flow on the left
+- {color=#b03030, size=36px} Styled text via {color=..., size=...}
+- @(0.58, 0.72) This line was placed with @(0.58, 0.72)
+---
+!bg(#14212b)
+### Backgrounds and shapes
+% !bg(#color) or !bg(url) sets the slide background. Style text to match:
+{color=#e8e4dc} Shapes live in a 1280×720 space (fractions work too):
+[boxA] {color=#e2a84b, thick=5} !rect (0.10, 0.35) (0.22, 0.22)
+[ringB] {color=#7fd0c5, thick=5} !circle (0.72, 0.46) 0.14
+[link] {color=#e8e4dc, thick=4} !arrow (0.33, 0.46) (0.56, 0.46)
+@(0.115, 0.60) {color=#e2a84b} a rect, labeled boxA
+@(0.63, 0.66) {color=#7fd0c5} a circle, labeled ringB
+---
+### Animations
+% Label things, then change them. Consecutive !anim lines run together.
+[dot] {color=#1f6f6b, fill=#1f6f6b} !circle (0.15, 0.55) 0.05
+[arr] {thick=5} !arrow (0.15, 0.75) (0.35, 0.75)
+[cap] @(0.12, 0.86) {size=26px} watch the dot and the arrow…
+...
+% These two run simultaneously (one keypress):
+!anim dot move (0.75, 0.30) 1.2s
+!anim arr point 2 (0.80, 0.55) 1.2s
+...
+% A >>> chain: each part starts when the previous one finishes.
+!anim dot color #c23b22 0.5s
+>>>
+!anim dot scale 3 0.6s
+>>>
+!anim dot scale 1 0.4s
+!anim cap color #c23b22 0.4s
+...
+!anim arr hide 0.5s
+!anim cap textsize 40px 0.7s
+---
+### Image animations
+[pic] @(0.36, 0.22) {w=0.28} ![specimen](${DEMO_IMG})
+...
+!anim pic size 0.45 1s
+>>>
+!anim pic move (0.60, 0.35) 0.8s
+>>>
+!anim pic size 0.18 0.8s
+...
+!anim pic hide
+@(0.30, 0.45) {size=44px, color=#1f6f6b} *…and it's gone.*
+---
+# That's the tour
+## space · n/p · v · b · f — and ? for the full reference
+`;
+
+ /* boot */
+srcEl.value=SAMPLE;
+refresh();
+</script>
+</body>
+</html>
