@@ -63,11 +63,18 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
 /* ---------- the slide itself (1280 x 720 logical) ---------- */
 .slide{position:absolute;left:0;top:0;width:1280px;height:720px;background:var(--paper);color:var(--slide-ink);transform-origin:0 0;font-family:var(--ui);overflow:hidden;background-size:cover;background-position:center}
-.slide .flow{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;padding:64px 84px;align-items:flex-start}
+.slide .flow{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;padding:64px 84px;align-items:flex-start;z-index:1}
+.slide .bg-scrim{position:absolute;inset:0;z-index:0;pointer-events:none}
 .slide .flow.title-slide{justify-content:center;align-items:center;text-align:center}
-.slide .abs-layer{position:absolute;inset:0;pointer-events:none}
+.slide .abs-layer{position:absolute;inset:0;pointer-events:none;z-index:2}
 .slide .abs-layer>*{pointer-events:auto}
-.slide svg.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.slide svg.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.slide .s-embed{position:relative;border-radius:8px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.28);background:#0d1016}
+.slide .s-embed iframe{width:100%;height:100%;border:0;display:block;background:#fff}
+.slide .s-embed.embed-ph{display:flex;align-items:center;justify-content:center;border:1px dashed #9aa;background:#eef1f3}
+.slide .s-embed.embed-ph span{font-family:var(--mono);font-size:16px;color:#556}
+.slide .box-text{width:100%;height:100%;display:flex;font-size:26px;line-height:1.3;color:#233;box-sizing:border-box;overflow:hidden}
+.slide .box-text .box-inner{display:block;width:100%}
 .s-h1{font-family:var(--display);font-weight:700;font-size:72px;line-height:1.12;letter-spacing:-.01em}
 .s-h2{font-family:var(--display);font-weight:400;font-style:italic;font-size:38px;color:#4c5566;margin-top:6px}
 .s-h3{font-family:var(--display);font-weight:600;font-size:48px;line-height:1.15;padding-bottom:14px;border-bottom:3px solid var(--teal);margin-bottom:14px;align-self:stretch}
@@ -172,22 +179,26 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <table>
       <tr><td>@(0.55, 0.1) text or element</td><td>Absolute position: top-left anchor at 55% across, 10% down. Add <code>{anchor=center}</code> to center on the point.</td></tr>
       <tr><td>[mylabel] element</td><td>Name an element so animations can target it.</td></tr>
-      <tr><td>{size=44px, color=crimson} text</td><td>Style overrides. Keys: <code>size</code> <code>color</code> <code>fill</code> <code>w</code> <code>h</code> <code>thick</code> <code>align</code> <code>anchor</code> <code>opacity</code>.</td></tr>
+      <tr><td>{size=44px, color=crimson} text</td><td>Style overrides. Keys: <code>size</code> <code>color</code> <code>fill</code> <code>w</code> <code>h</code> <code>thick</code> <code>align</code> <code>valign</code> <code>anchor</code> <code>opacity</code> · shapes/boxes also: <code>textcolor</code> <code>pad</code> <code>round</code> <code>tint</code> <code>dim</code>.</td></tr>
     </table>
 
-    <h3>Images &amp; backgrounds</h3>
+    <h3>Images, backgrounds &amp; embeds</h3>
     <table>
       <tr><td>![caption](url)</td><td>Image. Size with <code>{w=0.3}</code> (fraction of slide width) or pixels.</td></tr>
       <tr><td>!bg(url)  ·  !bg(#123456)</td><td>Slide background image (covers slide) or color.</td></tr>
+      <tr><td>{dim=0.5, tint=#000} !bg(url)  ·  !dim 0.5</td><td>Darken (or tint) the background so text on top stays readable. <code>dim</code> is 0–1.</td></tr>
+      <tr><td>!embed(https://your.app)</td><td>Embed a live web app as an iframe. Position with <code>@()</code>, size with <code>{w=, h=}</code>. Thumbnails show a placeholder.</td></tr>
     </table>
 
-    <h3>Shapes</h3>
+    <h3>Shapes &amp; text boxes</h3>
     <table>
       <tr><td>!line (x1,y1) (x2,y2)</td><td>Line. Style with <code>{color=…, thick=…}</code>.</td></tr>
       <tr><td>!arrow (x1,y1) (x2,y2)</td><td>Arrow (head at second point).</td></tr>
       <tr><td>!circle (cx,cy) r</td><td>Circle; r is a fraction of slide height or pixels.</td></tr>
       <tr><td>!ellipse (cx,cy) (rx,ry)</td><td>Ellipse.</td></tr>
       <tr><td>!rect (x,y) (w,h)</td><td>Rectangle, top-left at (x,y).</td></tr>
+      <tr><td>!textbox (x,y) (w,h) Your text</td><td>A rectangle with wrapped text inside. Style: <code>fill</code>, <code>textcolor</code>, <code>size</code>, <code>align</code>, <code>valign</code>, <code>pad</code>, <code>round</code>, <code>thick</code> (border).</td></tr>
+      <tr><td>!rect (x,y) (w,h) Some text</td><td>Any rect / circle / ellipse can carry inner text — just type it after the geometry.</td></tr>
     </table>
 
     <h3>Animations (target a [label]; duration optional, default 0.7s)</h3>
@@ -205,11 +216,13 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <h3>Presenting</h3>
     <table>
       <tr><td>space / → / click</td><td>Advance one step (past a … or on to the next slide). Pressing during an animation finishes it instantly.</td></tr>
-      <tr><td>← </td><td>Back one step.</td></tr>
+      <tr><td>←</td><td>Back one step.</td></tr>
+      <tr><td>Backspace</td><td>Back one whole slide.</td></tr>
       <tr><td>n / p</td><td>Next / previous slide (skipping remaining steps).</td></tr>
       <tr><td>v</td><td>Slide overview sidebar; click a slide to jump.</td></tr>
       <tr><td>b · f · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit.</td></tr>
     </table>
+    <p class="sub" style="margin-top:14px"><b>Editor ↔ preview.</b> Moving the caret in the script selects the slide you're editing; clicking a thumbnail jumps the caret to that slide.</p>
   </div>
 </div>
 
@@ -309,28 +322,55 @@ function parseSlide(body, slideIndex, warnings){
       if(a) cur().anims.push(a);
       continue;
     }
-    // --- background ---
+    // --- background (optional {dim=..,tint=..} via style prefix) ---
     if((m=line.match(/^!bg\((.+)\)\s*$/i))){
-      const v=m[1].trim();
+      const v=m[1].trim(), prev=slide.bg;
       slide.bg = (/[./\\]|^data:|^https?:/i.test(v)) ? {image:v} : {color:v};
+      if(style.dim!=null)       slide.bg.dim  = clamp(parseFloat(style.dim),0,1);
+      else if(prev&&prev.dim!=null) slide.bg.dim = prev.dim;
+      if(style.tint!=null)      slide.bg.tint = style.tint;
+      else if(prev&&prev.tint)  slide.bg.tint = prev.tint;
       continue;
     }
-    // --- shapes ---
-    if((m=line.match(/^!(line|arrow|circle|ellipse|rect)\b(.*)$/i))){
-      const kind=m[1].toLowerCase(), rest=m[2], pts=pairs(rest);
+    // dim an existing background (or start a black scrim) on its own line
+    if((m=line.match(/^!dim\s+([\d.]+)\s*$/i))){
+      slide.bg = slide.bg || {color:null};
+      slide.bg.dim = clamp(parseFloat(m[1]),0,1);
+      if(style.tint!=null) slide.bg.tint = style.tint;
+      continue;
+    }
+    // --- embedded web app (iframe) ---
+    if((m=line.match(/^!embed\((.+)\)\s*$/i))){
+      const item={id:nextId++, kind:"embed", src:m[1].trim(), label, style, pos};
+      slide.items.push(item); cur().reveals.push(item.id);
+      continue;
+    }
+    // --- shapes (rect/circle/ellipse may carry inner text; !textbox is rect+text) ---
+    if((m=line.match(/^!(line|arrow|circle|ellipse|rect|textbox|box)\b(.*)$/i))){
+      let kind=m[1].toLowerCase(); if(kind==="box") kind="textbox";
+      const rest=m[2];
       const item={id:nextId++, kind, label, style, pos:null};
-      let ok=true;
+      let ok=true, geomEnd=0;
+      RE_PAIR.lastIndex=0;                     // matchAll clones the regex WITH its lastIndex
+      const pm=[...rest.matchAll(RE_PAIR)];
+      const endOf=mm=>mm.index+mm[0].length;
       if(kind==="line"||kind==="arrow"){
-        if(pts.length<2){ok=false;} else item.coords=[[cx(pts[0][0]),cy(pts[0][1])],[cx(pts[1][0]),cy(pts[1][1])]];
+        if(pm.length<2){ok=false;} else {
+          item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])],[cx(+pm[1][1]),cy(+pm[1][2])]]; geomEnd=endOf(pm[1]);
+        }
       }else if(kind==="circle"){
-        const rm=rest.replace(RE_PAIR,"").match(/(-?[\d.]+)/);
-        if(pts.length<1||!rm){ok=false;} else {item.coords=[[cx(pts[0][0]),cy(pts[0][1])]]; item.r=px(parseFloat(rm[1]),SH);}
+        if(pm.length<1){ok=false;} else {
+          const after=rest.slice(endOf(pm[0])); const rm=after.match(/^\s*(-?[\d.]+)/);
+          if(!rm){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.r=px(parseFloat(rm[1]),SH); geomEnd=endOf(pm[0])+rm[0].length; }
+        }
       }else if(kind==="ellipse"){
-        if(pts.length<2){ok=false;} else {item.coords=[[cx(pts[0][0]),cy(pts[0][1])]]; item.rx=cx(pts[1][0]); item.ry=cy(pts[1][1]);}
-      }else if(kind==="rect"){
-        if(pts.length<2){ok=false;} else {item.coords=[[cx(pts[0][0]),cy(pts[0][1])]]; item.w=cx(pts[1][0]); item.h=cy(pts[1][1]);}
+        if(pm.length<2){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.rx=cx(+pm[1][1]); item.ry=cy(+pm[1][2]); geomEnd=endOf(pm[1]); }
+      }else{ // rect / textbox
+        if(pm.length<2){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.w=cx(+pm[1][1]); item.h=cy(+pm[1][2]); geomEnd=endOf(pm[1]); }
       }
       if(!ok){ warnings.push(`slide ${slideIndex+1}, line ${ln+1}: could not read !${kind} coordinates`); continue; }
+      const inner=rest.slice(geomEnd).trim();
+      if(inner && kind!=="line" && kind!=="arrow") item.text=inner;   // fo geometry needs a box
       slide.items.push(item); cur().reveals.push(item.id);
       continue;
     }
@@ -409,11 +449,18 @@ function sizeToPx(v, span){          // "44px" | "2em" | "0.4" | "512"
 }
 const SVGNS="http://www.w3.org/2000/svg";
 
-function renderSlide(slideDef){
+function renderSlide(slideDef, opts){
+  opts = opts || {};
   const root=document.createElement("div"); root.className="slide";
   if(slideDef.bg){
     if(slideDef.bg.color) root.style.background=slideDef.bg.color;
     if(slideDef.bg.image) root.style.backgroundImage=`url("${slideDef.bg.image.replace(/"/g,'%22')}")`;
+    if(slideDef.bg.dim>0){
+      const scrim=document.createElement("div"); scrim.className="bg-scrim";
+      scrim.style.background=slideDef.bg.tint||"#000";
+      scrim.style.opacity=String(slideDef.bg.dim);
+      root.appendChild(scrim);
+    }
   }
   const flow=document.createElement("div"); flow.className="flow";
   if(slideDef.hasH1 && !slideDef.hasH3) flow.classList.add("title-slide");
@@ -430,6 +477,7 @@ function renderSlide(slideDef){
               r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false, scale:1};
     if(["h1","h2","h3","p","li"].includes(def.kind))      buildText(it,flow,absLayer);
     else if(def.kind==="img")                             buildImg(it,flow,absLayer);
+    else if(def.kind==="embed")                           buildEmbed(it,flow,absLayer,opts);
     else                                                  buildShape(it,svg);
     setVisible(it,false);
     items.set(def.id,it);
@@ -478,10 +526,33 @@ function buildImg(it,flow,absLayer){
   box.appendChild(img); it.img=img;
   placeItem(it,flow,absLayer,box);
 }
+function buildEmbed(it,flow,absLayer,opts){
+  const d=it.def;
+  const w=d.style.w?sizeToPx(d.style.w,SW):Math.round(SW*0.6);
+  const h=d.style.h?sizeToPx(d.style.h,SH):Math.round(SH*0.62);
+  const box=document.createElement("div"); box.className="s-embed";
+  box.style.width=w+"px"; box.style.height=h+"px";
+  if(d.style.opacity) box.style.opacity=d.style.opacity;
+  it.embedW=w; it.embedH=h; it.embedBox=box;
+  if(opts.thumb){                       // don't spin up live iframes in the rail
+    box.classList.add("embed-ph");
+    let host=""; try{ host=new URL(d.src,location.href).host; }catch(e){ host=d.src; }
+    box.innerHTML=`<span>▷ ${escapeHtml(host||"embedded app")}</span>`;
+  }else{
+    const fr=document.createElement("iframe");
+    fr.src=d.src; fr.loading="lazy";
+    fr.setAttribute("allow","fullscreen; autoplay; clipboard-read; clipboard-write; camera; microphone; xr-spatial-tracking");
+    fr.setAttribute("referrerpolicy","no-referrer-when-downgrade");
+    box.appendChild(fr); it.iframe=fr;
+  }
+  placeItem(it,flow,absLayer,box);
+}
 function buildShape(it,svg){
   const d=it.def, st=d.style;
-  const stroke=st.color||"#232830", thick=st.thick?parseFloat(st.thick):4;
-  const fill=st.fill|| (d.kind==="line"||d.kind==="arrow" ? "none" : "none");
+  const isBox = d.kind==="textbox";
+  const stroke = st.color || st.stroke || st.border || (isBox ? "none" : "#232830");
+  const thick  = st.thick!=null ? parseFloat(st.thick) : (isBox ? 0 : 4);
+  const fill   = st.fill || (isBox ? "rgba(31,111,107,0.12)" : "none");
   const g=document.createElementNS(SVGNS,"g");
   it.stroke=stroke; it.thick=thick;
   if(d.kind==="line"||d.kind==="arrow"){
@@ -490,11 +561,26 @@ function buildShape(it,svg){
     g.appendChild(ln); it.lineEl=ln;
     if(d.kind==="arrow"){ const head=document.createElementNS(SVGNS,"polygon"); head.setAttribute("fill",stroke); g.appendChild(head); it.headEl=head; }
   }else{
-    const tag={circle:"circle",ellipse:"ellipse",rect:"rect"}[d.kind];
+    const tag = isBox ? "rect" : {circle:"circle",ellipse:"ellipse",rect:"rect"}[d.kind];
     const sh=document.createElementNS(SVGNS,tag);
     sh.setAttribute("stroke",stroke); sh.setAttribute("stroke-width",thick); sh.setAttribute("fill",fill);
-    if(d.kind==="rect") sh.setAttribute("rx",6);
+    if(tag==="rect"){ const rad = st.round!=null ? sizeToPx(st.round,SW) : (isBox?12:6); sh.setAttribute("rx",rad); }
     g.appendChild(sh); it.shapeEl=sh;
+  }
+  // optional inner text via a foreignObject (wraps, uses inline markdown)
+  if(d.text){
+    const fo=document.createElementNS(SVGNS,"foreignObject");
+    const body=document.createElement("div"); body.className="box-text";
+    const span=document.createElement("span"); span.className="box-inner";
+    span.innerHTML=inlineMd(d.text);
+    body.appendChild(span);
+    body.style.color = st.textcolor || st.color2 || (isBox ? "#233" : "#232830");
+    if(st.size)  body.style.fontSize=sizeToPx(st.size,SW)+"px";
+    body.style.textAlign = st.align||"center";
+    body.style.alignItems = {top:"flex-start",middle:"center",bottom:"flex-end"}[st.valign]||"center";
+    const pad = st.pad!=null ? sizeToPx(st.pad,SW) : 16;
+    body.style.padding=pad+"px";
+    fo.appendChild(body); g.appendChild(fo); it.fo=fo; it.foBody=body;
   }
   if(st.opacity) g.setAttribute("opacity",st.opacity);
   svg.appendChild(g); it.el=g; it.shape=true;
@@ -520,9 +606,18 @@ function updateShape(it){
   }else if(d.kind==="ellipse"){
     const [[x,y]]=it.coords; it.shapeEl.setAttribute("cx",x); it.shapeEl.setAttribute("cy",y);
     it.shapeEl.setAttribute("rx",it.rx); it.shapeEl.setAttribute("ry",it.ry);
-  }else if(d.kind==="rect"){
+  }else if(d.kind==="rect"||d.kind==="textbox"){
     const [[x,y]]=it.coords; it.shapeEl.setAttribute("x",x); it.shapeEl.setAttribute("y",y);
     it.shapeEl.setAttribute("width",it.w); it.shapeEl.setAttribute("height",it.h);
+  }
+  // keep inner text glued to the shape's bounding box
+  if(it.fo){
+    let bx,by,bw,bh;
+    if(d.kind==="circle"){ const [[x,y]]=it.coords; const r=it.r; bx=x-r; by=y-r; bw=bh=2*r; }
+    else if(d.kind==="ellipse"){ const [[x,y]]=it.coords; bx=x-it.rx; by=y-it.ry; bw=2*it.rx; bh=2*it.ry; }
+    else { const [[x,y]]=it.coords; bx=x; by=y; bw=it.w; bh=it.h; }
+    it.fo.setAttribute("x",bx); it.fo.setAttribute("y",by);
+    it.fo.setAttribute("width",Math.max(0,bw)); it.fo.setAttribute("height",Math.max(0,bh));
   }
 }
 function setVisible(it,on){
@@ -573,7 +668,13 @@ function makeAnim(a, render, warnings){
       return new Tween(a.dur,t=>{ it.coords[i]=[s[0]+(a.x-s[0])*t, s[1]+(a.y-s[1])*t]; updateShape(it); });
     }
     case "size":{
-      const img=it.img||it.inner.querySelector&&it.inner.querySelector("img");
+      if(it.embedBox){                   // embedded app: scale box, keep aspect
+        const w0=it.embedW, ratio=it.embedH/it.embedW;
+        return new Tween(a.dur,t=>{ const w=w0+(a.w-w0)*t;
+          it.embedW=w; it.embedH=w*ratio;
+          it.embedBox.style.width=w+"px"; it.embedBox.style.height=(w*ratio)+"px"; });
+      }
+      const img=it.img||(it.inner&&it.inner.querySelector&&it.inner.querySelector("img"));
       if(!img) return null;
       const w0=img.getBoundingClientRect().width/currentScale(render);
       return new Tween(a.dur,t=>{ img.style.width=(w0+(a.w-w0)*t)+"px"; });
@@ -591,6 +692,10 @@ function makeAnim(a, render, warnings){
     }
     case "color":{
       const B=resolveColor(a.color);
+      if(it.foBody){                     // shape carrying text -> animate the text color
+        const A=resolveColor(getComputedStyle(it.foBody).color);
+        return new Tween(a.dur,t=>{ it.foBody.style.color=mixColor(A,B,t); });
+      }
       if(it.shape){
         const A=resolveColor(it.stroke);
         return new Tween(a.dur,t=>{ const c=mixColor(A,B,t); it.stroke=t>=1?a.color:it.stroke;
@@ -602,7 +707,7 @@ function makeAnim(a, render, warnings){
       return new Tween(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
     }
     case "textsize":{
-      const tgt=it.inner||el;
+      const tgt=it.foBody||it.inner||el;
       const s0=parseFloat(getComputedStyle(tgt).fontSize);
       const s1=sizeToPx(a.size,SW);
       if(s1==null) return null;
@@ -628,9 +733,9 @@ function liftOutOfFlow(it,render){
    PLAYER — owns one rendered slide and walks its steps.
    ============================================================ */
 class Player{
-  constructor(slideDef, holder){
+  constructor(slideDef, holder, opts){
     this.def=slideDef;
-    this.render=renderSlide(slideDef);
+    this.render=renderSlide(slideDef, opts);
     holder.innerHTML=""; holder.appendChild(this.render.root);
     this.step=-1;           // no step applied yet
     this.busy=false; this.ff=false; this.live=[];
@@ -700,13 +805,28 @@ srcEl.addEventListener("keydown",e=>{
   }
 });
 
+let slideRanges=[];   // [startOffset, endOffset] in the editor text, per slide
+
+function computeSlideRanges(text){
+  const ranges=[]; const re=/^[^\S\n]*---[^\S\n]*$/gm;
+  let start=0, m;
+  while((m=re.exec(text))){ ranges.push([start, m.index]); start=re.lastIndex+1; }
+  ranges.push([start, text.length]);
+  return ranges;
+}
+function slideIndexAt(pos){
+  for(let i=0;i<slideRanges.length;i++){ if(pos>=slideRanges[i][0] && pos<=slideRanges[i][1]) return i; }
+  return clamp(slideRanges.length-1,0,Infinity);
+}
+
 function refresh(){
   deck=parseScript(srcEl.value);
+  slideRanges=computeSlideRanges(srcEl.value);
   selected=clamp(selected,0,deck.slides.length-1);
   warnbar.className="warnbar"+(deck.warnings.length?" on":"");
   warnbar.innerHTML=deck.warnings.map(w=>"⚠ "+escapeHtml(w)).join("<br>");
   rebuildEditorThumbs();
-  showPreview();
+  showPreview();          // rebuilds only if the selected slide's source changed
 }
 function buildThumbs(container,onPick,markSelected){
   container.innerHTML="";
@@ -714,26 +834,64 @@ function buildThumbs(container,onPick,markSelected){
     const t=document.createElement("div"); t.className="thumb"+((markSelected&&i===selected)?" sel":"");
     t.innerHTML=`<span class="num">${i+1}</span>`;
     const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
-    const p=new Player(sd,frame); p.jumpToStep(sd.steps.length-1);
+    const p=new Player(sd,frame,{thumb:true}); p.jumpToStep(sd.steps.length-1);
     fitInto(frame,144,81);
     t.addEventListener("click",()=>onPick(i));
     t.addEventListener("dblclick",()=>startPresent(i));
     container.appendChild(t);
   });
 }
+/* Rebuild the big preview only when the selected slide's own source text changes.
+   This keeps a live-embed preview from reloading its iframe on every keystroke
+   elsewhere in the script. Resize just re-fits the existing render. */
+let lastPreviewKey=null;
+function previewKey(i){ const r=slideRanges[i]||[0,0]; return i+"|"+srcEl.value.slice(r[0],r[1]); }
 function showPreview(){
-  if(!deck.slides.length){ stageHolder.innerHTML=""; return; }
-  const sd=deck.slides[selected];
-  const p=new Player(sd,stageHolder); p.jumpToStep(sd.steps.length-1);
+  if(!deck.slides.length){ stageHolder.innerHTML=""; lastPreviewKey=null; return; }
+  const key=previewKey(selected);
+  if(key!==lastPreviewKey){
+    const sd=deck.slides[selected];
+    const p=new Player(sd,stageHolder); p.jumpToStep(sd.steps.length-1);
+    lastPreviewKey=key;
+  }
   const stage=stageHolder.parentElement, r=stage.getBoundingClientRect();
   fitInto(stageHolder, r.width-44, r.height-44);
-  // refresh selection ring
   [...thumbRail.children].forEach((el,i)=>el.classList.toggle("sel",i===selected));
 }
 window.addEventListener("resize",()=>{ if(presentOn) layoutPresent(); else showPreview(); });
 
 /* thumbnails need a stable click handler (rebuild-free selection) */
-function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>{selected=i;showPreview();},true); }
+function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>jumpEditorToSlide(i),true); }
+
+/* click a preview thumbnail -> move the editor caret into that slide */
+function jumpEditorToSlide(i){
+  selected=i; showPreview();
+  const r=slideRanges[i]; if(!r) return;
+  let caret=r[0];
+  const v=srcEl.value;
+  while(caret<r[1] && (v[caret]==="\n"||v[caret]===" ")) caret++;   // skip to first content
+  srcEl.focus();
+  srcEl.setSelectionRange(caret,caret);
+  scrollCaretIntoView(caret);
+}
+function scrollCaretIntoView(pos){
+  const before=srcEl.value.slice(0,pos);
+  const line=(before.match(/\n/g)||[]).length;
+  const lh=parseFloat(getComputedStyle(srcEl).lineHeight)||20;
+  const target=line*lh - srcEl.clientHeight/3;
+  srcEl.scrollTop=clamp(target,0,srcEl.scrollHeight);
+}
+
+/* editor caret moved -> select the slide being edited (no rebuild unless changed) */
+function syncFromCaret(){
+  if(document.activeElement!==srcEl || presentOn) return;
+  const i=slideIndexAt(srcEl.selectionStart);
+  if(i!==selected){ selected=i; showPreview(); }
+  else { [...thumbRail.children].forEach((el,k)=>el.classList.toggle("sel",k===selected)); }
+}
+document.addEventListener("selectionchange",()=>{ if(document.activeElement===srcEl) syncFromCaret(); });
+srcEl.addEventListener("click",syncFromCaret);
+srcEl.addEventListener("keyup",e=>{ if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","PageUp","PageDown","Home","End"].includes(e.key)) syncFromCaret(); });
 
 /* ---------- presentation mode ---------- */
 const presentEl=$("#present"), pholder=$("#pholder"), hudCount=$("#hudCount"),
@@ -791,7 +949,18 @@ function backStep(){
 function toggleOverview(){
   const on=!overviewEl.classList.contains("on");
   overviewEl.classList.toggle("on",on);
-  if(on) buildThumbs(overviewList,i=>{ overviewEl.classList.remove("on"); gotoSlide(i); },false);
+  if(on){
+    overviewList.innerHTML="";
+    deck.slides.forEach((sd,i)=>{
+      const t=document.createElement("div"); t.className="thumb"+(i===curSlide?" sel":"");
+      t.innerHTML=`<span class="num">${i+1}</span>`;
+      const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
+      const p=new Player(sd,frame,{thumb:true}); p.jumpToStep(sd.steps.length-1);
+      fitInto(frame,144,81);
+      t.addEventListener("click",()=>{ overviewEl.classList.remove("on"); gotoSlide(i); });
+      overviewList.appendChild(t);
+    });
+  }
 }
 
 /* ---------- keyboard ---------- */
@@ -805,6 +974,7 @@ document.addEventListener("keydown",e=>{
   switch(e.key){
     case " ": case "ArrowRight": case "PageDown": e.preventDefault(); advance(); break;
     case "ArrowLeft": case "PageUp": e.preventDefault(); backStep(); break;
+    case "Backspace": e.preventDefault(); gotoSlide(Math.max(0,curSlide-1)); break;
     case "n": case "N": gotoSlide(curSlide+1,{animate:true}); break;
     case "p": case "P": gotoSlide(Math.max(0,curSlide-1)); break;
     case "v": case "V": toggleOverview(); break;
@@ -818,6 +988,7 @@ document.addEventListener("keydown",e=>{
 });
 presentEl.addEventListener("click",e=>{
   if(overviewEl.contains(e.target)||$("#hud").contains(e.target)) return;
+  if(e.target.closest&&e.target.closest(".s-embed")) return;   // interacting with an embedded app
   advance();
 });
 
@@ -927,8 +1098,34 @@ Each press of the spacebar reveals the next chunk:
 !anim pic hide
 @(0.30, 0.45) {size=44px, color=#1f6f6b} *…and it's gone.*
 ---
+% A dimmed background keeps text readable over a busy image.
+{dim=0.55, tint=#0a1a2a} !bg(${DEMO_IMG})
+### Dimmed backgrounds
+{color=#f4f1ea} The background image is scrimmed 55% so this text stays legible.
+- {color=#e8e4dc} Use {dim=0.0–1.0} and an optional {tint=#color}
+- {color=#e8e4dc} Or dim on its own line: \`!dim 0.4\`
+---
+### Text boxes
+% !textbox (x,y) (w,h) text  — a rectangle with wrapped text inside.
+[card] {fill=#1f6f6b, textcolor=#f4f1ea, size=30px} !textbox (0.08,0.32) (0.4,0.4) A **text box** wraps its text and can be *labeled*, filled, and animated.
+% Any shape can hold text too — here a circle:
+[node] {fill=#e2a84b22, color=#e2a84b, thick=4, textcolor=#8a5a12, size=26px} !circle (0.74,0.52) 0.2 centered text inside a circle
+...
+!anim card move (0.08, 0.10) 0.8s
+>>>
+!anim card color #c23b22 0.6s
+---
+% Embed any web app you've built by URL. Position and size like an image.
+### Embedded web apps
+[app] @(0.30, 0.16) {w=0.62, h=0.68} !embed(https://example.com)
+- Live iframe in present mode
+- Thumbnails show a lightweight placeholder
+- Animate it: move, scale, size, hide/show
+...
+!anim app scale 0.9 0.5s
+---
 # That's the tour
-## space · n/p · v · b · f — and ? for the full reference
+## space · n/p · Backspace · v · b · f — and ? for the full reference
 `;
 
  /* boot */
