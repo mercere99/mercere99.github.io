@@ -18,7 +18,7 @@
    in-app JSON/QBL export for durable, portable backups. */
 (function () {
   if (window.storage) return;
-  var P = "examforge:";
+  var P = "QBL:";
   window.storage = {
     get: function (k) {
       try { var v = localStorage.getItem(P + k); return Promise.resolve(v == null ? null : { key: k, value: v }); }
@@ -342,7 +342,7 @@ function(a,b,c){if(!Vd(b))throw Error(m(200));return Wd(null,a,b,!1,c)};Q.unmoun
 })();
 
 </script>
-<script>/* Exam Forge (precompiled from exam-builder.jsx — no in-browser Babel) */
+<script>/* QBL (precompiled from exam-builder.jsx — no in-browser Babel) */
 const { useState, useEffect, useMemo, useRef } = React;
 const STORAGE_KEY = "mcq-library-v1";
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWX";
@@ -1545,7 +1545,7 @@ function App() {
         .md .md-pre { background: #F0F2EF; border: 1px solid ${T.line}; border-radius: 6px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; overflow-x: auto; white-space: pre; margin: 6px 0; display: block; }
         .md .md-code { background: #F0F2EF; border: 1px solid ${T.line}; border-radius: 4px; padding: 0 4px; font-family: 'IBM Plex Mono', monospace; font-size: 0.92em; }
         .md .md-img { max-width: 100%; max-height: 320px; border: 1px solid ${T.line}; border-radius: 6px; display: block; margin: 6px 0; }
-        .md a { color: ${T.green}; text-decoration: underline; }`), /* @__PURE__ */ React.createElement("header", { style: { background: T.green, color: "#fff", padding: "18px 28px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1150, margin: "0 auto", display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "'IBM Plex Serif', serif", fontSize: 24, margin: 0 } }, "Exam Forge"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, opacity: 0.8 } }, "multiple-choice question bank & generator"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: "auto", fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, opacity: 0.85 } }, questions.length, " questions \xB7", " ", saveState === "saving" ? "saving\u2026" : saveState === "error" ? "\u26A0 save failed" : saveState === "saved" ? "saved" : ""))), /* @__PURE__ */ React.createElement("nav", { style: { background: T.card, borderBottom: `1px solid ${T.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1150, margin: "0 auto", display: "flex", padding: "0 16px" } }, /* @__PURE__ */ React.createElement("button", { style: tabStyle(view === "library"), onClick: () => setView("library") }, "Question Library"), /* @__PURE__ */ React.createElement("button", { style: tabStyle(view === "generate"), onClick: () => setView("generate") }, "Generate Exam"))), /* @__PURE__ */ React.createElement("main", { style: { maxWidth: 1150, margin: "0 auto", padding: "24px 16px 64px" } }, !loaded ? /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 48, color: T.gray } }, "Loading library\u2026") : view === "library" ? /* @__PURE__ */ React.createElement(LibraryView, { questions, setQuestions, allTags, xorSet }) : /* @__PURE__ */ React.createElement(GenerateView, { questions, allTags, xorSet })));
+        .md a { color: ${T.green}; text-decoration: underline; }`), /* @__PURE__ */ React.createElement("header", { style: { background: T.green, color: "#fff", padding: "18px 28px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1150, margin: "0 auto", display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "'IBM Plex Serif', serif", fontSize: 24, margin: 0 } }, "QBL"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, opacity: 0.8 } }, "multiple-choice question bank & generator"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: "auto", fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, opacity: 0.85 } }, questions.length, " questions \xB7", " ", saveState === "saving" ? "saving\u2026" : saveState === "error" ? "\u26A0 save failed" : saveState === "saved" ? "saved" : ""))), /* @__PURE__ */ React.createElement("nav", { style: { background: T.card, borderBottom: `1px solid ${T.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1150, margin: "0 auto", display: "flex", padding: "0 16px" } }, /* @__PURE__ */ React.createElement("button", { style: tabStyle(view === "library"), onClick: () => setView("library") }, "Question Library"), /* @__PURE__ */ React.createElement("button", { style: tabStyle(view === "generate"), onClick: () => setView("generate") }, "Generate Exam"))), /* @__PURE__ */ React.createElement("main", { style: { maxWidth: 1150, margin: "0 auto", padding: "24px 16px 64px" } }, !loaded ? /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 48, color: T.gray } }, "Loading library\u2026") : view === "library" ? /* @__PURE__ */ React.createElement(LibraryView, { questions, setQuestions, allTags, xorSet }) : /* @__PURE__ */ React.createElement(GenerateView, { questions, allTags, xorSet })));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/* @__PURE__ */ React.createElement(App, null));
 
