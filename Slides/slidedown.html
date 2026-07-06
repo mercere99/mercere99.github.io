@@ -135,6 +135,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   <div class="spacer"></div>
   <span class="kbd-hint"><kbd>space</kbd> advance · <kbd>n</kbd>/<kbd>p</kbd> slide · <kbd>v</kbd> overview · <kbd>b</kbd> black · <kbd>esc</kbd> exit</span>
   <button class="btn" id="btnPresentHere">Present from selected</button>
+  <button class="btn" id="btnPresenter" title="Slides open in a separate window (drag it to the projector); this window becomes your notes">⧉ Presenter view</button>
   <button class="btn primary" id="btnPresent">▶ Present</button>
   <button class="btn" id="btnPresent2" style="display:none" title="Present fullscreen on your second display">▶ 2nd screen</button>
   <input type="file" id="fileIn" accept=".psl,.txt,.md,.slides" style="display:none">
@@ -161,6 +162,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   <div class="hud" id="hud"><span class="count" id="hudCount"></span><span class="dots" id="hudDots"></span><button class="hudbtn" id="hudFs" title="Fullscreen (f)">⛶</button></div>
 </div>
 
+<div class="pconsole" id="pconsole"></div>
+
 <div class="help" id="help">
   <div class="card">
     <button class="btn close" id="btnHelpClose">Close</button>
@@ -177,15 +180,17 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>...</td><td>Pause point — wait for spacebar before revealing what follows.</td></tr>
       <tr><td>&gt;&gt;&gt;</td><td>Chain — run what follows automatically when the previous animations finish.</td></tr>
       <tr><td>```cpp … ```</td><td>Fenced code block with syntax highlighting (cpp, python, javascript, bash, and other common languages; omit the language for plain code). A <code>---</code> inside a fence does <i>not</i> start a new slide. Size with <code>{w=…, size=…}</code>.</td></tr>
+      <tr><td>| a | b |<br>|:--|--:|<br>| 1 | 2 |</td><td>Markdown table. The <code>|---|</code> row makes the first row a header; <code>:--</code>/<code>--:</code>/<code>:-:</code> set column alignment. Cells take inline markdown and <code>\${…}</code>.</td></tr>
     </table>
 
-    <h3>Deck-wide settings — !set key value (place anywhere; usually the top)</h3>
+    <h3>Variables, expressions &amp; deck styling</h3>
     <table>
-      <tr><td>!set bg #14212b  ·  !set bg url</td><td>Default background for every slide (a slide's own <code>!bg</code> overrides it). <code>!set dim 0.4</code> and <code>!set tint #001a2a</code> also apply deck-wide.</td></tr>
-      <tr><td>!set color #e8e4dc</td><td>Default text color for all slides.</td></tr>
-      <tr><td>!set accent #e2a84b</td><td>Color of bullet markers and the title underline.</td></tr>
-      <tr><td>!set font Georgia, serif</td><td>Body font for all slides. <code>!set headfont Futura, sans-serif</code> sets the heading font.</td></tr>
-      <tr><td>!set pagenum $N / $T</td><td>Slide number in the corner; <code>$N</code> = current, <code>$T</code> = total (e.g. <code>Slide $N of $T</code>). <code>on</code> → "$N / $T", <code>off</code> disables.</td></tr>
+      <tr><td>!set test 5</td><td>Define any variable. Numeric values become numbers; anything else is a string. Reserved style names configure the deck: <code>bg</code> <code>dim</code> <code>tint</code> <code>color</code> <code>accent</code> <code>font</code> <code>headfont</code> (e.g. <code>!set font Georgia, serif</code>).</td></tr>
+      <tr><td>The value is \${test}</td><td><code>\${…}</code> anywhere in slide text substitutes an expression: variables, numbers, strings, <code>+ - * / % ( )</code>. <code>+</code> concatenates strings.</td></tr>
+      <tr><td>\${test*2 + 1}</td><td>Math works, with normal precedence.</td></tr>
+      <tr><td>\${test = test + 1}</td><td>Assignment: prints the new value <i>and</i> updates the variable. Expressions run at parse time, top to bottom, so results are deterministic.</td></tr>
+      <tr><td>\${slide_num} · \${num_slides}</td><td>Built-ins: current slide number and total slide count.</td></tr>
+      <tr><td>!footer \${slide_num} / \${num_slides}</td><td>Deck-wide footer in the corner of every slide, re-evaluated per slide — the flexible replacement for a page number. <code>!footer</code> alone clears it.</td></tr>
     </table>
 
     <h3>Placement, labels, styling (prefixes, any order, before content)</h3>
@@ -233,6 +238,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>Backspace</td><td>Back one whole slide.</td></tr>
       <tr><td>n / p</td><td>Next / previous slide (skipping remaining steps).</td></tr>
       <tr><td>v</td><td>Slide overview sidebar; click a slide to jump.</td></tr>
+      <tr><td>⧉ Presenter view</td><td>Opens the slides in a separate window — drag it to the projector and press <code>F</code> (or click once) there for fullscreen. This window becomes your console: the script is your notes, auto-scrolled to the current slide, with thumbnails as a click-to-jump overview. Both windows' keyboards drive the show.</td></tr>
       <tr><td>b · f / ⛶ · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit. The Present buttons enter fullscreen automatically; "▶ 2nd screen" (shown when an extended display is detected, Chromium browsers) presents fullscreen on your other monitor.</td></tr>
     </table>
     <h3>Publishing a deck online</h3>
@@ -305,10 +311,89 @@ function splitSlides(text){
 
 function parseScript(text){
   const warnings=[];
-  const settings={};                     // deck-wide !set variables
+  const vars={};                          // deck variables (!set) + built-ins
   const slabs=splitSlides(text);
-  const slides=slabs.map((sl,si)=>parseSlide(sl.body, si, warnings, settings));
-  return {slides, settings, warnings};
+  vars.num_slides=slabs.length;
+  const slides=slabs.map((sl,si)=>{
+    vars.slide_num=si+1;
+    const s=parseSlide(sl.body, si, warnings, vars);
+    s.varsSnapshot={...vars};             // state as of the end of this slide
+    return s;
+  });
+  // The !footer template is evaluated once per slide, against that slide's
+  // variable snapshot, so ${slide_num} etc. are correct on every slide.
+  if(vars.__footer){
+    slides.forEach((s,i)=>{
+      const scratch={...s.varsSnapshot, slide_num:i+1, num_slides:slides.length};
+      s.footerText=substVars(vars.__footer, scratch, warnings, i, 0);
+    });
+  }
+  return {slides, settings:vars, warnings};
+}
+
+/* ---------- variables & expressions ----------
+   ${expr} anywhere in slide text evaluates a small expression language:
+   numbers, strings ("…"/'…'), variables, + - * / % ( ), unary +/-, and a
+   single top-level assignment (name = expr). `+` concatenates if either
+   side is a string. Evaluated at PARSE time in document order, so
+   assignments are deterministic and re-renders never re-run them. */
+function evalExpr(src, vars){
+  let i=0;
+  function ws(){ while(i<src.length && /\s/.test(src[i])) i++; }
+  function num(v,op){ const n=typeof v==="number"?v:parseFloat(v);
+    if(Number.isNaN(n)) throw new Error(`non-numeric value for “${op}”`); return n; }
+  function primary(){
+    ws();
+    if(i>=src.length) throw new Error("unexpected end of expression");
+    const c=src[i];
+    if(c==="("){ i++; const v=addsub(); ws(); if(src[i]!==")") throw new Error("missing “)”"); i++; return v; }
+    if(c==="-"){ i++; return -num(primary(),"-"); }
+    if(c==="+"){ i++; return  num(primary(),"+"); }
+    if(c==='"'||c==="'"){ const q=c; let j=i+1,s="";
+      while(j<src.length&&src[j]!==q) s+=src[j++];
+      if(src[j]!==q) throw new Error("unterminated string"); i=j+1; return s; }
+    let m=/^[A-Za-z_]\w*/.exec(src.slice(i));
+    if(m){ i+=m[0].length;
+      if(!(m[0] in vars)) throw new Error(`unknown variable “${m[0]}”`);
+      return vars[m[0]]; }
+    m=/^(\d+(\.\d*)?|\.\d+)/.exec(src.slice(i));
+    if(m){ i+=m[0].length; return parseFloat(m[0]); }
+    throw new Error(`unexpected “${src.slice(i,i+8)}”`);
+  }
+  function muldiv(){ let v=primary();
+    for(;;){ ws(); const c=src[i];
+      if(c==="*"){i++; v=num(v,"*")*num(primary(),"*");}
+      else if(c==="/"){i++; v=num(v,"/")/num(primary(),"/");}
+      else if(c==="%"){i++; v=num(v,"%")%num(primary(),"%");}
+      else return v; } }
+  function addsub(){ let v=muldiv();
+    for(;;){ ws(); const c=src[i];
+      if(c==="+"){i++; const r=muldiv();
+        v=(typeof v==="string"||typeof r==="string") ? String(v)+String(r) : v+r;}
+      else if(c==="-"){i++; v=num(v,"-")-num(muldiv(),"-");}
+      else return v; } }
+  ws();
+  const asn=/^([A-Za-z_]\w*)\s*=(?!=)/.exec(src.slice(i));
+  let value;
+  if(asn){ i+=asn[0].length; value=addsub(); vars[asn[1]]=value; }
+  else value=addsub();
+  ws();
+  if(i<src.length) throw new Error(`unexpected “${src.slice(i)}”`);
+  return value;
+}
+function fmtVal(v){
+  if(typeof v!=="number") return String(v);
+  if(Number.isInteger(v)) return String(v);
+  return String(Math.round(v*1e9)/1e9);        // avoid 0.30000000000000004
+}
+function substVars(text, vars, warnings, si, ln){
+  return text.replace(/\$\{([^}]*)\}/g,(all,expr)=>{
+    try{ return fmtVal(evalExpr(expr,vars)); }
+    catch(e){
+      warnings&&warnings.push(`slide ${si+1}, line ${ln}: ${e.message} in \${${expr}}`);
+      return all;                               // leave visible for debugging
+    }
+  });
 }
 
 const RE_POS   = /^@\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)\s*/;
@@ -339,7 +424,7 @@ function pairs(s){
   return out;
 }
 
-function parseSlide(body, slideIndex, warnings, settings){
+function parseSlide(body, slideIndex, warnings, vars){
   const slide={items:[], steps:[[newPhase()]], bg:null, hasH1:false, hasH3:false};
   let step=0, phase=0, nextId=0;
   function cur(){ return slide.steps[step][phase]; }
@@ -354,6 +439,13 @@ function parseSlide(body, slideIndex, warnings, settings){
 
     if(line==="..."){ step++; phase=0; slide.steps[step]=[newPhase()]; continue; }
     if(line===">>>"){ phase++; slide.steps[step][phase]=newPhase(); continue; }
+
+    // --- footer template: captured RAW so ${slide_num} evaluates per slide ---
+    let m;
+    if((m=line.match(/^!footer\s*(.*)$/i))){ vars.__footer=m[1]; continue; }
+
+    // --- ${expr} substitution (everywhere except code-fence bodies) ---
+    line=substVars(line, vars, warnings, slideIndex, ln+1);
 
     // --- prefixes: @(x,y), [label], {style} — any order ---
     let {pos,label,style,rest}=extractPrefixes(line);
@@ -375,14 +467,30 @@ function parseSlide(body, slideIndex, warnings, settings){
       continue;
     }
 
-    // --- deck-wide settings: !set key value ---
-    let m;
-    if((m=line.match(/^!set\s+([\w-]+)\s*(.*)$/i))){
-      const key=m[1].toLowerCase();
+    // --- Markdown table: consecutive |-prefixed lines ---
+    if(line.startsWith("|")){
+      const rowsRaw=[line]; let j=ln+1;
+      for(; j<lines.length && lines[j].trim().startsWith("|"); j++)
+        rowsRaw.push(substVars(lines[j].trim(), vars, warnings, slideIndex, j+1));
+      ln=j-1;
+      const splitRow=s=>s.replace(/^\|/,"").replace(/\|\s*$/,"").split("|").map(c=>c.trim());
+      const all=rowsRaw.map(splitRow);
+      const isSep=r=>r.length>0 && r.every(c=>/^:?-{2,}:?$/.test(c));
+      let head=null, aligns=[], rows=all;
+      if(all.length>1 && isSep(all[1])){
+        head=all[0];
+        aligns=all[1].map(c=>c.startsWith(":")&&c.endsWith(":")?"center":c.endsWith(":")?"right":c.startsWith(":")?"left":null);
+        rows=all.slice(2);
+      }
+      const item={id:nextId++, kind:"table", head, aligns, rows, label, style, pos};
+      slide.items.push(item); cur().reveals.push(item.id);
+      continue;
+    }
+
+    // --- variables: !set name value (value already ${}-substituted) ---
+    if((m=line.match(/^!set\s+([A-Za-z_]\w*)\s*(.*)$/i))){
       const val=m[2].trim().replace(/^["']|["']$/g,"");
-      const known=["bg","dim","tint","color","font","headfont","accent","pagenum"];
-      if(known.includes(key)) settings[key]=val;
-      else warnings.push(`slide ${slideIndex+1}, line ${ln+1}: unknown setting “${key}” (known: ${known.join(", ")})`);
+      vars[m[1]] = /^-?\d+(\.\d+)?$/.test(val) ? parseFloat(val) : val;
       continue;
     }
 
@@ -559,11 +667,10 @@ function renderSlide(slideDef, opts){
   svg.setAttribute("class","overlay"); svg.setAttribute("viewBox",`0 0 ${SW} ${SH}`);
   root.append(flow,absLayer,svg);
 
-  // page number, e.g. `!set pagenum $N / $T` or `!set pagenum Slide $N of $T`
-  if(st.pagenum && st.pagenum!=="off" && opts.total){
-    const fmt = st.pagenum==="on" ? "$N / $T" : st.pagenum;
+  // deck footer (from `!footer …`, already evaluated per slide at parse time)
+  if(slideDef.footerText){
     const pn=document.createElement("div"); pn.className="pageno";
-    pn.textContent=fmt.replace(/\$N/g,(opts.index||0)+1).replace(/\$T/g,opts.total);
+    pn.textContent=slideDef.footerText;
     root.appendChild(pn);
   }
 
@@ -576,6 +683,7 @@ function renderSlide(slideDef, opts){
     if(["h1","h2","h3","p","li"].includes(def.kind))      buildText(it,flow,absLayer);
     else if(def.kind==="img")                             buildImg(it,flow,absLayer);
     else if(def.kind==="code")                            buildCode(it,flow,absLayer);
+    else if(def.kind==="table")                           buildTable(it,flow,absLayer);
     else if(def.kind==="embed")                           buildEmbed(it,flow,absLayer,opts);
     else                                                  buildShape(it,svg);
     setVisible(it,false);
@@ -607,6 +715,25 @@ function buildCode(it,flow,absLayer){
   pre.appendChild(codeEl);
   applyTextStyle(pre,d.style);
   placeItem(it,flow,absLayer,pre);
+}
+function buildTable(it,flow,absLayer){
+  const d=it.def, tb=document.createElement("table"); tb.className="s-table";
+  const mkRow=(tag,cells)=>{
+    const tr=document.createElement("tr");
+    cells.forEach((c,ci)=>{
+      const el=document.createElement(tag);
+      el.innerHTML=inlineMd(c);
+      const al=d.aligns&&d.aligns[ci]; if(al) el.style.textAlign=al;
+      tr.appendChild(el);
+    });
+    return tr;
+  };
+  if(d.head){ const th=document.createElement("thead"); th.appendChild(mkRow("th",d.head)); tb.appendChild(th); }
+  const tbody=document.createElement("tbody");
+  d.rows.forEach(r=>tbody.appendChild(mkRow("td",r)));
+  tb.appendChild(tbody);
+  applyTextStyle(tb,d.style);
+  placeItem(it,flow,absLayer,tb);
 }
 function placeItem(it,flow,absLayer,el){
   if(it.def.pos){
@@ -976,8 +1103,10 @@ window.addEventListener("resize",()=>{ if(presentOn) layoutPresent(); else showP
 /* thumbnails need a stable click handler (rebuild-free selection) */
 function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>jumpEditorToSlide(i),true); }
 
-/* click a preview thumbnail -> move the editor caret into that slide */
+/* click a preview thumbnail -> move the editor caret into that slide
+   (in presenter mode it also drives the show — thumbnails are the overview) */
 function jumpEditorToSlide(i){
+  if(presenterMode){ gotoSlide(i,{animate:true}); return; }   // updateHud syncs the editor
   selected=i; showPreview();
   const r=slideRanges[i]; if(!r) return;
   let caret=r[0];
@@ -997,7 +1126,7 @@ function scrollCaretIntoView(pos){
 
 /* editor caret moved -> select the slide being edited (no rebuild unless changed) */
 function syncFromCaret(){
-  if(document.activeElement!==srcEl || presentOn) return;
+  if(document.activeElement!==srcEl || presentOn || presenterMode) return;
   const i=slideIndexAt(srcEl.selectionStart);
   if(i!==selected){ selected=i; showPreview(); }
   else { [...thumbRail.children].forEach((el,k)=>el.classList.toggle("sel",k===selected)); }
@@ -1011,6 +1140,17 @@ const presentEl=$("#present"), pholder=$("#pholder"), hudCount=$("#hudCount"),
       hudDots=$("#hudDots"), overviewEl=$("#overview"), overviewList=$("#overviewList"),
       blackout=$("#blackout");
 let presentOn=false, curSlide=0, player=null;
+let presenterMode=false, presenterWin=null, presenterHolder=null, presenterBlack=null;
+
+function activeHolder(){ return presenterMode ? presenterHolder : pholder; }
+function layoutPresent(){
+  if(presenterMode){
+    if(!presenterWin||presenterWin.closed) return;
+    fitInto(presenterHolder, presenterWin.innerWidth-8, presenterWin.innerHeight-8);
+  }else{
+    fitInto(pholder, window.innerWidth-24, window.innerHeight-24);
+  }
+}
 
 function enterFullscreen(screenOpt){
   const req = presentEl.requestFullscreen ? presentEl.requestFullscreen(screenOpt?{screen:screenOpt}:undefined)
@@ -1022,6 +1162,7 @@ function toggleFullscreen(){
   else enterFullscreen();
 }
 function startPresent(fromIndex, o={}){
+  if(presenterMode) exitPresenter();
   refresh();
   if(!deck.slides.length) return;
   srcEl.blur();
@@ -1034,12 +1175,9 @@ function exitPresent(){
   overviewEl.classList.remove("on"); blackout.classList.remove("on");
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
 }
-function layoutPresent(){
-  fitInto(pholder, window.innerWidth-24, window.innerHeight-24);
-}
 function gotoSlide(i,{animate=false,lastStep=false}={}){
   curSlide=clamp(i,0,deck.slides.length-1);
-  player=new Player(deck.slides[curSlide],pholder,{settings:deck.settings,index:curSlide,total:deck.slides.length});
+  player=new Player(deck.slides[curSlide],activeHolder(),{settings:deck.settings,index:curSlide,total:deck.slides.length});
   layoutPresent();
   const last=player.stepCount-1;
   if(lastStep) player.jumpToStep(last);
@@ -1048,6 +1186,14 @@ function gotoSlide(i,{animate=false,lastStep=false}={}){
   updateHud();
 }
 function updateHud(){
+  if(presenterMode){
+    $("#pconsole").innerHTML=
+      `<b>Presenting</b> · slide ${curSlide+1} / ${deck.slides.length}`
+      +(player.stepCount>1?` · step ${player.step+1}/${player.stepCount}`:"")
+      +` &nbsp;—&nbsp; space next · ←/Backspace back · click a thumbnail to jump · Esc ends`;
+    revealSlideInEditor(curSlide);
+    return;
+  }
   hudCount.textContent=`${curSlide+1} / ${deck.slides.length}`;
   hudDots.innerHTML="";
   if(player.stepCount>1)
@@ -1056,6 +1202,11 @@ function updateHud(){
       d.className="dot"+(s<=player.step?" done":"");
       hudDots.appendChild(d);
     }
+}
+/* Scroll the script (the presenter's notes) to a slide WITHOUT stealing focus. */
+function revealSlideInEditor(i){
+  selected=i; showPreview();
+  const r=slideRanges[i]; if(r) scrollCaretIntoView(r[0]);
 }
 function advance(){
   if(!player) return;
@@ -1086,28 +1237,42 @@ function toggleOverview(){
   }
 }
 
-/* ---------- keyboard ---------- */
-document.addEventListener("keydown",e=>{
-  if($("#help").classList.contains("on")){ if(e.key==="Escape")toggleHelp(false); return; }
-  if(!presentOn){
-    if(e.key==="F5"){ e.preventDefault(); startPresent(0,{fs:true}); }
-    return;
-  }
-  if(e.target===srcEl) return;
+/* ---------- keyboard (shared by the main window and the presenter popup) ---------- */
+function handleShowKey(e){
   switch(e.key){
     case " ": case "ArrowRight": case "PageDown": e.preventDefault(); advance(); break;
     case "ArrowLeft": case "PageUp": e.preventDefault(); backStep(); break;
     case "Backspace": e.preventDefault(); gotoSlide(Math.max(0,curSlide-1)); break;
     case "n": case "N": gotoSlide(curSlide+1,{animate:true}); break;
     case "p": case "P": gotoSlide(Math.max(0,curSlide-1)); break;
-    case "v": case "V": toggleOverview(); break;
-    case "b": case "B": blackout.classList.toggle("on"); break;
-    case "f": case "F": toggleFullscreen(); break;
+    case "v": case "V": if(!presenterMode) toggleOverview(); break;   // presenter: thumbnails are the overview
+    case "b": case "B":
+      if(presenterMode){ if(presenterBlack) presenterBlack.style.display=presenterBlack.style.display==="none"?"block":"none"; }
+      else blackout.classList.toggle("on");
+      break;
+    case "f": case "F":
+      if(presenterMode){ try{ presenterWin.document.documentElement.requestFullscreen().catch(()=>{});}catch(_){} }
+      else toggleFullscreen();
+      break;
     case "Home": gotoSlide(0); break;
     case "End": gotoSlide(deck.slides.length-1,{lastStep:true}); break;
     case "?": toggleHelp(true); break;
-    case "Escape": overviewEl.classList.contains("on")?overviewEl.classList.remove("on"):exitPresent(); break;
+    case "Escape":
+      if(presenterMode) exitPresenter();
+      else overviewEl.classList.contains("on")?overviewEl.classList.remove("on"):exitPresent();
+      break;
   }
+}
+document.addEventListener("keydown",e=>{
+  if($("#help").classList.contains("on")){ if(e.key==="Escape")toggleHelp(false); return; }
+  if(!presentOn && !presenterMode){
+    if(e.key==="F5"){ e.preventDefault(); startPresent(0,{fs:true}); }
+    return;
+  }
+  // In normal present mode ignore keys aimed at the (hidden) editor; in
+  // presenter mode the textarea is read-only notes, so keys drive the show.
+  if(presentOn && e.target===srcEl) return;
+  handleShowKey(e);
 });
 presentEl.addEventListener("click",e=>{
   if(overviewEl.contains(e.target)||$("#hud").contains(e.target)) return;
@@ -1119,6 +1284,63 @@ presentEl.addEventListener("click",e=>{
 $("#btnPresent").addEventListener("click",()=>startPresent(0,{fs:true}));
 $("#btnPresent2").addEventListener("click",presentOnSecondScreen);
 $("#hudFs").addEventListener("click",toggleFullscreen);
+$("#btnPresenter").addEventListener("click",openPresenterView);
+
+/* ---------- presenter view: slides in a popup, notes (the script) here ----------
+   The popup is scripted directly by this window (no channels needed), so it
+   also works from file://. Drag it to the projector; press F or click inside
+   it once to go fullscreen there. */
+function openPresenterView(){
+  refresh(); if(!deck.slides.length) return;
+  if(presenterMode){ exitPresenter(); return; }
+  const w=window.open("","SlideDownDisplay","width=1100,height=650");
+  if(!w){
+    warnbar.className="warnbar on";
+    warnbar.innerHTML="⚠ Presenter view needs pop-ups enabled for this page.";
+    return;
+  }
+  presenterWin=w;
+  const d=w.document;
+  d.open(); d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>SlideDown — display</title></head><body></body></html>'); d.close();
+  document.querySelectorAll('style,link[rel="stylesheet"]').forEach(n=>d.head.appendChild(d.importNode(n,true)));
+  d.body.style.cssText="margin:0;background:#000;overflow:hidden";
+  const stage=d.createElement("div");
+  stage.style.cssText="position:fixed;inset:0;display:flex;align-items:center;justify-content:center";
+  presenterHolder=d.createElement("div");
+  presenterHolder.style.cssText="position:relative;overflow:hidden";
+  stage.appendChild(presenterHolder); d.body.appendChild(stage);
+  presenterBlack=d.createElement("div");
+  presenterBlack.style.cssText="position:fixed;inset:0;background:#000;display:none;z-index:8";
+  d.body.appendChild(presenterBlack);
+  const hint=d.createElement("div");
+  hint.textContent="Drag this window to the projector · press F or click once for fullscreen";
+  hint.style.cssText="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);color:#d9dee7;background:rgba(17,21,28,.9);border:1px solid #2e3846;border-radius:16px;padding:7px 16px;font:13px Inter,sans-serif;z-index:9;transition:opacity .4s";
+  d.body.appendChild(hint);
+  let hintDone=false;
+  const dismiss=()=>{ if(!hintDone){ hintDone=true; hint.style.opacity="0"; setTimeout(()=>hint.remove(),450);} };
+  const fsPopup=()=>{ d.documentElement.requestFullscreen&&d.documentElement.requestFullscreen().catch(()=>{}); dismiss(); };
+  d.addEventListener("keydown",e=>{
+    if(e.key==="f"||e.key==="F"){ e.preventDefault(); fsPopup(); return; }
+    handleShowKey(e);                       // same bindings as the main window
+  });
+  d.addEventListener("click",e=>{ if(!hintDone){ fsPopup(); } else advance(); });
+  w.addEventListener("resize",layoutPresent);
+  w.addEventListener("pagehide",()=>{ if(presenterMode) exitPresenter(false); });
+
+  presenterMode=true;
+  srcEl.readOnly=true;                      // the script is notes now
+  $("#pconsole").classList.add("on");
+  $("#btnPresenter").textContent="⧉ End presenter view";
+  gotoSlide(selected,{animate:true});
+}
+function exitPresenter(closeWin=true){
+  presenterMode=false;
+  srcEl.readOnly=false;
+  $("#pconsole").classList.remove("on");
+  $("#btnPresenter").textContent="⧉ Presenter view";
+  if(closeWin && presenterWin && !presenterWin.closed) presenterWin.close();
+  presenterWin=null; presenterHolder=null; presenterBlack=null;
+}
 
 /* Present fullscreen on a second display (Window Management API — Chromium).
    Falls back to plain fullscreen anywhere else. */
@@ -1167,7 +1389,7 @@ const DEMO_IMG="data:image/svg+xml;utf8,"+encodeURIComponent(
 
 const SAMPLE=`% ===== A tour of the Portable Slide Language (PSL) =====
 % Deck-wide settings can go anywhere; the top is conventional:
-!set pagenum $N / $T
+!footer \${slide_num} / \${num_slides}
 # SlideDown
 ## A tour of the Portable Slide Language.
 ---
@@ -1285,8 +1507,24 @@ def fib(n):
         a, b = b, a + b
 \`\`\`
 ---
+### Variables & expressions
+!set test 5
+% \${...} evaluates at parse time, top to bottom:
+- \`!set test 5\` defines a variable — the test value is \${test}
+- Math works: test * 2 + 1 = \${test * 2 + 1}
+- Assignment prints AND updates: \${test = test + 1} … so test is now \${test}
+- Built-ins: this is slide \${slide_num} of \${num_slides}
+- The corner footer is \`!footer \${slide_num} / \${num_slides}\`
+---
+### Tables
+Markdown pipe tables, with optional alignment markers:
+| Feature | Syntax | Alignment |
+|:--------|:------:|----------:|
+| Bullets | \`- item\` | left |
+| **Bold** & *italic* | \`**b**\` \`*i*\` | center |
+| Variables | slide \${slide_num} of \${num_slides} | right |
+---
 ### Deck-wide styling with !set
-- This deck sets \`!set pagenum $N / $T\` — see the corner
 - \`!set bg\` / \`!set color\` / \`!set accent\` — default background & colors
 - \`!set font\` and \`!set headfont\` — change every slide's fonts
 - {font=Courier New, monospace} …or per element: {font=Courier New, monospace}
