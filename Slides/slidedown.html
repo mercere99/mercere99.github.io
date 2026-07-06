@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlideDown — Portable Slide Language</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+:root{
+  --ink:#171c24;         /* app chrome background */
+  --panel:#1e2530;
+  --panel2:#232b38;
+  --line:#2e3846;
+  --chrome-text:#d9dee7;
+  --chrome-dim:#8b95a5;
+  --amber:#e2a84b;       /* chrome accent (HUD, controls) */
+  --amber-dim:#9b7333;
+  --paper:#fbf9f4;       /* default slide background */
+  --slide-ink:#232830;   /* default slide text */
+  --teal:#1f6f6b;        /* default slide accent (title rule, bullets) */
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ui:"Inter",-apple-system,"Segoe UI",sans-serif;
+  --display:"Spectral",Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--chrome-text);font-family:var(--ui);font-size:14px;overflow:hidden}
+button{font-family:var(--ui)}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:baseline;gap:8px;margin-right:8px;user-select:none}
+.brand b{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.02em;color:var(--chrome-text)}
+.brand b em{font-style:normal;color:var(--amber)}
+.brand span{color:var(--chrome-dim);font-size:11.5px}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--chrome-text);border-radius:7px;padding:7px 12px;font-size:13px;cursor:pointer;transition:border-color .15s,background .15s}
+.btn:hover{border-color:var(--amber-dim)}
+.btn:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.btn.primary{background:var(--amber);border-color:var(--amber);color:#241a08;font-weight:600}
+.btn.primary:hover{background:#eeb75e}
+.spacer{flex:1}
+.kbd-hint{color:var(--chrome-dim);font-size:12px}
+kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--chrome-text)}
+
+/* ---------- editor layout ---------- */
+.split{display:flex;height:calc(100% - 52px)}
+.editor-pane{width:44%;min-width:340px;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.editor-pane textarea{flex:1;resize:none;border:0;outline:none;background:var(--ink);color:#cdd6e4;font-family:var(--mono);font-size:13.5px;line-height:1.55;padding:16px 18px;tab-size:2;white-space:pre;overflow:auto}
+.editor-pane textarea::selection{background:#3b4a61}
+.warnbar{max-height:90px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:11.5px;color:#d9a05a;padding:6px 12px;display:none}
+.warnbar.on{display:block}
+.preview-pane{flex:1;display:flex;min-width:0}
+.thumb-rail{width:168px;overflow-y:auto;padding:12px 10px;border-right:1px solid var(--line);background:var(--panel)}
+.thumb{position:relative;margin:0 0 12px;cursor:pointer;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:#000}
+.thumb.sel{border-color:var(--amber)}
+.thumb .num{position:absolute;left:5px;top:4px;z-index:2;font-family:var(--mono);font-size:10px;color:#fff;background:rgba(20,24,32,.72);border-radius:4px;padding:1px 5px}
+.thumb .frame{width:144px;height:81px;overflow:hidden;position:relative}
+.stage-wrap{flex:1;display:flex;flex-direction:column;min-width:0}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;padding:22px;min-height:0}
+.stage-holder{position:relative;box-shadow:0 10px 34px rgba(0,0,0,.5);border-radius:4px;overflow:hidden}
+.stage-note{padding:6px 14px 12px;color:var(--chrome-dim);font-size:12px;text-align:center}
+
+/* ---------- the slide itself (1280 x 720 logical) ---------- */
+.slide{position:absolute;left:0;top:0;width:1280px;height:720px;background:var(--paper);color:var(--slide-ink);transform-origin:0 0;font-family:var(--ui);overflow:hidden;background-size:cover;background-position:center}
+.slide .flow{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;padding:64px 84px;align-items:flex-start;z-index:1}
+.slide .bg-scrim{position:absolute;inset:0;z-index:0;pointer-events:none}
+.slide .flow.title-slide{justify-content:center;align-items:center;text-align:center}
+.slide .abs-layer{position:absolute;inset:0;pointer-events:none;z-index:2}
+.slide .abs-layer>*{pointer-events:auto}
+.slide svg.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.slide .s-embed{position:relative;border-radius:8px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.28);background:#0d1016}
+.slide .s-embed iframe{width:100%;height:100%;border:0;display:block;background:#fff}
+.slide .s-embed.embed-ph{display:flex;align-items:center;justify-content:center;border:1px dashed #9aa;background:#eef1f3}
+.slide .s-embed.embed-ph span{font-family:var(--mono);font-size:16px;color:#556}
+.slide .box-text{width:100%;height:100%;display:flex;font-size:26px;line-height:1.3;color:#233;box-sizing:border-box;overflow:hidden}
+.slide .box-text .box-inner{display:block;width:100%}
+.s-h1{font-family:var(--slide-display,var(--display));font-weight:700;font-size:72px;line-height:1.12;letter-spacing:-.01em}
+.s-h2{font-family:var(--slide-display,var(--display));font-weight:400;font-style:italic;font-size:38px;color:var(--h2c,#4c5566);margin-top:6px}
+.s-h3{font-family:var(--slide-display,var(--display));font-weight:600;font-size:48px;line-height:1.15;padding-bottom:14px;border-bottom:3px solid var(--slide-accent,var(--teal));margin-bottom:14px;align-self:stretch}
+.s-p{font-size:30px;line-height:1.45}
+.s-li{font-size:30px;line-height:1.42;display:flex;gap:14px;align-items:baseline}
+.s-li .mk{flex:none;color:var(--slide-accent,var(--teal));font-weight:700}
+.s-li.lv1{margin-left:52px;font-size:27px}
+.s-li.lv2{margin-left:104px;font-size:25px}
+.s-li.lv1 .mk,.s-li.lv2 .mk{color:#6b7482;font-weight:400}
+.s-img img{display:block;max-width:100%;border-radius:3px}
+.slide .abs-item{position:absolute;max-width:760px}
+.slide code{font-family:var(--mono);font-size:.85em;background:rgba(31,111,107,.10);border:1px solid rgba(31,111,107,.25);border-radius:4px;padding:1px 6px}
+.hidden-item{visibility:hidden}
+
+/* ---------- presentation mode ---------- */
+.present{position:fixed;inset:0;background:#0b0e13;display:none;z-index:50}
+.present.on{display:block}
+.present .pstage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.present .pholder{position:relative;overflow:hidden}
+.hud{position:absolute;right:18px;bottom:14px;display:flex;align-items:center;gap:12px;background:rgba(17,21,28,.82);border:1px solid var(--line);border-radius:20px;padding:6px 14px;z-index:5;transition:opacity .3s}
+.hud .count{font-family:var(--mono);font-size:12.5px;color:var(--chrome-text)}
+.hud .dots{display:flex;gap:5px}
+.hud .dot{width:7px;height:7px;border-radius:50%;background:#3a4556}
+.hud .dot.done{background:var(--amber)}
+.blackout{position:absolute;inset:0;background:#000;z-index:8;display:none}
+.blackout.on{display:block}
+
+/* ---------- overview (v) ---------- */
+.overview{position:absolute;left:0;top:0;bottom:0;width:220px;background:rgba(17,21,28,.95);border-right:1px solid var(--line);overflow-y:auto;padding:14px 12px;z-index:9;transform:translateX(-100%);transition:transform .22s ease}
+.overview.on{transform:none}
+.overview h4{margin:2px 4px 10px;font-size:12px;font-weight:600;color:var(--chrome-dim);text-transform:uppercase;letter-spacing:.08em}
+
+/* ---------- help overlay ---------- */
+.help{position:fixed;inset:0;background:rgba(10,13,18,.78);display:none;z-index:80;align-items:center;justify-content:center}
+.help.on{display:flex}
+.help .card{width:min(880px,92vw);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:26px 32px}
+.help h2{font-family:var(--display);margin:0 0 4px;font-size:24px}
+.help h2 em{font-style:normal;color:var(--amber)}
+.help p.sub{margin:0 0 18px;color:var(--chrome-dim)}
+.help h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--amber);margin:20px 0 8px}
+.help table{width:100%;border-collapse:collapse;font-size:13px}
+.help td{padding:5px 10px 5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.help td:first-child{font-family:var(--mono);white-space:pre;color:#9fd0c0;width:44%}
+.help .close{float:right}
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><b>Slide<em>Down</em></b><span>Portable Slide Language</span></div>
+  <button class="btn" id="btnOpen">Open script…</button>
+  <button class="btn" id="btnSave">Save script</button>
+  <button class="btn" id="btnSample">Load sample deck</button>
+  <button class="btn" id="btnHelp">Syntax reference</button>
+  <div class="spacer"></div>
+  <span class="kbd-hint"><kbd>space</kbd> advance · <kbd>n</kbd>/<kbd>p</kbd> slide · <kbd>v</kbd> overview · <kbd>b</kbd> black · <kbd>esc</kbd> exit</span>
+  <button class="btn" id="btnPresentHere">Present from selected</button>
+  <button class="btn primary" id="btnPresent">▶ Present</button>
+  <button class="btn" id="btnPresent2" style="display:none" title="Present fullscreen on your second display">▶ 2nd screen</button>
+  <input type="file" id="fileIn" accept=".psl,.txt,.md,.slides" style="display:none">
+</div>
+
+<div class="split">
+  <div class="editor-pane">
+    <textarea id="src" spellcheck="false" aria-label="Slide script"></textarea>
+    <div class="warnbar" id="warnbar"></div>
+  </div>
+  <div class="preview-pane">
+    <div class="thumb-rail" id="thumbRail"></div>
+    <div class="stage-wrap">
+      <div class="stage"><div class="stage-holder" id="stageHolder"></div></div>
+      <div class="stage-note">Preview shows the selected slide fully advanced. Double-click a thumbnail to present from it.</div>
+    </div>
+  </div>
+</div>
+
+<div class="present" id="present">
+  <div class="pstage"><div class="pholder" id="pholder"></div></div>
+  <div class="blackout" id="blackout"></div>
+  <div class="overview" id="overview"><h4>Slides — click to jump</h4><div id="overviewList"></div></div>
+  <div class="hud" id="hud"><span class="count" id="hudCount"></span><span class="dots" id="hudDots"></span><button class="hudbtn" id="hudFs" title="Fullscreen (f)">⛶</button></div>
+</div>
+
+<div class="help" id="help">
+  <div class="card">
+    <button class="btn close" id="btnHelpClose">Close</button>
+    <h2>Slide<em>Down</em> — Portable Slide Language (PSL) reference</h2>
+    <p class="sub">Coordinates may be fractions of the slide (0–1) or pixels in a 1280×720 space. Values ≤ 1 are treated as fractions.</p>
+
+    <h3>Structure</h3>
+    <table>
+      <tr><td>---</td><td>Start a new slide.</td></tr>
+      <tr><td># Title / ## Subtitle</td><td>Big centered title and subtitle (title slides).</td></tr>
+      <tr><td>### Slide title</td><td>Heading at the top of a regular slide.</td></tr>
+      <tr><td>- item / &nbsp;&nbsp;- sub-item</td><td>Bullets; indent 2 spaces per level. <code>**bold**</code>, <code>*italic*</code>, <code>`code`</code> work in any text.</td></tr>
+      <tr><td>% a comment</td><td>Ignored.</td></tr>
+      <tr><td>...</td><td>Pause point — wait for spacebar before revealing what follows.</td></tr>
+      <tr><td>&gt;&gt;&gt;</td><td>Chain — run what follows automatically when the previous animations finish.</td></tr>
+      <tr><td>```cpp … ```</td><td>Fenced code block with syntax highlighting (cpp, python, javascript, bash, and other common languages; omit the language for plain code). A <code>---</code> inside a fence does <i>not</i> start a new slide. Size with <code>{w=…, size=…}</code>.</td></tr>
+    </table>
+
+    <h3>Deck-wide settings — !set key value (place anywhere; usually the top)</h3>
+    <table>
+      <tr><td>!set bg #14212b  ·  !set bg url</td><td>Default background for every slide (a slide's own <code>!bg</code> overrides it). <code>!set dim 0.4</code> and <code>!set tint #001a2a</code> also apply deck-wide.</td></tr>
+      <tr><td>!set color #e8e4dc</td><td>Default text color for all slides.</td></tr>
+      <tr><td>!set accent #e2a84b</td><td>Color of bullet markers and the title underline.</td></tr>
+      <tr><td>!set font Georgia, serif</td><td>Body font for all slides. <code>!set headfont Futura, sans-serif</code> sets the heading font.</td></tr>
+      <tr><td>!set pagenum $N / $T</td><td>Slide number in the corner; <code>$N</code> = current, <code>$T</code> = total (e.g. <code>Slide $N of $T</code>). <code>on</code> → "$N / $T", <code>off</code> disables.</td></tr>
+    </table>
+
+    <h3>Placement, labels, styling (prefixes, any order, before content)</h3>
+    <table>
+      <tr><td>@(0.55, 0.1) text or element</td><td>Absolute position: top-left anchor at 55% across, 10% down. Add <code>{anchor=center}</code> to center on the point.</td></tr>
+      <tr><td>[mylabel] element</td><td>Name an element so animations can target it.</td></tr>
+      <tr><td>{size=44px, color=crimson} text</td><td>Style overrides. Keys: <code>size</code> <code>color</code> <code>font</code> <code>fill</code> <code>w</code> <code>h</code> <code>thick</code> <code>align</code> <code>valign</code> <code>anchor</code> <code>opacity</code> · shapes/boxes also: <code>textcolor</code> <code>pad</code> <code>round</code> <code>tint</code> <code>dim</code>.</td></tr>
+    </table>
+
+    <h3>Images, backgrounds &amp; embeds</h3>
+    <table>
+      <tr><td>![caption](url)</td><td>Image. Size with <code>{w=0.3}</code> (fraction of slide width) or pixels.</td></tr>
+      <tr><td>!bg(url)  ·  !bg(#123456)</td><td>Slide background image (covers slide) or color.</td></tr>
+      <tr><td>{dim=0.5, tint=#000} !bg(url)  ·  !dim 0.5</td><td>Darken (or tint) the background so text on top stays readable. <code>dim</code> is 0–1.</td></tr>
+      <tr><td>!embed(https://your.app)</td><td>Embed a live web app as an iframe. Position with <code>@()</code>, size with <code>{w=, h=}</code>. Thumbnails show a placeholder.</td></tr>
+    </table>
+
+    <h3>Shapes &amp; text boxes</h3>
+    <table>
+      <tr><td>!line (x1,y1) (x2,y2)</td><td>Line. Style with <code>{color=…, thick=…}</code>.</td></tr>
+      <tr><td>!arrow (x1,y1) (x2,y2)</td><td>Arrow (head at second point).</td></tr>
+      <tr><td>!circle (cx,cy) r</td><td>Circle; r is a fraction of slide height or pixels.</td></tr>
+      <tr><td>!ellipse (cx,cy) (rx,ry)</td><td>Ellipse.</td></tr>
+      <tr><td>!rect (x,y) (w,h)</td><td>Rectangle, top-left at (x,y).</td></tr>
+      <tr><td>!textbox (x,y) (w,h) Your text</td><td>A rectangle with wrapped text inside. Style: <code>fill</code>, <code>textcolor</code>, <code>size</code>, <code>align</code>, <code>valign</code>, <code>pad</code>, <code>round</code>, <code>thick</code> (border).</td></tr>
+      <tr><td>!rect (x,y) (w,h) Some text</td><td>Any rect / circle / ellipse can carry inner text — just type it after the geometry.</td></tr>
+    </table>
+
+    <h3>Animations (target a [label]; duration optional, default 0.7s)</h3>
+    <table>
+      <tr><td>!anim pic hide 0.5s   ·   !anim pic show</td><td>Fade out / fade in.</td></tr>
+      <tr><td>!anim pic move (0.6, 0.2) 1s</td><td>Move to a new position. Shapes move by their first-listed point; flow text is lifted out of flow.</td></tr>
+      <tr><td>!anim arrow1 point 2 (0.8, 0.5) 1s</td><td>Move just point 1 or 2 of a line/arrow.</td></tr>
+      <tr><td>!anim pic size 0.45 1s</td><td>Animate an image to a new width.</td></tr>
+      <tr><td>!anim pic scale 1.6 0.5s</td><td>Scale any element about its center.</td></tr>
+      <tr><td>!anim word color #cc2244 0.5s</td><td>Animate text color / shape stroke.</td></tr>
+      <tr><td>!anim word textsize 54px 0.7s</td><td>Animate font size.</td></tr>
+    </table>
+    <p class="sub" style="margin-top:14px">Consecutive <code>!anim</code> lines run <b>simultaneously</b>. Separate with <code>...</code> to wait for a keypress, or <code>&gt;&gt;&gt;</code> to auto-run in sequence.</p>
+
+    <h3>Presenting</h3>
+    <table>
+      <tr><td>space / → / click</td><td>Advance one step (past a … or on to the next slide). Pressing during an animation finishes it instantly.</td></tr>
+      <tr><td>←</td><td>Back one step.</td></tr>
+      <tr><td>Backspace</td><td>Back one whole slide.</td></tr>
+      <tr><td>n / p</td><td>Next / previous slide (skipping remaining steps).</td></tr>
+      <tr><td>v</td><td>Slide overview sidebar; click a slide to jump.</td></tr>
+      <tr><td>b · f / ⛶ · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit. The Present buttons enter fullscreen automatically; "▶ 2nd screen" (shown when an extended display is detected, Chromium browsers) presents fullscreen on your other monitor.</td></tr>
+    </table>
+    <h3>Publishing a deck online</h3>
+    <p class="sub" style="margin:6px 0 0">Host this HTML file and your <code>.psl</code> script anywhere (e.g. GitHub Pages), then share a link like <code>slidedown.html?present=my_talk.psl</code> — visitors land directly in the slideshow and can step through with space. Add <code>&amp;slide=5</code> to start on a specific slide. Cross-origin script URLs work if the host sends CORS headers; same-site files always work.</p>
+    <p class="sub" style="margin-top:14px"><b>Editor ↔ preview.</b> Moving the caret in the script selects the slide you're editing; clicking a thumbnail jumps the caret to that slide.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   SlideDown — a presentation manager driven by the Portable Slide Language (PSL).
+   Logical slide space: 1280 x 720. Values <= 1 are fractions.
+   ============================================================ */
+const SW = 1280, SH = 720;
+const DEFAULT_DUR = 0.7;
+
+/* ---------- tiny helpers ---------- */
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+const easeInOut = t => t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+const px = (v, span) => (Math.abs(v) <= 1 ? v*span : v);   // fraction or pixels
+const cx = v => px(v, SW), cy = v => px(v, SH);
+
+function escapeHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function inlineMd(s){
+  let h = escapeHtml(s);
+  h = h.replace(/`([^`]+)`/g,"<code>$1</code>");
+  h = h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  h = h.replace(/\*([^*]+)\*/g,"<i>$1</i>");
+  return h;
+}
+let _colorProbe=null;
+function resolveColor(c){
+  if(!_colorProbe){_colorProbe=document.createElement("span");_colorProbe.style.display="none";document.body.appendChild(_colorProbe);}
+  _colorProbe.style.color=""; _colorProbe.style.color=c;
+  const m=getComputedStyle(_colorProbe).color.match(/[\d.]+/g)||[0,0,0,1];
+  return {r:+m[0],g:+m[1],b:+m[2],a:m.length>3?+m[3]:1};
+}
+const mixColor=(A,B,t)=>`rgba(${Math.round(A.r+(B.r-A.r)*t)},${Math.round(A.g+(B.g-A.g)*t)},${Math.round(A.b+(B.b-A.b)*t)},${(A.a+(B.a-A.a)*t).toFixed(3)})`;
+
+/* ============================================================
+   PARSER
+   ============================================================ */
+/* Split the script into slide slabs at lines that are exactly `---`,
+   but NOT inside a ``` code fence. Returns char offsets so the editor
+   can map caret position -> slide with identical logic. */
+function splitSlides(text){
+  const lines=text.replace(/\r\n?/g,"\n").split("\n");
+  // A fence may open after position/label/style prefixes, e.g.  {w=0.5} ```cpp
+  const FENCE_OPEN=/^(?:@\([^)]*\)\s*|\[[\w-]+\]\s*|\{[^}]*\}\s*)*```/;
+  const slabs=[]; let buf=[], slabStart=0, off=0, inFence=false;
+  for(const L of lines){
+    const t=L.trim();
+    if(inFence){
+      if(t.startsWith("```")) inFence=false;
+      buf.push(L);
+    }else if(FENCE_OPEN.test(t)){
+      inFence=true; buf.push(L);
+    }else if(t==="---"){
+      slabs.push({start:slabStart, end:off, body:buf.join("\n")});
+      buf=[]; slabStart=off+L.length+1;
+    }
+    else buf.push(L);
+    off+=L.length+1;
+  }
+  slabs.push({start:slabStart, end:Math.max(slabStart,off-1), body:buf.join("\n")});
+  return slabs;
+}
+
+function parseScript(text){
+  const warnings=[];
+  const settings={};                     // deck-wide !set variables
+  const slabs=splitSlides(text);
+  const slides=slabs.map((sl,si)=>parseSlide(sl.body, si, warnings, settings));
+  return {slides, settings, warnings};
+}
+
+const RE_POS   = /^@\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)\s*/;
+const RE_LABEL = /^\[([A-Za-z_][\w-]*)\]\s*/;
+const RE_STYLE = /^\{([^}]*)\}\s*/;
+const RE_PAIR  = /\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)/g;
+const RE_DUR   = /(?:^|\s)([\d.]+)\s*s\s*$/;
+
+function parseStyle(s){
+  const st={}; let lastKey=null;
+  for(const part of s.split(/[,;]/)){
+    const eq=part.indexOf("=");
+    if(eq>=0){ lastKey=part.slice(0,eq).trim().toLowerCase(); st[lastKey]=part.slice(eq+1).trim(); }
+    else if(part.trim()){
+      if(lastKey) st[lastKey]+=", "+part.trim();      // e.g. {font=Georgia, serif}
+      else st[part.trim().toLowerCase()]=true;
+    }
+  }
+  return st;
+}
+function takeDur(s){ // returns [restString, durationSeconds]
+  const m=s.match(RE_DUR);
+  return m ? [s.slice(0,m.index).trim(), parseFloat(m[1])] : [s.trim(), DEFAULT_DUR];
+}
+function pairs(s){
+  const out=[]; let m; RE_PAIR.lastIndex=0;
+  while((m=RE_PAIR.exec(s))) out.push([parseFloat(m[1]),parseFloat(m[2])]);
+  return out;
+}
+
+function parseSlide(body, slideIndex, warnings, settings){
+  const slide={items:[], steps:[[newPhase()]], bg:null, hasH1:false, hasH3:false};
+  let step=0, phase=0, nextId=0;
+  function cur(){ return slide.steps[step][phase]; }
+
+  const lines=body.split("\n");
+  for(let ln=0; ln<lines.length; ln++){
+    const raw=lines[ln];
+    if(!raw.trim()) continue;
+    const indent=(raw.match(/^ */)[0].length);
+    let line=raw.trim();
+    if(line.startsWith("%")) continue;
+
+    if(line==="..."){ step++; phase=0; slide.steps[step]=[newPhase()]; continue; }
+    if(line===">>>"){ phase++; slide.steps[step][phase]=newPhase(); continue; }
+
+    // --- prefixes: @(x,y), [label], {style} — any order ---
+    let {pos,label,style,rest}=extractPrefixes(line);
+    line=rest;
+    if(!line) continue;
+
+    // --- fenced code block: ```lang ... ``` (lines kept verbatim) ---
+    if(line.startsWith("```")){
+      const lang=line.slice(3).trim().toLowerCase();
+      const buf=[]; let j=ln+1, closed=false;
+      for(; j<lines.length; j++){
+        if(lines[j].trim().startsWith("```")){ closed=true; break; }
+        buf.push(lines[j]);
+      }
+      if(!closed) warnings.push(`slide ${slideIndex+1}, line ${ln+1}: unterminated code fence`);
+      ln=j;                                   // skip past the closing fence
+      const item={id:nextId++, kind:"code", lang, code:buf.join("\n"), label, style, pos};
+      slide.items.push(item); cur().reveals.push(item.id);
+      continue;
+    }
+
+    // --- deck-wide settings: !set key value ---
+    let m;
+    if((m=line.match(/^!set\s+([\w-]+)\s*(.*)$/i))){
+      const key=m[1].toLowerCase();
+      const val=m[2].trim().replace(/^["']|["']$/g,"");
+      const known=["bg","dim","tint","color","font","headfont","accent","pagenum"];
+      if(known.includes(key)) settings[key]=val;
+      else warnings.push(`slide ${slideIndex+1}, line ${ln+1}: unknown setting “${key}” (known: ${known.join(", ")})`);
+      continue;
+    }
+
+    // --- animation lines ---
+    if((m=line.match(/^!anim\s+([\w-]+)\s+(\w+)\s*(.*)$/i))){
+      const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,slideIndex,ln+1);
+      if(a) cur().anims.push(a);
+      continue;
+    }
+    // --- background (optional {dim=..,tint=..} via style prefix) ---
+    if((m=line.match(/^!bg\((.+)\)\s*$/i))){
+      const v=m[1].trim(), prev=slide.bg;
+      slide.bg = (/[./\\]|^data:|^https?:/i.test(v)) ? {image:v} : {color:v};
+      if(style.dim!=null)       slide.bg.dim  = clamp(parseFloat(style.dim),0,1);
+      else if(prev&&prev.dim!=null) slide.bg.dim = prev.dim;
+      if(style.tint!=null)      slide.bg.tint = style.tint;
+      else if(prev&&prev.tint)  slide.bg.tint = prev.tint;
+      continue;
+    }
+    // dim an existing background (or start a black scrim) on its own line
+    if((m=line.match(/^!dim\s+([\d.]+)\s*$/i))){
+      slide.bg = slide.bg || {color:null};
+      slide.bg.dim = clamp(parseFloat(m[1]),0,1);
+      if(style.tint!=null) slide.bg.tint = style.tint;
+      continue;
+    }
+    // --- embedded web app (iframe) ---
+    if((m=line.match(/^!embed\((.+)\)\s*$/i))){
+      const item={id:nextId++, kind:"embed", src:m[1].trim(), label, style, pos};
+      slide.items.push(item); cur().reveals.push(item.id);
+      continue;
+    }
+    // --- shapes (rect/circle/ellipse may carry inner text; !textbox is rect+text) ---
+    if((m=line.match(/^!(line|arrow|circle|ellipse|rect|textbox|box)\b(.*)$/i))){
+      let kind=m[1].toLowerCase(); if(kind==="box") kind="textbox";
+      const rest=m[2];
+      const item={id:nextId++, kind, label, style, pos:null};
+      let ok=true, geomEnd=0;
+      RE_PAIR.lastIndex=0;                     // matchAll clones the regex WITH its lastIndex
+      const pm=[...rest.matchAll(RE_PAIR)];
+      const endOf=mm=>mm.index+mm[0].length;
+      if(kind==="line"||kind==="arrow"){
+        if(pm.length<2){ok=false;} else {
+          item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])],[cx(+pm[1][1]),cy(+pm[1][2])]]; geomEnd=endOf(pm[1]);
+        }
+      }else if(kind==="circle"){
+        if(pm.length<1){ok=false;} else {
+          const after=rest.slice(endOf(pm[0])); const rm=after.match(/^\s*(-?[\d.]+)/);
+          if(!rm){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.r=px(parseFloat(rm[1]),SH); geomEnd=endOf(pm[0])+rm[0].length; }
+        }
+      }else if(kind==="ellipse"){
+        if(pm.length<2){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.rx=cx(+pm[1][1]); item.ry=cy(+pm[1][2]); geomEnd=endOf(pm[1]); }
+      }else{ // rect / textbox
+        if(pm.length<2){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.w=cx(+pm[1][1]); item.h=cy(+pm[1][2]); geomEnd=endOf(pm[1]); }
+      }
+      if(!ok){ warnings.push(`slide ${slideIndex+1}, line ${ln+1}: could not read !${kind} coordinates`); continue; }
+      const inner=rest.slice(geomEnd).trim();
+      if(inner && kind!=="line" && kind!=="arrow") item.text=inner;   // fo geometry needs a box
+      slide.items.push(item); cur().reveals.push(item.id);
+      continue;
+    }
+    if(line.startsWith("!") && !line.startsWith("![")){ warnings.push(`slide ${slideIndex+1}, line ${ln+1}: unknown directive “${line.split(/\s/)[0]}”`); continue; }
+
+    // --- images ---
+    if((m=line.match(/^!\[([^\]]*)\]\((.+)\)\s*$/))){
+      const item={id:nextId++, kind:"img", alt:m[1], src:m[2].trim(), label, style, pos};
+      slide.items.push(item); cur().reveals.push(item.id);
+      continue;
+    }
+    // --- headings, bullets, paragraphs ---
+    // (prefixes may also follow the marker, e.g. "- {color=red} text")
+    let item;
+    if((m=line.match(/^(#{1,3})\s+(.*)$/))){
+      const lvl=m[1].length, inner=extractPrefixes(m[2]);
+      item={id:nextId++, kind:"h"+lvl, text:inner.rest, label:inner.label||label,
+            style:Object.assign(style,inner.style), pos:inner.pos||pos};
+      if(lvl===1) slide.hasH1=true; if(lvl===3) slide.hasH3=true;
+    }else if((m=line.match(/^-\s+(.*)$/))){
+      const inner=extractPrefixes(m[1]);
+      item={id:nextId++, kind:"li", lv:clamp(Math.floor(indent/2),0,2), text:inner.rest,
+            label:inner.label||label, style:Object.assign(style,inner.style), pos:inner.pos||pos};
+    }else{
+      item={id:nextId++, kind:"p", text:line, label, style, pos};
+    }
+    slide.items.push(item); cur().reveals.push(item.id);
+  }
+  return slide;
+}
+function newPhase(){ return {reveals:[], anims:[]}; }
+
+function extractPrefixes(line){
+  let pos=null, label=null, style={}, moved=true;
+  while(moved){
+    moved=false; let m;
+    if((m=line.match(RE_POS)))  { pos={x:parseFloat(m[1]),y:parseFloat(m[2])}; line=line.slice(m[0].length); moved=true; }
+    if((m=line.match(RE_LABEL))){ label=m[1]; line=line.slice(m[0].length); moved=true; }
+    if((m=line.match(RE_STYLE))){ Object.assign(style,parseStyle(m[1])); line=line.slice(m[0].length); moved=true; }
+  }
+  return {pos,label,style,rest:line};
+}
+
+function parseAnim(target, verb, argsRaw, warnings, si, ln){
+  let [args,dur]=takeDur(argsRaw);
+  const bad=msg=>{warnings.push(`slide ${si+1}, line ${ln}: ${msg}`); return null;};
+  switch(verb){
+    case "hide": case "show": return {target,verb,dur};
+    case "move":{ const p=pairs(args); if(!p.length) return bad("move needs (x,y)");
+      return {target,verb,dur,x:cx(p[0][0]),y:cy(p[0][1])}; }
+    case "point":{ const n=parseInt(args); const p=pairs(args);
+      if(!(n===1||n===2)||!p.length) return bad("point needs an index (1 or 2) and (x,y)");
+      return {target,verb,dur,n,x:cx(p[0][0]),y:cy(p[0][1])}; }
+    case "size":{ const v=parseFloat(args); if(isNaN(v)) return bad("size needs a width");
+      return {target,verb,dur,w:px(v,SW)}; }
+    case "scale":{ const v=parseFloat(args); if(isNaN(v)) return bad("scale needs a factor");
+      return {target,verb,dur,f:v}; }
+    case "color": return args ? {target,verb,dur,color:args} : bad("color needs a value");
+    case "textsize": return args ? {target,verb,dur,size:args} : bad("textsize needs a size");
+    default: return bad(`unknown animation “${verb}”`);
+  }
+}
+</script>
+<script>
+/* ============================================================
+   RENDERER — builds DOM for one slide; Player drives steps.
+   ============================================================ */
+"use strict";
+function sizeToPx(v, span){          // "44px" | "2em" | "0.4" | "512"
+  if(v==null) return null;
+  const s=String(v).trim();
+  if(s.endsWith("px")) return parseFloat(s);
+  if(s.endsWith("em")) return parseFloat(s)*30;      // 30px = default body size
+  const n=parseFloat(s);
+  return isNaN(n)?null:px(n,span);
+}
+const SVGNS="http://www.w3.org/2000/svg";
+
+function renderSlide(slideDef, opts){
+  opts = opts || {};
+  const st = opts.settings || {};
+  const root=document.createElement("div"); root.className="slide";
+
+  // deck-wide typography & colors (per-slide styles still override per element)
+  if(st.font)     root.style.fontFamily=st.font;
+  if(st.headfont) root.style.setProperty("--slide-display", st.headfont);
+  if(st.accent)   root.style.setProperty("--slide-accent", st.accent);
+  if(st.color){
+    root.style.color=st.color;
+    root.style.setProperty("--h2c", `color-mix(in srgb, ${st.color} 72%, transparent)`);
+  }
+
+  // background: a slide's own !bg fully overrides the deck default
+  let bg=slideDef.bg;
+  if(!bg && (st.bg || st.dim!=null)){
+    if(st.bg) bg = (/[./\\]|^data:|^https?:/i.test(st.bg)) ? {image:st.bg} : {color:st.bg};
+    bg = bg || {color:null};
+    if(st.dim!=null) bg.dim = clamp(parseFloat(st.dim),0,1);
+    if(st.tint)      bg.tint = st.tint;
+  }
+  if(bg){
+    if(bg.color) root.style.background=bg.color;
+    if(bg.image) root.style.backgroundImage=`url("${bg.image.replace(/"/g,'%22')}")`;
+    if(bg.dim>0){
+      const scrim=document.createElement("div"); scrim.className="bg-scrim";
+      scrim.style.background=bg.tint||"#000";
+      scrim.style.opacity=String(bg.dim);
+      root.appendChild(scrim);
+    }
+  }
+
+  const flow=document.createElement("div"); flow.className="flow";
+  if(slideDef.hasH1 && !slideDef.hasH3) flow.classList.add("title-slide");
+  const absLayer=document.createElement("div"); absLayer.className="abs-layer";
+  const svg=document.createElementNS(SVGNS,"svg");
+  svg.setAttribute("class","overlay"); svg.setAttribute("viewBox",`0 0 ${SW} ${SH}`);
+  root.append(flow,absLayer,svg);
+
+  // page number, e.g. `!set pagenum $N / $T` or `!set pagenum Slide $N of $T`
+  if(st.pagenum && st.pagenum!=="off" && opts.total){
+    const fmt = st.pagenum==="on" ? "$N / $T" : st.pagenum;
+    const pn=document.createElement("div"); pn.className="pageno";
+    pn.textContent=fmt.replace(/\$N/g,(opts.index||0)+1).replace(/\$T/g,opts.total);
+    root.appendChild(pn);
+  }
+
+  const items=new Map();       // id -> runtime item
+  const labels=new Map();      // label -> runtime item
+
+  for(const def of slideDef.items){
+    const it={def, el:null, shape:null, coords:def.coords?def.coords.map(c=>c.slice()):null,
+              r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false, scale:1};
+    if(["h1","h2","h3","p","li"].includes(def.kind))      buildText(it,flow,absLayer);
+    else if(def.kind==="img")                             buildImg(it,flow,absLayer);
+    else if(def.kind==="code")                            buildCode(it,flow,absLayer);
+    else if(def.kind==="embed")                           buildEmbed(it,flow,absLayer,opts);
+    else                                                  buildShape(it,svg);
+    setVisible(it,false);
+    items.set(def.id,it);
+    if(def.label) labels.set(def.label,it);
+  }
+  return {root,flow,absLayer,svg,items,labels,def:slideDef};
+}
+
+function applyTextStyle(el,style){
+  if(style.size)  el.style.fontSize=sizeToPx(style.size,SW)+"px";
+  if(style.color) el.style.color=style.color;
+  if(style.font)  el.style.fontFamily=style.font;
+  if(style.align) el.style.textAlign=style.align;
+  if(style.w)     el.style.width=sizeToPx(style.w,SW)+"px";
+  if(style.opacity) el.style.opacity=style.opacity;
+}
+const LANG_ALIASES={"c++":"cpp","h":"cpp","hpp":"cpp","py":"python","js":"javascript","ts":"typescript","sh":"bash","shell":"bash"};
+function buildCode(it,flow,absLayer){
+  const d=it.def, pre=document.createElement("pre"); pre.className="s-code";
+  const codeEl=document.createElement("code"); codeEl.className="hljs";
+  let html=null;
+  const lang=LANG_ALIASES[d.lang]||d.lang;
+  if(window.hljs && lang && window.hljs.getLanguage(lang)){
+    try{ html=window.hljs.highlight(d.code,{language:lang}).value; }catch(e){}
+  }
+  if(html!=null) codeEl.innerHTML=html;
+  else codeEl.textContent=d.code;          // no hljs / unknown language -> plain
+  pre.appendChild(codeEl);
+  applyTextStyle(pre,d.style);
+  placeItem(it,flow,absLayer,pre);
+}
+function placeItem(it,flow,absLayer,el){
+  if(it.def.pos){
+    const wrap=document.createElement("div"); wrap.className="abs-item";
+    wrap.style.left=cx(it.def.pos.x)+"px"; wrap.style.top=cy(it.def.pos.y)+"px";
+    if(it.def.style.anchor==="center") wrap.style.transform="translate(-50%,-50%)";
+    wrap.appendChild(el); absLayer.appendChild(wrap);
+    it.el=wrap; it.x=cx(it.def.pos.x); it.y=cy(it.def.pos.y); it.inner=el;
+  }else{
+    flow.appendChild(el); it.el=el; it.inner=el;
+  }
+}
+function buildText(it,flow,absLayer){
+  const d=it.def, el=document.createElement("div");
+  if(d.kind==="li"){
+    el.className=`s-li lv${d.lv}`;
+    el.innerHTML=`<span class="mk">${d.lv===0?"▸":"–"}</span><span class="tx">${inlineMd(d.text)}</span>`;
+  }else{
+    el.className={h1:"s-h1",h2:"s-h2",h3:"s-h3",p:"s-p"}[d.kind];
+    el.innerHTML=inlineMd(d.text);
+  }
+  applyTextStyle(el,d.style);
+  placeItem(it,flow,absLayer,el);
+}
+function buildImg(it,flow,absLayer){
+  const d=it.def, box=document.createElement("div"); box.className="s-img";
+  const img=document.createElement("img"); img.src=d.src; img.alt=d.alt||"";
+  const w=d.style.w?sizeToPx(d.style.w,SW):null, h=d.style.h?sizeToPx(d.style.h,SH):null;
+  if(w) img.style.width=w+"px"; else if(!h) img.style.width="500px";
+  if(h) img.style.height=h+"px";
+  if(d.style.opacity) img.style.opacity=d.style.opacity;
+  box.appendChild(img); it.img=img;
+  placeItem(it,flow,absLayer,box);
+}
+function buildEmbed(it,flow,absLayer,opts){
+  const d=it.def;
+  const w=d.style.w?sizeToPx(d.style.w,SW):Math.round(SW*0.6);
+  const h=d.style.h?sizeToPx(d.style.h,SH):Math.round(SH*0.62);
+  const box=document.createElement("div"); box.className="s-embed";
+  box.style.width=w+"px"; box.style.height=h+"px";
+  if(d.style.opacity) box.style.opacity=d.style.opacity;
+  it.embedW=w; it.embedH=h; it.embedBox=box;
+  if(opts.thumb){                       // don't spin up live iframes in the rail
+    box.classList.add("embed-ph");
+    let host=""; try{ host=new URL(d.src,location.href).host; }catch(e){ host=d.src; }
+    box.innerHTML=`<span>▷ ${escapeHtml(host||"embedded app")}</span>`;
+  }else{
+    const fr=document.createElement("iframe");
+    fr.src=d.src; fr.loading="lazy";
+    fr.setAttribute("allow","fullscreen; autoplay; clipboard-read; clipboard-write; camera; microphone; xr-spatial-tracking");
+    fr.setAttribute("referrerpolicy","no-referrer-when-downgrade");
+    box.appendChild(fr); it.iframe=fr;
+  }
+  placeItem(it,flow,absLayer,box);
+}
+function buildShape(it,svg){
+  const d=it.def, st=d.style;
+  const isBox = d.kind==="textbox";
+  const stroke = st.color || st.stroke || st.border || (isBox ? "none" : "#232830");
+  const thick  = st.thick!=null ? parseFloat(st.thick) : (isBox ? 0 : 4);
+  const fill   = st.fill || (isBox ? "rgba(31,111,107,0.12)" : "none");
+  const g=document.createElementNS(SVGNS,"g");
+  it.stroke=stroke; it.thick=thick;
+  if(d.kind==="line"||d.kind==="arrow"){
+    const ln=document.createElementNS(SVGNS,"line");
+    ln.setAttribute("stroke",stroke); ln.setAttribute("stroke-width",thick); ln.setAttribute("stroke-linecap","round");
+    g.appendChild(ln); it.lineEl=ln;
+    if(d.kind==="arrow"){ const head=document.createElementNS(SVGNS,"polygon"); head.setAttribute("fill",stroke); g.appendChild(head); it.headEl=head; }
+  }else{
+    const tag = isBox ? "rect" : {circle:"circle",ellipse:"ellipse",rect:"rect"}[d.kind];
+    const sh=document.createElementNS(SVGNS,tag);
+    sh.setAttribute("stroke",stroke); sh.setAttribute("stroke-width",thick); sh.setAttribute("fill",fill);
+    if(tag==="rect"){ const rad = st.round!=null ? sizeToPx(st.round,SW) : (isBox?12:6); sh.setAttribute("rx",rad); }
+    g.appendChild(sh); it.shapeEl=sh;
+  }
+  // optional inner text via a foreignObject (wraps, uses inline markdown)
+  if(d.text){
+    const fo=document.createElementNS(SVGNS,"foreignObject");
+    const body=document.createElement("div"); body.className="box-text";
+    const span=document.createElement("span"); span.className="box-inner";
+    span.innerHTML=inlineMd(d.text);
+    body.appendChild(span);
+    body.style.color = st.textcolor || st.color2 || (isBox ? "#233" : "#232830");
+    if(st.size)  body.style.fontSize=sizeToPx(st.size,SW)+"px";
+    body.style.textAlign = st.align||"center";
+    body.style.alignItems = {top:"flex-start",middle:"center",bottom:"flex-end"}[st.valign]||"center";
+    const pad = st.pad!=null ? sizeToPx(st.pad,SW) : 16;
+    body.style.padding=pad+"px";
+    fo.appendChild(body); g.appendChild(fo); it.fo=fo; it.foBody=body;
+  }
+  if(st.opacity) g.setAttribute("opacity",st.opacity);
+  svg.appendChild(g); it.el=g; it.shape=true;
+  updateShape(it);
+}
+function updateShape(it){
+  const d=it.def;
+  if(d.kind==="line"||d.kind==="arrow"){
+    const [[x1,y1],[x2,y2]]=it.coords;
+    it.lineEl.setAttribute("x1",x1); it.lineEl.setAttribute("y1",y1);
+    let ex=x2, ey=y2;
+    if(it.headEl){
+      const ang=Math.atan2(y2-y1,x2-x1), L=Math.max(14,it.thick*4.2), Wd=Math.max(9,it.thick*2.6);
+      ex=x2-Math.cos(ang)*L*0.8; ey=y2-Math.sin(ang)*L*0.8;   // shorten shaft under the head
+      const bx=x2-Math.cos(ang)*L, by=y2-Math.sin(ang)*L;
+      const nx=-Math.sin(ang), ny=Math.cos(ang);
+      it.headEl.setAttribute("points",
+        `${x2},${y2} ${bx+nx*Wd},${by+ny*Wd} ${bx-nx*Wd},${by-ny*Wd}`);
+    }
+    it.lineEl.setAttribute("x2",ex); it.lineEl.setAttribute("y2",ey);
+  }else if(d.kind==="circle"){
+    const [[x,y]]=it.coords; it.shapeEl.setAttribute("cx",x); it.shapeEl.setAttribute("cy",y); it.shapeEl.setAttribute("r",it.r);
+  }else if(d.kind==="ellipse"){
+    const [[x,y]]=it.coords; it.shapeEl.setAttribute("cx",x); it.shapeEl.setAttribute("cy",y);
+    it.shapeEl.setAttribute("rx",it.rx); it.shapeEl.setAttribute("ry",it.ry);
+  }else if(d.kind==="rect"||d.kind==="textbox"){
+    const [[x,y]]=it.coords; it.shapeEl.setAttribute("x",x); it.shapeEl.setAttribute("y",y);
+    it.shapeEl.setAttribute("width",it.w); it.shapeEl.setAttribute("height",it.h);
+  }
+  // keep inner text glued to the shape's bounding box
+  if(it.fo){
+    let bx,by,bw,bh;
+    if(d.kind==="circle"){ const [[x,y]]=it.coords; const r=it.r; bx=x-r; by=y-r; bw=bh=2*r; }
+    else if(d.kind==="ellipse"){ const [[x,y]]=it.coords; bx=x-it.rx; by=y-it.ry; bw=2*it.rx; bh=2*it.ry; }
+    else { const [[x,y]]=it.coords; bx=x; by=y; bw=it.w; bh=it.h; }
+    it.fo.setAttribute("x",bx); it.fo.setAttribute("y",by);
+    it.fo.setAttribute("width",Math.max(0,bw)); it.fo.setAttribute("height",Math.max(0,bh));
+  }
+}
+function setVisible(it,on){
+  it.visible=on;
+  it.el.classList.toggle("hidden-item",!on);
+  if(it.shape) it.el.style.visibility=on?"visible":"hidden";
+}
+
+/* ============================================================
+   ANIMATION ENGINE
+   ============================================================ */
+class Tween{
+  constructor(dur,onUpdate){ this.dur=Math.max(0.01,dur)*1000; this.onUpdate=onUpdate; this.done=false; }
+  start(){ return new Promise(res=>{
+    this.resolve=res; this.t0=performance.now();
+    const tick=now=>{ if(this.done) return;
+      const t=clamp((now-this.t0)/this.dur,0,1);
+      this.onUpdate(easeInOut(t));
+      if(t>=1){ this.done=true; res(); } else this.raf=requestAnimationFrame(tick);
+    };
+    this.raf=requestAnimationFrame(tick);
+  });}
+  finish(){ if(this.done) return; this.done=true; cancelAnimationFrame(this.raf); this.onUpdate(1); this.resolve&&this.resolve(); }
+}
+
+/* Build a Tween (or instant applier) for one animation on a rendered slide. */
+function makeAnim(a, render, warnings){
+  const it=render.labels.get(a.target);
+  if(!it){ warnings&&warnings.push(`animation targets unknown label “${a.target}”`); return null; }
+  const el=it.el;
+  switch(a.verb){
+    case "hide": return new Tween(a.dur,t=>{ el.style.opacity=String(1-t); if(t>=1){setVisible(it,false); el.style.opacity="";} });
+    case "show": return new Tween(a.dur,t=>{ if(!it.visible) setVisible(it,true); el.style.opacity=String(t); if(t>=1) el.style.opacity=""; });
+    case "move":{
+      if(it.shape){
+        const start=it.coords.map(c=>c.slice());
+        const dx=a.x-start[0][0], dy=a.y-start[0][1];
+        return new Tween(a.dur,t=>{ it.coords=start.map(c=>[c[0]+dx*t,c[1]+dy*t]); updateShape(it); });
+      }
+      liftOutOfFlow(it,render);
+      const x0=it.x,y0=it.y;
+      return new Tween(a.dur,t=>{ it.x=x0+(a.x-x0)*t; it.y=y0+(a.y-y0)*t;
+        el.style.left=it.x+"px"; el.style.top=it.y+"px"; });
+    }
+    case "point":{
+      if(!it.coords||it.coords.length<2) return null;
+      const i=a.n-1, s=it.coords[i].slice();
+      return new Tween(a.dur,t=>{ it.coords[i]=[s[0]+(a.x-s[0])*t, s[1]+(a.y-s[1])*t]; updateShape(it); });
+    }
+    case "size":{
+      if(it.embedBox){                   // embedded app: scale box, keep aspect
+        const w0=it.embedW, ratio=it.embedH/it.embedW;
+        return new Tween(a.dur,t=>{ const w=w0+(a.w-w0)*t;
+          it.embedW=w; it.embedH=w*ratio;
+          it.embedBox.style.width=w+"px"; it.embedBox.style.height=(w*ratio)+"px"; });
+      }
+      const img=it.img||(it.inner&&it.inner.querySelector&&it.inner.querySelector("img"));
+      if(!img) return null;
+      const w0=img.getBoundingClientRect().width/currentScale(render);
+      return new Tween(a.dur,t=>{ img.style.width=(w0+(a.w-w0)*t)+"px"; });
+    }
+    case "scale":{
+      const f0=it.scale;
+      const base=it.def.pos&&it.def.style.anchor==="center" ? "translate(-50%,-50%) " : "";
+      if(it.shape){
+        const bb=el.getBBox(), ox=bb.x+bb.width/2, oy=bb.y+bb.height/2;
+        return new Tween(a.dur,t=>{ it.scale=f0+(a.f-f0)*t;
+          el.setAttribute("transform",`translate(${ox} ${oy}) scale(${it.scale}) translate(${-ox} ${-oy})`); });
+      }
+      el.style.transformOrigin="center center";
+      return new Tween(a.dur,t=>{ it.scale=f0+(a.f-f0)*t; el.style.transform=base+`scale(${it.scale})`; });
+    }
+    case "color":{
+      const B=resolveColor(a.color);
+      if(it.foBody){                     // shape carrying text -> animate the text color
+        const A=resolveColor(getComputedStyle(it.foBody).color);
+        return new Tween(a.dur,t=>{ it.foBody.style.color=mixColor(A,B,t); });
+      }
+      if(it.shape){
+        const A=resolveColor(it.stroke);
+        return new Tween(a.dur,t=>{ const c=mixColor(A,B,t); it.stroke=t>=1?a.color:it.stroke;
+          it.lineEl&&it.lineEl.setAttribute("stroke",c);
+          it.headEl&&it.headEl.setAttribute("fill",c);
+          it.shapeEl&&it.shapeEl.setAttribute("stroke",c); });
+      }
+      const tgt=it.inner||el, A=resolveColor(getComputedStyle(tgt).color);
+      return new Tween(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
+    }
+    case "textsize":{
+      const tgt=it.foBody||it.inner||el;
+      const s0=parseFloat(getComputedStyle(tgt).fontSize);
+      const s1=sizeToPx(a.size,SW);
+      if(s1==null) return null;
+      return new Tween(a.dur,t=>{ tgt.style.fontSize=(s0+(s1-s0)*t)+"px"; });
+    }
+  }
+  return null;
+}
+function currentScale(render){ const r=render.root.getBoundingClientRect(); return r.width/SW || 1; }
+function liftOutOfFlow(it,render){
+  if(it.def.pos || it.lifted) return;
+  const s=currentScale(render);
+  const r=it.el.getBoundingClientRect(), sr=render.root.getBoundingClientRect();
+  const x=(r.left-sr.left)/s, y=(r.top-sr.top)/s, w=r.width/s;
+  const ph=document.createElement("div"); ph.style.height=(r.height/s)+"px"; ph.style.width=w+"px"; ph.style.visibility="hidden";
+  it.el.parentNode.insertBefore(ph,it.el);
+  it.el.style.position="absolute"; it.el.style.left=x+"px"; it.el.style.top=y+"px"; it.el.style.width=w+"px"; it.el.style.margin="0";
+  render.absLayer.appendChild(it.el);
+  it.x=x; it.y=y; it.lifted=true;
+}
+
+/* ============================================================
+   PLAYER — owns one rendered slide and walks its steps.
+   ============================================================ */
+class Player{
+  constructor(slideDef, holder, opts){
+    this.def=slideDef;
+    this.render=renderSlide(slideDef, opts);
+    holder.innerHTML=""; holder.appendChild(this.render.root);
+    this.step=-1;           // no step applied yet
+    this.busy=false; this.ff=false; this.live=[];
+  }
+  get stepCount(){ return this.def.steps.length; }
+
+  applyPhaseInstant(ph){
+    for(const id of ph.reveals){ const it=this.render.items.get(id); it&&setVisible(it,true); }
+    for(const a of ph.anims){ const tw=makeAnim(a,this.render); tw&&tw.finish(); }
+  }
+  jumpToStep(target){                      // instant, deterministic
+    for(let s=this.step+1; s<=target && s<this.stepCount; s++)
+      for(const ph of this.def.steps[s]) this.applyPhaseInstant(ph);
+    this.step=Math.min(target,this.stepCount-1);
+  }
+  async runStep(s,onDone){                 // animated, honoring >>> chains
+    if(s>=this.stepCount) return;
+    this.busy=true; this.ff=false; this.step=s;
+    for(const ph of this.def.steps[s]){
+      if(this.ff){ this.applyPhaseInstant(ph); continue; }
+      for(const id of ph.reveals){
+        const it=this.render.items.get(id);
+        if(it){ setVisible(it,true); if(!it.shape){ it.el.animate([{opacity:0},{opacity:1}],{duration:220}); } }
+      }
+      const tws=ph.anims.map(a=>makeAnim(a,this.render)).filter(Boolean);
+      this.live=tws;
+      await Promise.all(tws.map(t=>t.start()));
+      this.live=[];
+    }
+    this.busy=false; onDone&&onDone();
+  }
+  fastForward(){ this.ff=true; for(const t of this.live) t.finish(); }
+  /* advance() -> true if it consumed the keypress, false if slide is finished */
+  advance(){
+    if(this.busy){ this.fastForward(); return true; }
+    if(this.step+1<this.stepCount){ this.runStep(this.step+1); return true; }
+    return false;
+  }
+}
+</script>
+<script>
+/* ============================================================
+   APP — editor, preview, presentation mode, keyboard, files.
+   ============================================================ */
+"use strict";
+let deck={slides:[],warnings:[]};
+let selected=0;
+
+/* ---------- fitting a slide into a holder ---------- */
+function fitInto(holder, maxW, maxH){
+  const s=Math.min(maxW/SW, maxH/SH);
+  holder.style.width=(SW*s)+"px"; holder.style.height=(SH*s)+"px";
+  const slide=holder.querySelector(".slide");
+  if(slide) slide.style.transform=`scale(${s})`;
+  return s;
+}
+
+/* ---------- editor preview ---------- */
+const srcEl=$("#src"), thumbRail=$("#thumbRail"), stageHolder=$("#stageHolder"), warnbar=$("#warnbar");
+let parseTimer=null;
+srcEl.addEventListener("input",()=>{ clearTimeout(parseTimer); parseTimer=setTimeout(refresh,300); });
+srcEl.addEventListener("keydown",e=>{
+  if(e.key==="Tab"){ e.preventDefault();
+    const {selectionStart:a,selectionEnd:b,value:v}=srcEl;
+    srcEl.value=v.slice(0,a)+"  "+v.slice(b); srcEl.selectionStart=srcEl.selectionEnd=a+2;
+    srcEl.dispatchEvent(new Event("input"));
+  }
+});
+
+let slideRanges=[];   // [startOffset, endOffset] in the editor text, per slide
+
+function computeSlideRanges(text){
+  // Same fence-aware logic as the parser (splitSlides), so the caret->slide
+  // mapping can never disagree with how slides are actually split.
+  return splitSlides(text).map(sl=>[sl.start, sl.end]);
+}
+function slideIndexAt(pos){
+  for(let i=0;i<slideRanges.length;i++){ if(pos>=slideRanges[i][0] && pos<=slideRanges[i][1]) return i; }
+  return clamp(slideRanges.length-1,0,Infinity);
+}
+
+function refresh(){
+  deck=parseScript(srcEl.value);
+  slideRanges=computeSlideRanges(srcEl.value);
+  selected=clamp(selected,0,deck.slides.length-1);
+  warnbar.className="warnbar"+(deck.warnings.length?" on":"");
+  warnbar.innerHTML=deck.warnings.map(w=>"⚠ "+escapeHtml(w)).join("<br>");
+  rebuildEditorThumbs();
+  showPreview();          // rebuilds only if the selected slide's source changed
+}
+function buildThumbs(container,onPick,markSelected){
+  container.innerHTML="";
+  deck.slides.forEach((sd,i)=>{
+    const t=document.createElement("div"); t.className="thumb"+((markSelected&&i===selected)?" sel":"");
+    t.innerHTML=`<span class="num">${i+1}</span>`;
+    const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
+    const p=new Player(sd,frame,{thumb:true,settings:deck.settings,index:i,total:deck.slides.length}); p.jumpToStep(sd.steps.length-1);
+    fitInto(frame,144,81);
+    t.addEventListener("click",()=>onPick(i));
+    t.addEventListener("dblclick",()=>startPresent(i,{fs:true}));
+    container.appendChild(t);
+  });
+}
+/* Rebuild the big preview only when the selected slide's own source text changes.
+   This keeps a live-embed preview from reloading its iframe on every keystroke
+   elsewhere in the script. Resize just re-fits the existing render. */
+let lastPreviewKey=null;
+function previewKey(i){ const r=slideRanges[i]||[0,0]; return i+"|"+srcEl.value.slice(r[0],r[1]); }
+function showPreview(){
+  if(!deck.slides.length){ stageHolder.innerHTML=""; lastPreviewKey=null; return; }
+  const key=previewKey(selected);
+  if(key!==lastPreviewKey){
+    const sd=deck.slides[selected];
+    const p=new Player(sd,stageHolder,{settings:deck.settings,index:selected,total:deck.slides.length}); p.jumpToStep(sd.steps.length-1);
+    lastPreviewKey=key;
+  }
+  const stage=stageHolder.parentElement, r=stage.getBoundingClientRect();
+  fitInto(stageHolder, r.width-44, r.height-44);
+  [...thumbRail.children].forEach((el,i)=>el.classList.toggle("sel",i===selected));
+}
+window.addEventListener("resize",()=>{ if(presentOn) layoutPresent(); else showPreview(); });
+
+/* thumbnails need a stable click handler (rebuild-free selection) */
+function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>jumpEditorToSlide(i),true); }
+
+/* click a preview thumbnail -> move the editor caret into that slide */
+function jumpEditorToSlide(i){
+  selected=i; showPreview();
+  const r=slideRanges[i]; if(!r) return;
+  let caret=r[0];
+  const v=srcEl.value;
+  while(caret<r[1] && (v[caret]==="\n"||v[caret]===" ")) caret++;   // skip to first content
+  srcEl.focus();
+  srcEl.setSelectionRange(caret,caret);
+  scrollCaretIntoView(caret);
+}
+function scrollCaretIntoView(pos){
+  const before=srcEl.value.slice(0,pos);
+  const line=(before.match(/\n/g)||[]).length;
+  const lh=parseFloat(getComputedStyle(srcEl).lineHeight)||20;
+  const target=line*lh - srcEl.clientHeight/3;
+  srcEl.scrollTop=clamp(target,0,srcEl.scrollHeight);
+}
+
+/* editor caret moved -> select the slide being edited (no rebuild unless changed) */
+function syncFromCaret(){
+  if(document.activeElement!==srcEl || presentOn) return;
+  const i=slideIndexAt(srcEl.selectionStart);
+  if(i!==selected){ selected=i; showPreview(); }
+  else { [...thumbRail.children].forEach((el,k)=>el.classList.toggle("sel",k===selected)); }
+}
+document.addEventListener("selectionchange",()=>{ if(document.activeElement===srcEl) syncFromCaret(); });
+srcEl.addEventListener("click",syncFromCaret);
+srcEl.addEventListener("keyup",e=>{ if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","PageUp","PageDown","Home","End"].includes(e.key)) syncFromCaret(); });
+
+/* ---------- presentation mode ---------- */
+const presentEl=$("#present"), pholder=$("#pholder"), hudCount=$("#hudCount"),
+      hudDots=$("#hudDots"), overviewEl=$("#overview"), overviewList=$("#overviewList"),
+      blackout=$("#blackout");
+let presentOn=false, curSlide=0, player=null;
+
+function enterFullscreen(screenOpt){
+  const req = presentEl.requestFullscreen ? presentEl.requestFullscreen(screenOpt?{screen:screenOpt}:undefined)
+            : presentEl.webkitRequestFullscreen ? Promise.resolve(presentEl.webkitRequestFullscreen()) : Promise.reject();
+  return Promise.resolve(req).catch(()=>{});
+}
+function toggleFullscreen(){
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  else enterFullscreen();
+}
+function startPresent(fromIndex, o={}){
+  refresh();
+  if(!deck.slides.length) return;
+  srcEl.blur();
+  presentOn=true; presentEl.classList.add("on");
+  gotoSlide(clamp(fromIndex,0,deck.slides.length-1),{animate:true});
+  if(o.fs && !document.fullscreenElement) enterFullscreen();   // valid only within a user gesture
+}
+function exitPresent(){
+  presentOn=false; presentEl.classList.remove("on");
+  overviewEl.classList.remove("on"); blackout.classList.remove("on");
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+}
+function layoutPresent(){
+  fitInto(pholder, window.innerWidth-24, window.innerHeight-24);
+}
+function gotoSlide(i,{animate=false,lastStep=false}={}){
+  curSlide=clamp(i,0,deck.slides.length-1);
+  player=new Player(deck.slides[curSlide],pholder,{settings:deck.settings,index:curSlide,total:deck.slides.length});
+  layoutPresent();
+  const last=player.stepCount-1;
+  if(lastStep) player.jumpToStep(last);
+  else if(animate) player.runStep(0,updateHud);
+  else player.jumpToStep(0);
+  updateHud();
+}
+function updateHud(){
+  hudCount.textContent=`${curSlide+1} / ${deck.slides.length}`;
+  hudDots.innerHTML="";
+  if(player.stepCount>1)
+    for(let s=0;s<player.stepCount;s++){
+      const d=document.createElement("span");
+      d.className="dot"+(s<=player.step?" done":"");
+      hudDots.appendChild(d);
+    }
+}
+function advance(){
+  if(!player) return;
+  if(player.advance()){ updateHud(); return; }
+  if(curSlide+1<deck.slides.length) gotoSlide(curSlide+1,{animate:true});
+}
+function backStep(){
+  if(!player) return;
+  if(player.busy){ player.fastForward(); updateHud(); return; }
+  if(player.step>0){ const target=player.step-1; gotoSlide(curSlide); player.jumpToStep(target); }
+  else if(curSlide>0) gotoSlide(curSlide-1,{lastStep:true});
+  updateHud();
+}
+function toggleOverview(){
+  const on=!overviewEl.classList.contains("on");
+  overviewEl.classList.toggle("on",on);
+  if(on){
+    overviewList.innerHTML="";
+    deck.slides.forEach((sd,i)=>{
+      const t=document.createElement("div"); t.className="thumb"+(i===curSlide?" sel":"");
+      t.innerHTML=`<span class="num">${i+1}</span>`;
+      const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
+      const p=new Player(sd,frame,{thumb:true,settings:deck.settings,index:i,total:deck.slides.length}); p.jumpToStep(sd.steps.length-1);
+      fitInto(frame,144,81);
+      t.addEventListener("click",()=>{ overviewEl.classList.remove("on"); gotoSlide(i); });
+      overviewList.appendChild(t);
+    });
+  }
+}
+
+/* ---------- keyboard ---------- */
+document.addEventListener("keydown",e=>{
+  if($("#help").classList.contains("on")){ if(e.key==="Escape")toggleHelp(false); return; }
+  if(!presentOn){
+    if(e.key==="F5"){ e.preventDefault(); startPresent(0,{fs:true}); }
+    return;
+  }
+  if(e.target===srcEl) return;
+  switch(e.key){
+    case " ": case "ArrowRight": case "PageDown": e.preventDefault(); advance(); break;
+    case "ArrowLeft": case "PageUp": e.preventDefault(); backStep(); break;
+    case "Backspace": e.preventDefault(); gotoSlide(Math.max(0,curSlide-1)); break;
+    case "n": case "N": gotoSlide(curSlide+1,{animate:true}); break;
+    case "p": case "P": gotoSlide(Math.max(0,curSlide-1)); break;
+    case "v": case "V": toggleOverview(); break;
+    case "b": case "B": blackout.classList.toggle("on"); break;
+    case "f": case "F": toggleFullscreen(); break;
+    case "Home": gotoSlide(0); break;
+    case "End": gotoSlide(deck.slides.length-1,{lastStep:true}); break;
+    case "?": toggleHelp(true); break;
+    case "Escape": overviewEl.classList.contains("on")?overviewEl.classList.remove("on"):exitPresent(); break;
+  }
+});
+presentEl.addEventListener("click",e=>{
+  if(overviewEl.contains(e.target)||$("#hud").contains(e.target)) return;
+  if(e.target.closest&&e.target.closest(".s-embed")) return;   // interacting with an embedded app
+  advance();
+});
+
+/* ---------- files, buttons ---------- */
+$("#btnPresent").addEventListener("click",()=>startPresent(0,{fs:true}));
+$("#btnPresent2").addEventListener("click",presentOnSecondScreen);
+$("#hudFs").addEventListener("click",toggleFullscreen);
+
+/* Present fullscreen on a second display (Window Management API — Chromium).
+   Falls back to plain fullscreen anywhere else. */
+async function presentOnSecondScreen(){
+  startPresent(selected);
+  try{
+    const det=await window.getScreenDetails();       // permission prompt on first use
+    const other=det.screens.find(sc=>sc!==det.currentScreen)||det.currentScreen;
+    await presentEl.requestFullscreen({screen:other});
+  }catch(e){ enterFullscreen(); }
+}
+if(window.screen && "isExtended" in screen){
+  const updExt=()=>{ $("#btnPresent2").style.display = screen.isExtended ? "" : "none"; };
+  updExt();
+  if(screen.addEventListener) screen.addEventListener("change",updExt);
+}
+$("#btnPresentHere").addEventListener("click",()=>startPresent(selected,{fs:true}));
+$("#btnOpen").addEventListener("click",()=>$("#fileIn").click());
+$("#fileIn").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ srcEl.value=rd.result; selected=0; refresh(); };
+  rd.readAsText(f); e.target.value="";
+});
+$("#btnSave").addEventListener("click",()=>{
+  const blob=new Blob([srcEl.value],{type:"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download="presentation.psl"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+});
+$("#btnSample").addEventListener("click",()=>{ srcEl.value=SAMPLE; selected=0; refresh(); });
+function toggleHelp(on){ $("#help").classList.toggle("on",on); }
+$("#btnHelp").addEventListener("click",()=>toggleHelp(true));
+$("#btnHelpClose").addEventListener("click",()=>toggleHelp(false));
+$("#help").addEventListener("click",e=>{ if(e.target===$("#help")) toggleHelp(false); });
+
+/* ---------- sample deck (doubles as a tutorial) ---------- */
+const DEMO_IMG="data:image/svg+xml;utf8,"+encodeURIComponent(
+`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+<rect width="400" height="300" rx="10" fill="#1f6f6b"/>
+<circle cx="200" cy="128" r="70" fill="#fbf9f4"/>
+<circle cx="176" cy="112" r="10" fill="#232830"/><circle cx="224" cy="112" r="10" fill="#232830"/>
+<path d="M168 152 q32 26 64 0" stroke="#232830" stroke-width="7" fill="none" stroke-linecap="round"/>
+<text x="200" y="252" font-family="Georgia,serif" font-size="26" fill="#fbf9f4" text-anchor="middle">specimen #42</text>
+</svg>`);
+
+const SAMPLE=`% ===== A tour of the Portable Slide Language (PSL) =====
+% Deck-wide settings can go anywhere; the top is conventional:
+!set pagenum $N / $T
+# SlideDown
+## A tour of the Portable Slide Language.
+---
+### Basics
+Plain lines become paragraphs. Inline **bold**, *italic*, and \`code\` all work.
+Here is a simple list:
+- Bullet one
+- Bullet two
+  - An indented sub-bullet (2 spaces)
+- Bullet three showing **bold** and *italic* text
+---
+### Pauses with ...
+% Lines starting with % are comments and are ignored.
+Each press of the spacebar reveals the next chunk:
+...
+- Bullet one appears
+...
+- Bullet two appears
+...
+- Bullet three appears
+  - This sub-bullet comes with it (no ... above it)
+...
+  - But this one waits for its own keypress
+---
+### Placement, images, and styling
+% Position anything with @(x,y) — fractions of the slide, or pixels.
+@(0.55, 0.18) {w=0.34} ![A friendly specimen](${DEMO_IMG})
+- Bullets still flow on the left
+- {color=#b03030, size=36px} Styled text via {color=..., size=...}
+- @(0.58, 0.72) This line was placed with @(0.58, 0.72)
+---
+!bg(#14212b)
+### Backgrounds and shapes
+% !bg(#color) or !bg(url) sets the slide background. Style text to match:
+{color=#e8e4dc} Shapes live in a 1280×720 space (fractions work too):
+[boxA] {color=#e2a84b, thick=5} !rect (0.10, 0.35) (0.22, 0.22)
+[ringB] {color=#7fd0c5, thick=5} !circle (0.72, 0.46) 0.14
+[link] {color=#e8e4dc, thick=4} !arrow (0.33, 0.46) (0.56, 0.46)
+@(0.115, 0.60) {color=#e2a84b} a rect, labeled boxA
+@(0.63, 0.66) {color=#7fd0c5} a circle, labeled ringB
+---
+### Animations
+% Label things, then change them. Consecutive !anim lines run together.
+[dot] {color=#1f6f6b, fill=#1f6f6b} !circle (0.15, 0.55) 0.05
+[arr] {thick=5} !arrow (0.15, 0.75) (0.35, 0.75)
+[cap] @(0.12, 0.86) {size=26px} watch the dot and the arrow…
+...
+% These two run simultaneously (one keypress):
+!anim dot move (0.75, 0.30) 1.2s
+!anim arr point 2 (0.80, 0.55) 1.2s
+...
+% A >>> chain: each part starts when the previous one finishes.
+!anim dot color #c23b22 0.5s
+>>>
+!anim dot scale 3 0.6s
+>>>
+!anim dot scale 1 0.4s
+!anim cap color #c23b22 0.4s
+...
+!anim arr hide 0.5s
+!anim cap textsize 40px 0.7s
+---
+### Image animations
+[pic] @(0.36, 0.22) {w=0.28} ![specimen](${DEMO_IMG})
+...
+!anim pic size 0.45 1s
+>>>
+!anim pic move (0.60, 0.35) 0.8s
+>>>
+!anim pic size 0.18 0.8s
+...
+!anim pic hide
+@(0.30, 0.45) {size=44px, color=#1f6f6b} *…and it's gone.*
+---
+% A dimmed background keeps text readable over a busy image.
+{dim=0.55, tint=#0a1a2a} !bg(${DEMO_IMG})
+### Dimmed backgrounds
+{color=#f4f1ea} The background image is scrimmed 55% so this text stays legible.
+- {color=#e8e4dc} Use {dim=0.0–1.0} and an optional {tint=#color}
+- {color=#e8e4dc} Or dim on its own line: \`!dim 0.4\`
+---
+### Text boxes
+% !textbox (x,y) (w,h) text  — a rectangle with wrapped text inside.
+[card] {fill=#1f6f6b, textcolor=#f4f1ea, size=30px} !textbox (0.08,0.32) (0.4,0.4) A **text box** wraps its text and can be *labeled*, filled, and animated.
+% Any shape can hold text too — here a circle:
+[node] {fill=#e2a84b22, color=#e2a84b, thick=4, textcolor=#8a5a12, size=26px} !circle (0.74,0.52) 0.2 centered text inside a circle
+...
+!anim card move (0.08, 0.10) 0.8s
+>>>
+!anim card color #c23b22 0.6s
+---
+% Embed any web app you've built by URL. Position and size like an image.
+### Embedded web apps
+[app] @(0.30, 0.16) {w=0.62, h=0.68} !embed(https://example.com)
+- Live iframe in present mode
+- Thumbnails show a lightweight placeholder
+- Animate it: move, scale, size, hide/show
+...
+!anim app scale 0.9 0.5s
+---
+### Code blocks
+Fenced code is highlighted automatically (C++, Python, JS, and more):
+{w=0.56} \`\`\`cpp
+#include <print>
+
+int main() {
+  std::println("Example Code Block!");
+}
+\`\`\`
+@(0.63, 0.34) {w=0.33, size=19px} \`\`\`python
+def fib(n):
+    a, b = 0, 1
+    while a < n:
+        yield a
+        a, b = b, a + b
+\`\`\`
+---
+### Deck-wide styling with !set
+- This deck sets \`!set pagenum $N / $T\` — see the corner
+- \`!set bg\` / \`!set color\` / \`!set accent\` — default background & colors
+- \`!set font\` and \`!set headfont\` — change every slide's fonts
+- {font=Courier New, monospace} …or per element: {font=Courier New, monospace}
+---
+# That's the tour
+## space · n/p · Backspace · v · b · f — and ? for the full reference
+`;
+
+ /* ---------- boot: viewer mode via URL, else the sample deck ----------
+    Post slidedown.html + your .psl script online, then share:
+      slidedown.html?present=my_talk.psl        (relative or absolute URL)
+      slidedown.html?present=...&slide=5        (start on slide 5)          */
+(function boot(){
+  const q=new URLSearchParams(location.search);
+  const remote=q.get("present")||q.get("script");
+  if(!remote){ srcEl.value=SAMPLE; refresh(); return; }
+  srcEl.value="% Loading "+remote+" …"; refresh();
+  fetch(remote)
+    .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
+    .then(txt=>{
+      srcEl.value=txt; selected=0; refresh();
+      const s=parseInt(q.get("slide"),10);
+      startPresent(isNaN(s)?0:s-1);            // fullscreen needs a gesture: press f or ⛶
+    })
+    .catch(err=>{
+      srcEl.value="### Could not load the presentation\n"
+        +"{color=#b03030} URL: "+remote+"\n"
+        +"{color=#b03030} "+String(err).replace(/\n/g," ")+"\n"
+        +"Check the address, and that the host allows cross-origin requests.\n"
+        +"---\n"+SAMPLE;
+      selected=0; refresh();
+    });
+})();
+</script>
+</body>
+</html>
