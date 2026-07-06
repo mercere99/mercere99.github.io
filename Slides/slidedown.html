@@ -173,6 +173,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <h3>Structure</h3>
     <table>
       <tr><td>---</td><td>Start a new slide.</td></tr>
+      <tr><td>!---</td><td>Start a <b>hidden</b> slide — skipped entirely (not shown, not numbered, not executed). Handy for backup slides; switch back with a plain <code>---</code> later.</td></tr>
       <tr><td># Title / ## Subtitle</td><td>Big centered title and subtitle (title slides).</td></tr>
       <tr><td>### Slide title</td><td>Heading at the top of a regular slide.</td></tr>
       <tr><td>- item / &nbsp;&nbsp;- sub-item</td><td>Bullets; indent 2 spaces per level. <code>**bold**</code>, <code>*italic*</code>, <code>`code`</code> work in any text.</td></tr>
@@ -190,7 +191,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>\${test*2 + 1}</td><td>Math works, with normal precedence.</td></tr>
       <tr><td>\${test = test + 1}</td><td>Assignment: prints the new value <i>and</i> updates the variable. Expressions run at parse time, top to bottom, so results are deterministic.</td></tr>
       <tr><td>\${slide_num} · \${num_slides}</td><td>Built-ins: current slide number and total slide count.</td></tr>
-      <tr><td>!footer \${slide_num} / \${num_slides}</td><td>Deck-wide footer in the corner of every slide, re-evaluated per slide — the flexible replacement for a page number. <code>!footer</code> alone clears it.</td></tr>
+      <tr><td>\${min(3,7)} · \${sin(pi/2)} · \${test > 4}</td><td>Functions: <code>min max sin cos tan exp log log2 sqrt abs floor ceil round</code> (with built-in <code>pi</code>). Comparisons <code>< <= > >= == !=</code> return 1 or 0.</td></tr>
+      <tr><td>\${pic.x} · \${box.cy} · \${arr.x2}</td><td>Members of any <code>[label]</code>ed element (values as declared, in px): all elements have <code>x y</code> (+ <code>w h cx cy</code> when known); lines/arrows add <code>x1 y1 x2 y2</code>; circles <code>r</code>; ellipses <code>rx ry</code>. Great for attaching one element to another.</td></tr>
+      <tr><td>!all<br>&nbsp;&nbsp;…lines…</td><td>Everything after <code>!all</code> (to the end of that slide) is pasted at the top of <b>every</b> slide, then evaluated per slide — so <code>\${slide_num}</code> is correct. Build footers, headers, watermarks, running counters. One block per deck.</td></tr>
+      <tr><td>!set coords absolute</td><td>Undistorted geometry: fractions on <b>both</b> axes map to the slide height (one unit = 720px), so <code>!rect (…)(0.3,0.3)</code> is a true square. The slide is <code>aspect</code> (≈1.778) units wide; pixels (values &gt; 1) are always undistorted. <code>!set coords fraction</code> restores the default (x → width, y → height). Built-ins: <code>slide_w slide_h aspect</code>.</td></tr>
     </table>
 
     <h3>Placement, labels, styling (prefixes, any order, before content)</h3>
@@ -286,11 +290,12 @@ const mixColor=(A,B,t)=>`rgba(${Math.round(A.r+(B.r-A.r)*t)},${Math.round(A.g+(B
 /* Split the script into slide slabs at lines that are exactly `---`,
    but NOT inside a ``` code fence. Returns char offsets so the editor
    can map caret position -> slide with identical logic. */
+// A fence may open after position/label/style prefixes, e.g.  {w=0.5} ```cpp
+const FENCE_OPEN=/^(?:@\([^)]*\)\s*|\[[\w-]+\]\s*|\{[^}]*\}\s*)*```/;
 function splitSlides(text){
   const lines=text.replace(/\r\n?/g,"\n").split("\n");
-  // A fence may open after position/label/style prefixes, e.g.  {w=0.5} ```cpp
-  const FENCE_OPEN=/^(?:@\([^)]*\)\s*|\[[\w-]+\]\s*|\{[^}]*\}\s*)*```/;
-  const slabs=[]; let buf=[], slabStart=0, off=0, inFence=false;
+  const slabs=[]; let buf=[], slabStart=0, off=0, inFence=false, hidden=false;
+  const flush=()=>{ slabs.push({start:slabStart, end:off, body:buf.join("\n"), hidden}); buf=[]; };
   for(const L of lines){
     const t=L.trim();
     if(inFence){
@@ -298,36 +303,77 @@ function splitSlides(text){
       buf.push(L);
     }else if(FENCE_OPEN.test(t)){
       inFence=true; buf.push(L);
-    }else if(t==="---"){
-      slabs.push({start:slabStart, end:off, body:buf.join("\n")});
-      buf=[]; slabStart=off+L.length+1;
+    }else if(t==="---"||t==="!---"){
+      flush(); hidden=(t==="!---"); slabStart=off+L.length+1;
     }
     else buf.push(L);
     off+=L.length+1;
   }
-  slabs.push({start:slabStart, end:Math.max(slabStart,off-1), body:buf.join("\n")});
+  slabs.push({start:slabStart, end:Math.max(slabStart,off-1), body:buf.join("\n"), hidden});
   return slabs;
+}
+
+/* ---------- coordinates ----------
+   Values with |v| <= 1 are fractions; larger values are pixels in the
+   1280x720 logical space. Default ("fraction") mode maps x-fractions to the
+   slide WIDTH and y-fractions to the HEIGHT — convenient for layout, but
+   distorting for geometry. After `!set coords absolute`, fractions on BOTH
+   axes map to the slide HEIGHT (one unit = 720px), so shapes keep their true
+   aspect; the slide is then `aspect` (16/9 ~ 1.778) units wide. Pixels are
+   always undistorted. Built-ins: slide_w, slide_h, aspect, pi. */
+const isAbs = vars => vars && vars.coords==="absolute";
+const cvx  = (v,vars) => Math.abs(v)<=1 ? v*(isAbs(vars)?SH:SW) : v;
+const cvy  = (v,vars) => Math.abs(v)<=1 ? v*SH : v;
+const cvlen= (v,vars,span) => Math.abs(v)<=1 ? v*(isAbs(vars)?SH:span) : v;
+/* style lengths ("44px" | "2em" | fraction | px) — parse-time version */
+function styleLen(v, span, vars){
+  if(v==null) return null;
+  const s=String(v).trim();
+  if(s.endsWith("px")) return parseFloat(s);
+  if(s.endsWith("em")) return parseFloat(s)*30;
+  const n=parseFloat(s);
+  return isNaN(n)?null:cvlen(n,vars,span);
 }
 
 function parseScript(text){
   const warnings=[];
-  const vars={};                          // deck variables (!set) + built-ins
-  const slabs=splitSlides(text);
+  const vars={ __labels:{}, slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI };
+  const slabs=splitSlides(text).filter(sl=>!sl.hidden);   // !--- slides are skipped entirely
   vars.num_slides=slabs.length;
+
+  // Extract the !all block: everything from an `!all` line to the end of that
+  // slab is pasted at the top of every OTHER slide, then parsed per slide —
+  // so ${slide_num} etc. evaluate with each slide's own values. The declaring
+  // slide keeps its original body (the block simply runs in place there, in
+  // written order, with accurate line numbers). One block per deck.
+  const allLines=[]; let allSlab=-1;
+  slabs.forEach((sl,si)=>{
+    const lines=sl.body.split("\n"); let inF=false;
+    for(let k=0;k<lines.length;k++){
+      const t=lines[k].trim();
+      if(inF){ if(t.startsWith("```")) inF=false; continue; }
+      if(FENCE_OPEN.test(t)){ inF=true; continue; }
+      if(/^!all\b/i.test(t)){
+        if(allSlab<0){
+          allSlab=si;
+          const m=t.match(/^!all\b\s*(.*)$/i);
+          if(m[1]) allLines.push(m[1]);
+          for(let j=k+1;j<lines.length;j++) allLines.push(lines[j]);
+        }else{
+          warnings.push(`slide ${si+1}: only one !all block per deck — extra !all ignored (its lines run on this slide only)`);
+        }
+        break;
+      }
+    }
+  });
+  const allText=allLines.join("\n");
+
   const slides=slabs.map((sl,si)=>{
     vars.slide_num=si+1;
-    const s=parseSlide(sl.body, si, warnings, vars);
-    s.varsSnapshot={...vars};             // state as of the end of this slide
-    return s;
+    const prepend = allText && si!==allSlab;
+    const body = prepend ? allText+"\n"+sl.body : sl.body;
+    return parseSlide(body, si, warnings, vars, prepend?allLines.length:0);
   });
-  // The !footer template is evaluated once per slide, against that slide's
-  // variable snapshot, so ${slide_num} etc. are correct on every slide.
-  if(vars.__footer){
-    slides.forEach((s,i)=>{
-      const scratch={...s.varsSnapshot, slide_num:i+1, num_slides:slides.length};
-      s.footerText=substVars(vars.__footer, scratch, warnings, i, 0);
-    });
-  }
   return {slides, settings:vars, warnings};
 }
 
@@ -337,6 +383,10 @@ function parseScript(text){
    single top-level assignment (name = expr). `+` concatenates if either
    side is a string. Evaluated at PARSE time in document order, so
    assignments are deterministic and re-renders never re-run them. */
+const EXPR_FNS={min:Math.min,max:Math.max,sin:Math.sin,cos:Math.cos,tan:Math.tan,
+  exp:Math.exp,log:Math.log,log2:Math.log2,sqrt:Math.sqrt,abs:Math.abs,
+  floor:Math.floor,ceil:Math.ceil,round:Math.round};
+
 function evalExpr(src, vars){
   let i=0;
   function ws(){ while(i<src.length && /\s/.test(src[i])) i++; }
@@ -346,16 +396,38 @@ function evalExpr(src, vars){
     ws();
     if(i>=src.length) throw new Error("unexpected end of expression");
     const c=src[i];
-    if(c==="("){ i++; const v=addsub(); ws(); if(src[i]!==")") throw new Error("missing “)”"); i++; return v; }
+    if(c==="("){ i++; const v=comparison(); ws(); if(src[i]!==")") throw new Error("missing “)”"); i++; return v; }
     if(c==="-"){ i++; return -num(primary(),"-"); }
     if(c==="+"){ i++; return  num(primary(),"+"); }
     if(c==='"'||c==="'"){ const q=c; let j=i+1,s="";
       while(j<src.length&&src[j]!==q) s+=src[j++];
       if(src[j]!==q) throw new Error("unterminated string"); i=j+1; return s; }
     let m=/^[A-Za-z_]\w*/.exec(src.slice(i));
-    if(m){ i+=m[0].length;
-      if(!(m[0] in vars)) throw new Error(`unknown variable “${m[0]}”`);
-      return vars[m[0]]; }
+    if(m){
+      const name=m[0]; i+=name.length;
+      ws();
+      if(src[i]==="("){                                    // function call
+        if(!(name in EXPR_FNS)) throw new Error(`unknown function “${name}”`);
+        i++; const args=[];
+        ws();
+        if(src[i]!==")"){ for(;;){ args.push(num(comparison(),name+"()")); ws();
+          if(src[i]===","){ i++; continue; } break; } }
+        if(src[i]!==")") throw new Error(`missing “)” after ${name}(…`); i++;
+        return EXPR_FNS[name](...args);
+      }
+      if(src[i]==="."){                                    // label.member
+        i++; const mm=/^[A-Za-z_]\w*/.exec(src.slice(i));
+        if(!mm) throw new Error(`missing member name after “${name}.”`);
+        i+=mm[0].length;
+        const def=vars.__labels && vars.__labels[name];
+        if(!def) throw new Error(`unknown label “${name}”`);
+        const val=memberOf(def, mm[0], vars);
+        if(val===undefined) throw new Error(`“${name}” has no member “${mm[0]}”`);
+        return val;
+      }
+      if(!(name in vars)) throw new Error(`unknown variable “${name}”`);
+      return vars[name];
+    }
     m=/^(\d+(\.\d*)?|\.\d+)/.exec(src.slice(i));
     if(m){ i+=m[0].length; return parseFloat(m[0]); }
     throw new Error(`unexpected “${src.slice(i,i+8)}”`);
@@ -372,25 +444,69 @@ function evalExpr(src, vars){
         v=(typeof v==="string"||typeof r==="string") ? String(v)+String(r) : v+r;}
       else if(c==="-"){i++; v=num(v,"-")-num(muldiv(),"-");}
       else return v; } }
+  function comparison(){ let v=addsub();                   // returns 1 / 0
+    for(;;){ ws();
+      const op=/^(<=|>=|==|!=|<|>)/.exec(src.slice(i));
+      if(!op) return v;
+      i+=op[0].length; const r=addsub();
+      switch(op[0]){
+        case "==": v = (v===r || String(v)===String(r)) ? 1:0; break;
+        case "!=": v = (v===r || String(v)===String(r)) ? 0:1; break;
+        case "<":  v = num(v,"<") <  num(r,"<") ?1:0; break;
+        case "<=": v = num(v,"<=")<= num(r,"<=")?1:0; break;
+        case ">":  v = num(v,">") >  num(r,">") ?1:0; break;
+        case ">=": v = num(v,">=")>= num(r,">=")?1:0; break;
+      }
+    } }
   ws();
-  const asn=/^([A-Za-z_]\w*)\s*=(?!=)/.exec(src.slice(i));
+  const asn=/^([A-Za-z_]\w*)\s*=(?![=<>])/.exec(src.slice(i));
   let value;
-  if(asn){ i+=asn[0].length; value=addsub(); vars[asn[1]]=value; }
-  else value=addsub();
+  if(asn){ i+=asn[0].length; value=comparison(); vars[asn[1]]=value; }
+  else value=comparison();
   ws();
   if(i<src.length) throw new Error(`unexpected “${src.slice(i)}”`);
   return value;
+}
+
+/* Members of a labeled element, computed from its declared geometry (px).
+   Values are parse-time — i.e. as written in the script up to this point;
+   animations happen later and do not feed back into ${…}. */
+function memberOf(def, m, vars){
+  const c=def.coords, st=def.style||{};
+  const pick=o=>o[m];
+  switch(def.kind){
+    case "line": case "arrow": {
+      const [[x1,y1],[x2,y2]]=c;
+      return pick({x:x1,y:y1,x1,y1,x2,y2,w:Math.abs(x2-x1),h:Math.abs(y2-y1),
+                   cx:(x1+x2)/2,cy:(y1+y2)/2});
+    }
+    case "circle": { const [[x,y]]=c;
+      return pick({x,y,cx:x,cy:y,r:def.r,w:2*def.r,h:2*def.r}); }
+    case "ellipse": { const [[x,y]]=c;
+      return pick({x,y,cx:x,cy:y,rx:def.rx,ry:def.ry,w:2*def.rx,h:2*def.ry}); }
+    case "rect": case "textbox": { const [[x,y]]=c;
+      return pick({x,y,w:def.w,h:def.h,cx:x+def.w/2,cy:y+def.h/2}); }
+    default: {                          // text, images, embeds, code, tables
+      const x=def.pos?def.pos.x:undefined, y=def.pos?def.pos.y:undefined;
+      let w=styleLen(st.w,SW,vars), h=styleLen(st.h,SH,vars);
+      if(def.kind==="embed"){ if(w==null) w=Math.round(SW*0.6); if(h==null) h=Math.round(SH*0.62); }
+      const o={x,y,w:w==null?undefined:w,h:h==null?undefined:h};
+      if(o.x!==undefined&&o.w!==undefined) o.cx=o.x+o.w/2;
+      if(o.y!==undefined&&o.h!==undefined) o.cy=o.y+o.h/2;
+      return pick(o);
+    }
+  }
 }
 function fmtVal(v){
   if(typeof v!=="number") return String(v);
   if(Number.isInteger(v)) return String(v);
   return String(Math.round(v*1e9)/1e9);        // avoid 0.30000000000000004
 }
-function substVars(text, vars, warnings, si, ln){
+function substVars(text, vars, warnings, whereStr){
   return text.replace(/\$\{([^}]*)\}/g,(all,expr)=>{
     try{ return fmtVal(evalExpr(expr,vars)); }
     catch(e){
-      warnings&&warnings.push(`slide ${si+1}, line ${ln}: ${e.message} in \${${expr}}`);
+      warnings&&warnings.push(`${whereStr}: ${e.message} in \${${expr}}`);
       return all;                               // leave visible for debugging
     }
   });
@@ -424,10 +540,22 @@ function pairs(s){
   return out;
 }
 
-function parseSlide(body, slideIndex, warnings, vars){
+function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
   const slide={items:[], steps:[[newPhase()]], bg:null, hasH1:false, hasH3:false};
   let step=0, phase=0, nextId=0;
   function cur(){ return slide.steps[step][phase]; }
+  // Warning locations account for a prepended !all block.
+  const where=l=>{ const n=l-lnOff;
+    return n>=1 ? `slide ${slideIndex+1}, line ${n}` : `!all block (on slide ${slideIndex+1})`; };
+  // Finalize an item: bake @() position to px (honoring the coords mode at
+  // THIS point in the script), stamp the mode, register its label for
+  // ${label.member} access, and reveal it in the current step/phase.
+  function addItem(item){
+    if(item.pos) item.pos={x:cvx(item.pos.x,vars), y:cvy(item.pos.y,vars)};
+    item.abs=isAbs(vars);
+    if(item.label) vars.__labels[item.label]=item;
+    slide.items.push(item); cur().reveals.push(item.id);
+  }
 
   const lines=body.split("\n");
   for(let ln=0; ln<lines.length; ln++){
@@ -440,12 +568,11 @@ function parseSlide(body, slideIndex, warnings, vars){
     if(line==="..."){ step++; phase=0; slide.steps[step]=[newPhase()]; continue; }
     if(line===">>>"){ phase++; slide.steps[step][phase]=newPhase(); continue; }
 
-    // --- footer template: captured RAW so ${slide_num} evaluates per slide ---
     let m;
-    if((m=line.match(/^!footer\s*(.*)$/i))){ vars.__footer=m[1]; continue; }
+    if(/^!all\b/i.test(line)) continue;   // handled by parseScript's extraction
 
     // --- ${expr} substitution (everywhere except code-fence bodies) ---
-    line=substVars(line, vars, warnings, slideIndex, ln+1);
+    line=substVars(line, vars, warnings, where(ln+1));
 
     // --- prefixes: @(x,y), [label], {style} — any order ---
     let {pos,label,style,rest}=extractPrefixes(line);
@@ -460,10 +587,9 @@ function parseSlide(body, slideIndex, warnings, vars){
         if(lines[j].trim().startsWith("```")){ closed=true; break; }
         buf.push(lines[j]);
       }
-      if(!closed) warnings.push(`slide ${slideIndex+1}, line ${ln+1}: unterminated code fence`);
+      if(!closed) warnings.push(`${where(ln+1)}: unterminated code fence`);
       ln=j;                                   // skip past the closing fence
-      const item={id:nextId++, kind:"code", lang, code:buf.join("\n"), label, style, pos};
-      slide.items.push(item); cur().reveals.push(item.id);
+      addItem({id:nextId++, kind:"code", lang, code:buf.join("\n"), label, style, pos});
       continue;
     }
 
@@ -471,9 +597,9 @@ function parseSlide(body, slideIndex, warnings, vars){
     if(line.startsWith("|")){
       const rowsRaw=[line]; let j=ln+1;
       for(; j<lines.length && lines[j].trim().startsWith("|"); j++)
-        rowsRaw.push(substVars(lines[j].trim(), vars, warnings, slideIndex, j+1));
+        rowsRaw.push(substVars(lines[j].trim(), vars, warnings, where(j+1)));
       ln=j-1;
-      const splitRow=s=>s.replace(/^\|/,"").replace(/\|\s*$/,"").split("|").map(c=>c.trim());
+      const splitRow=t=>t.replace(/^\|/,"").replace(/\|\s*$/,"").split("|").map(c=>c.trim());
       const all=rowsRaw.map(splitRow);
       const isSep=r=>r.length>0 && r.every(c=>/^:?-{2,}:?$/.test(c));
       let head=null, aligns=[], rows=all;
@@ -482,8 +608,7 @@ function parseSlide(body, slideIndex, warnings, vars){
         aligns=all[1].map(c=>c.startsWith(":")&&c.endsWith(":")?"center":c.endsWith(":")?"right":c.startsWith(":")?"left":null);
         rows=all.slice(2);
       }
-      const item={id:nextId++, kind:"table", head, aligns, rows, label, style, pos};
-      slide.items.push(item); cur().reveals.push(item.id);
+      addItem({id:nextId++, kind:"table", head, aligns, rows, label, style, pos});
       continue;
     }
 
@@ -496,7 +621,7 @@ function parseSlide(body, slideIndex, warnings, vars){
 
     // --- animation lines ---
     if((m=line.match(/^!anim\s+([\w-]+)\s+(\w+)\s*(.*)$/i))){
-      const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,slideIndex,ln+1);
+      const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,where(ln+1),vars);
       if(a) cur().anims.push(a);
       continue;
     }
@@ -519,45 +644,43 @@ function parseSlide(body, slideIndex, warnings, vars){
     }
     // --- embedded web app (iframe) ---
     if((m=line.match(/^!embed\((.+)\)\s*$/i))){
-      const item={id:nextId++, kind:"embed", src:m[1].trim(), label, style, pos};
-      slide.items.push(item); cur().reveals.push(item.id);
+      addItem({id:nextId++, kind:"embed", src:m[1].trim(), label, style, pos});
       continue;
     }
     // --- shapes (rect/circle/ellipse may carry inner text; !textbox is rect+text) ---
     if((m=line.match(/^!(line|arrow|circle|ellipse|rect|textbox|box)\b(.*)$/i))){
       let kind=m[1].toLowerCase(); if(kind==="box") kind="textbox";
-      const rest=m[2];
+      const rest2=m[2];
       const item={id:nextId++, kind, label, style, pos:null};
       let ok=true, geomEnd=0;
       RE_PAIR.lastIndex=0;                     // matchAll clones the regex WITH its lastIndex
-      const pm=[...rest.matchAll(RE_PAIR)];
+      const pm=[...rest2.matchAll(RE_PAIR)];
       const endOf=mm=>mm.index+mm[0].length;
       if(kind==="line"||kind==="arrow"){
         if(pm.length<2){ok=false;} else {
-          item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])],[cx(+pm[1][1]),cy(+pm[1][2])]]; geomEnd=endOf(pm[1]);
+          item.coords=[[cvx(+pm[0][1],vars),cvy(+pm[0][2],vars)],[cvx(+pm[1][1],vars),cvy(+pm[1][2],vars)]]; geomEnd=endOf(pm[1]);
         }
       }else if(kind==="circle"){
         if(pm.length<1){ok=false;} else {
-          const after=rest.slice(endOf(pm[0])); const rm=after.match(/^\s*(-?[\d.]+)/);
-          if(!rm){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.r=px(parseFloat(rm[1]),SH); geomEnd=endOf(pm[0])+rm[0].length; }
+          const after=rest2.slice(endOf(pm[0])); const rm=after.match(/^\s*(-?[\d.]+)/);
+          if(!rm){ok=false;} else { item.coords=[[cvx(+pm[0][1],vars),cvy(+pm[0][2],vars)]]; item.r=cvlen(parseFloat(rm[1]),vars,SH); geomEnd=endOf(pm[0])+rm[0].length; }
         }
       }else if(kind==="ellipse"){
-        if(pm.length<2){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.rx=cx(+pm[1][1]); item.ry=cy(+pm[1][2]); geomEnd=endOf(pm[1]); }
+        if(pm.length<2){ok=false;} else { item.coords=[[cvx(+pm[0][1],vars),cvy(+pm[0][2],vars)]]; item.rx=cvx(+pm[1][1],vars); item.ry=cvy(+pm[1][2],vars); geomEnd=endOf(pm[1]); }
       }else{ // rect / textbox
-        if(pm.length<2){ok=false;} else { item.coords=[[cx(+pm[0][1]),cy(+pm[0][2])]]; item.w=cx(+pm[1][1]); item.h=cy(+pm[1][2]); geomEnd=endOf(pm[1]); }
+        if(pm.length<2){ok=false;} else { item.coords=[[cvx(+pm[0][1],vars),cvy(+pm[0][2],vars)]]; item.w=cvx(+pm[1][1],vars); item.h=cvy(+pm[1][2],vars); geomEnd=endOf(pm[1]); }
       }
-      if(!ok){ warnings.push(`slide ${slideIndex+1}, line ${ln+1}: could not read !${kind} coordinates`); continue; }
-      const inner=rest.slice(geomEnd).trim();
+      if(!ok){ warnings.push(`${where(ln+1)}: could not read !${kind} coordinates`); continue; }
+      const inner=rest2.slice(geomEnd).trim();
       if(inner && kind!=="line" && kind!=="arrow") item.text=inner;   // fo geometry needs a box
-      slide.items.push(item); cur().reveals.push(item.id);
+      addItem(item);
       continue;
     }
-    if(line.startsWith("!") && !line.startsWith("![")){ warnings.push(`slide ${slideIndex+1}, line ${ln+1}: unknown directive “${line.split(/\s/)[0]}”`); continue; }
+    if(line.startsWith("!") && !line.startsWith("![")){ warnings.push(`${where(ln+1)}: unknown directive “${line.split(/\s/)[0]}”`); continue; }
 
     // --- images ---
     if((m=line.match(/^!\[([^\]]*)\]\((.+)\)\s*$/))){
-      const item={id:nextId++, kind:"img", alt:m[1], src:m[2].trim(), label, style, pos};
-      slide.items.push(item); cur().reveals.push(item.id);
+      addItem({id:nextId++, kind:"img", alt:m[1], src:m[2].trim(), label, style, pos});
       continue;
     }
     // --- headings, bullets, paragraphs ---
@@ -575,7 +698,7 @@ function parseSlide(body, slideIndex, warnings, vars){
     }else{
       item={id:nextId++, kind:"p", text:line, label, style, pos};
     }
-    slide.items.push(item); cur().reveals.push(item.id);
+    addItem(item);
   }
   return slide;
 }
@@ -592,18 +715,18 @@ function extractPrefixes(line){
   return {pos,label,style,rest:line};
 }
 
-function parseAnim(target, verb, argsRaw, warnings, si, ln){
+function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
   let [args,dur]=takeDur(argsRaw);
-  const bad=msg=>{warnings.push(`slide ${si+1}, line ${ln}: ${msg}`); return null;};
+  const bad=msg=>{warnings.push(`${whereStr}: ${msg}`); return null;};
   switch(verb){
     case "hide": case "show": return {target,verb,dur};
     case "move":{ const p=pairs(args); if(!p.length) return bad("move needs (x,y)");
-      return {target,verb,dur,x:cx(p[0][0]),y:cy(p[0][1])}; }
+      return {target,verb,dur,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
     case "point":{ const n=parseInt(args); const p=pairs(args);
       if(!(n===1||n===2)||!p.length) return bad("point needs an index (1 or 2) and (x,y)");
-      return {target,verb,dur,n,x:cx(p[0][0]),y:cy(p[0][1])}; }
+      return {target,verb,dur,n,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
     case "size":{ const v=parseFloat(args); if(isNaN(v)) return bad("size needs a width");
-      return {target,verb,dur,w:px(v,SW)}; }
+      return {target,verb,dur,w:cvlen(v,vars,SW)}; }
     case "scale":{ const v=parseFloat(args); if(isNaN(v)) return bad("scale needs a factor");
       return {target,verb,dur,f:v}; }
     case "color": return args ? {target,verb,dur,color:args} : bad("color needs a value");
@@ -617,13 +740,15 @@ function parseAnim(target, verb, argsRaw, warnings, si, ln){
    RENDERER — builds DOM for one slide; Player drives steps.
    ============================================================ */
 "use strict";
-function sizeToPx(v, span){          // "44px" | "2em" | "0.4" | "512"
+function sizeToPx(v, span, abs){     // "44px" | "2em" | "0.4" | "512"
   if(v==null) return null;
   const s=String(v).trim();
   if(s.endsWith("px")) return parseFloat(s);
   if(s.endsWith("em")) return parseFloat(s)*30;      // 30px = default body size
   const n=parseFloat(s);
-  return isNaN(n)?null:px(n,span);
+  if(isNaN(n)) return null;
+  if(Math.abs(n)>1) return n;                        // pixels either way
+  return n*(abs?SH:span);                            // absolute: unit = slide height
 }
 const SVGNS="http://www.w3.org/2000/svg";
 
@@ -667,12 +792,6 @@ function renderSlide(slideDef, opts){
   svg.setAttribute("class","overlay"); svg.setAttribute("viewBox",`0 0 ${SW} ${SH}`);
   root.append(flow,absLayer,svg);
 
-  // deck footer (from `!footer …`, already evaluated per slide at parse time)
-  if(slideDef.footerText){
-    const pn=document.createElement("div"); pn.className="pageno";
-    pn.textContent=slideDef.footerText;
-    root.appendChild(pn);
-  }
 
   const items=new Map();       // id -> runtime item
   const labels=new Map();      // label -> runtime item
@@ -738,10 +857,10 @@ function buildTable(it,flow,absLayer){
 function placeItem(it,flow,absLayer,el){
   if(it.def.pos){
     const wrap=document.createElement("div"); wrap.className="abs-item";
-    wrap.style.left=cx(it.def.pos.x)+"px"; wrap.style.top=cy(it.def.pos.y)+"px";
+    wrap.style.left=it.def.pos.x+"px"; wrap.style.top=it.def.pos.y+"px";   // baked to px at parse
     if(it.def.style.anchor==="center") wrap.style.transform="translate(-50%,-50%)";
     wrap.appendChild(el); absLayer.appendChild(wrap);
-    it.el=wrap; it.x=cx(it.def.pos.x); it.y=cy(it.def.pos.y); it.inner=el;
+    it.el=wrap; it.x=it.def.pos.x; it.y=it.def.pos.y; it.inner=el;
   }else{
     flow.appendChild(el); it.el=el; it.inner=el;
   }
@@ -761,7 +880,7 @@ function buildText(it,flow,absLayer){
 function buildImg(it,flow,absLayer){
   const d=it.def, box=document.createElement("div"); box.className="s-img";
   const img=document.createElement("img"); img.src=d.src; img.alt=d.alt||"";
-  const w=d.style.w?sizeToPx(d.style.w,SW):null, h=d.style.h?sizeToPx(d.style.h,SH):null;
+  const w=d.style.w?sizeToPx(d.style.w,SW,d.abs):null, h=d.style.h?sizeToPx(d.style.h,SH,d.abs):null;
   if(w) img.style.width=w+"px"; else if(!h) img.style.width="500px";
   if(h) img.style.height=h+"px";
   if(d.style.opacity) img.style.opacity=d.style.opacity;
@@ -770,8 +889,8 @@ function buildImg(it,flow,absLayer){
 }
 function buildEmbed(it,flow,absLayer,opts){
   const d=it.def;
-  const w=d.style.w?sizeToPx(d.style.w,SW):Math.round(SW*0.6);
-  const h=d.style.h?sizeToPx(d.style.h,SH):Math.round(SH*0.62);
+  const w=d.style.w?sizeToPx(d.style.w,SW,d.abs):Math.round(SW*0.6);
+  const h=d.style.h?sizeToPx(d.style.h,SH,d.abs):Math.round(SH*0.62);
   const box=document.createElement("div"); box.className="s-embed";
   box.style.width=w+"px"; box.style.height=h+"px";
   if(d.style.opacity) box.style.opacity=d.style.opacity;
@@ -1389,9 +1508,11 @@ const DEMO_IMG="data:image/svg+xml;utf8,"+encodeURIComponent(
 
 const SAMPLE=`% ===== A tour of the Portable Slide Language (PSL) =====
 % Deck-wide settings can go anywhere; the top is conventional:
-!footer \${slide_num} / \${num_slides}
 # SlideDown
 ## A tour of the Portable Slide Language.
+% Everything after !all is pasted onto EVERY slide (evaluated per slide):
+!all
+@(1225, 688) {size=18px, anchor=center} \${slide_num} / \${num_slides}
 ---
 ### Basics
 Plain lines become paragraphs. Inline **bold**, *italic*, and \`code\` all work.
@@ -1514,7 +1635,22 @@ def fib(n):
 - Math works: test * 2 + 1 = \${test * 2 + 1}
 - Assignment prints AND updates: \${test = test + 1} … so test is now \${test}
 - Built-ins: this is slide \${slide_num} of \${num_slides}
-- The corner footer is \`!footer \${slide_num} / \${num_slides}\`
+- Functions: min(3,7)=\${min(3,7)}, sin(pi/2)=\${sin(pi/2)}, log2(1024)=\${log2(1024)}
+- Comparisons give 0/1: (test > 4) = \${test > 4}
+- The corner number comes from the \`!all\` block on slide 1
+---
+!set coords absolute
+### Absolute coordinates & members
+% With !set coords absolute, one unit = slide height on BOTH axes:
+[sq] {color=#1f6f6b, thick=5} !rect (120, 260) (0.32, 0.32) a true square
+[rng] {color=#e2a84b, thick=5} !circle (\${sq.x + sq.w + 330}, \${sq.cy}) 0.16
+{thick=4} !arrow (\${sq.x + sq.w + 14}, \${sq.cy}) (\${rng.x - rng.r - 14}, \${sq.cy})
+@(\${sq.x}, \${sq.y + sq.h + 22}) {size=24px} sq: \${sq.w} x \${sq.h} px — no distortion
+@(\${rng.cx}, \${rng.y + rng.r + 22}) {size=24px, anchor=center} placed via sq.cy and rng.r
+!set coords fraction
+!---
+### Hidden slide (the separator above is !--- )
+This slide is skipped: never shown, numbered, or executed. Backup material lives here.
 ---
 ### Tables
 Markdown pipe tables, with optional alignment markers:
