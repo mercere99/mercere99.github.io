@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>slidedown-authoring-guide</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<h1 id="building-slideshows-with-slidedown">Building Slideshows with
+SlideDown</h1>
+<p>A practical guide to writing decks in the <strong>Portable Slide
+Language (PSL)</strong> — the plain-text format that drives
+<code>slidedown.html</code>. A deck is just a <code>.psl</code> text
+file (or text typed into the editor). This guide takes you from a
+one-line deck to animated diagrams, loops, and published links.</p>
+<hr />
+<h2 id="getting-started">1. Getting started</h2>
+<p>There are three ways to run a deck:</p>
+<ul>
+<li><strong>Editor:</strong> open <code>slidedown.html</code> in a
+browser and type/paste PSL into the left pane. The preview updates live;
+moving the caret selects the slide you’re editing.</li>
+<li><strong>Load a file:</strong> use the file picker in the toolbar to
+open a <code>.psl</code> file, or click <strong>Sample</strong> to load
+the built-in tour.</li>
+<li><strong>Published link:</strong> host <code>slidedown.html</code>
+and your script together, then open
+<code>slidedown.html?present=my_talk.psl</code> to land straight in the
+slideshow (see §13).</li>
+</ul>
+<p>Press <code>?</code> in the app at any time for the built-in syntax
+reference. The logical slide is <strong>1280 × 720</strong>; any
+coordinate <strong>≤ 1 is a fraction</strong> of the slide, anything
+<strong>&gt; 1 is pixels</strong>.</p>
+<p>A minimal deck:</p>
+<pre><code># My Talk
+## An optional subtitle
+---
+### First real slide
+- A point
+- Another point</code></pre>
+<p><code>---</code> on its own line starts a new slide. Everything else
+is content.</p>
+<hr />
+<h2 id="slide-structure">2. Slide structure</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Marker</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>---</code></td>
+<td style="text-align: left;">Start a new slide (a line that is
+<em>exactly</em> three dashes).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>!---</code></td>
+<td style="text-align: left;">Start a <strong>pocket slide</strong>:
+shown in the editor/overview and reachable by direct navigation, but
+<strong>skipped</strong> when advancing with space/<code>n</code>. It
+still <em>executes</em>, so <code>!set</code> and <code>${…}</code>
+there affect later slides.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code># Title</code></td>
+<td style="text-align: left;">Big centered title (title-slide
+style).</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>## Subtitle</code></td>
+<td style="text-align: left;">Centered subtitle under a <code>#</code>
+title.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>### Heading</code></td>
+<td style="text-align: left;">Heading at the top of a normal content
+slide.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>- item</code></td>
+<td style="text-align: left;">Bullet. Indent <strong>2 spaces per
+level</strong> for sub-bullets.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>% comment</code></td>
+<td style="text-align: left;">Ignored.</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>---</code> inside a fenced code block does
+<strong>not</strong> split the slide, so you can show code containing
+dashes safely.</p>
+<hr />
+<h2 id="text-content">3. Text content</h2>
+<p><strong>Inline markup</strong> works in any text (titles, bullets,
+cells, shape labels):</p>
+<ul>
+<li><code>**bold**</code>, <code>*italic*</code>,
+<code>`code`</code></li>
+<li>HTML entities such as <code>&amp;mdash;</code>,
+<code>&amp;rarr;</code>, <code>&amp;nbsp;</code>,
+<code>&amp;#x1F600;</code> render as characters. Raw tags do
+<strong>not</strong> — markup always stays escaped, so you can’t inject
+HTML.</li>
+<li>Emoji can be pasted directly. <code>${nbsp}</code> is a non-breaking
+space; <code>${chr(8594)}</code> yields any code point.</li>
+</ul>
+<p><strong>Code blocks</strong> are fenced and syntax-highlighted
+(<code>cpp</code>, <code>python</code>, <code>javascript</code>,
+<code>bash</code>, and other common languages; omit the language for
+plain code). Size them with a <code>{w=…, size=…}</code> prefix on the
+opening fence:</p>
+<pre><code>{w=0.56} ```cpp
+#include &lt;print&gt;
+int main() { std::println(&quot;hi&quot;); }
+```   ← closing fence</code></pre>
+<p><strong>Tables</strong> use markdown pipes. A <code>|---|</code>
+separator row promotes the first row to a header; <code>:--</code> /
+<code>--:</code> / <code>:-:</code> set column alignment. Cells accept
+inline markup and <code>${…}</code>:</p>
+<pre><code>| Feature | Syntax  | Align |
+|:--------|:-------:|------:|
+| Bullet  | `- x`   | left  |
+| Bold    | `**b**` | center|</code></pre>
+<hr />
+<h2 id="revealing-content-step-by-step">4. Revealing content step by
+step</h2>
+<p>Two operators control pacing within a slide:</p>
+<ul>
+<li><code>...</code> — a <strong>pause</strong>. Everything after it
+waits for the next spacebar/click.</li>
+<li><code>&gt;&gt;&gt;</code> — a <strong>chain</strong>. What follows
+runs <em>automatically</em> when the previous animations finish.</li>
+</ul>
+<pre><code>### Build-up
+- Shown immediately
+...
+- Revealed on the next keypress
+  - This sub-bullet rides along (no ... of its own)
+...
+  - This one waits for its own keypress</code></pre>
+<p>Consecutive <code>!anim</code> lines run
+<strong>simultaneously</strong>; separate them with <code>...</code>
+(wait for input) or <code>&gt;&gt;&gt;</code> (auto-sequence) to stage
+them.</p>
+<hr />
+<h2 id="placement-labels-styling-the-three-prefixes">5. Placement,
+labels &amp; styling (the three prefixes)</h2>
+<p>Any line can start with up to three prefixes, in <strong>any
+order</strong>, before its content:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Prefix</th>
+<th style="text-align: left;">Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>@(x, y)</code></td>
+<td style="text-align: left;">Absolute position. Top-left anchor at that
+point; add <code>{anchor=center}</code> to center on it.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>[label]</code></td>
+<td style="text-align: left;">Name the element so animations and
+<code>${label.member}</code> can target it.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>{key=val, …}</code></td>
+<td style="text-align: left;">Style overrides.</td>
+</tr>
+</tbody>
+</table>
+<pre><code>[pic] @(0.55, 0.18) {w=0.34} ![caption](image.png)</code></pre>
+<p><strong>Style keys</strong> (all elements): <code>size</code>,
+<code>color</code>, <code>font</code>, <code>fill</code>,
+<code>w</code>, <code>h</code>, <code>thick</code>, <code>align</code>,
+<code>valign</code>, <code>anchor</code>, <code>opacity</code>.
+<strong>Shapes and boxes</strong> additionally take:
+<code>textcolor</code>, <code>pad</code>, <code>round</code>,
+<code>tint</code>, <code>dim</code>.</p>
+<p>Without <code>@()</code>, text and bullets <strong>flow</strong> down
+the left of the slide as usual; positioned elements are lifted out of
+that flow.</p>
+<hr />
+<h2 id="the-coordinate-system">6. The coordinate system</h2>
+<p>Values <strong>≤ 1</strong> are fractions; values <strong>&gt;
+1</strong> are pixels in the 1280 × 720 space. Two modes control how
+fractions map:</p>
+<ul>
+<li><strong><code>!set coords fraction</code></strong> (default):
+<code>x</code> scales to slide width, <code>y</code> to slide height.
+Convenient for layout, but <code>(0.3, 0.3)</code> is a
+<em>rectangle</em>, not a square, because the axes have different
+spans.</li>
+<li><strong><code>!set coords absolute</code></strong>: fractions on
+<strong>both</strong> axes map to the slide <strong>height</strong> (one
+unit = 720 px), so <code>!rect (…)(0.3,0.3)</code> is a <strong>true
+square</strong>. The slide is <code>aspect</code> (≈ 1.778) units wide.
+Pixels (&gt; 1) are always undistorted. Built-ins: <code>slide_w</code>,
+<code>slide_h</code>, <code>aspect</code>.</li>
+</ul>
+<p>Switch modes mid-deck as needed and switch back with
+<code>!set coords fraction</code>.</p>
+<hr />
+<h2 id="images-backgrounds-embeds">7. Images, backgrounds &amp;
+embeds</h2>
+<pre><code>![caption](url)                         image; size with {w=0.3} (fraction) or pixels
+!bg(url)   ·   !bg(#123456)             slide background image (covers) or color
+{dim=0.55, tint=#0a1a2a} !bg(url)       scrim a busy background so text stays readable
+!dim 0.4                                dim on its own line (0–1)
+!embed(https://your.app)                embed a live web app as an iframe</code></pre>
+<p><code>!embed</code> is positioned with <code>@()</code> and sized
+with <code>{w=, h=}</code> just like an image, and can be animated
+(<code>move</code>, <code>scale</code>, <code>size</code>,
+<code>hide</code>/<code>show</code>). Thumbnails show a lightweight
+placeholder; the live iframe appears in present mode.</p>
+<hr />
+<h2 id="shapes-text-boxes">8. Shapes &amp; text boxes</h2>
+<p>All shapes take a <code>{…}</code> style prefix (<code>color</code> =
+stroke, <code>fill</code>, <code>thick</code>, etc.) and can be
+<code>[label]</code>ed and animated.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Shape</th>
+<th style="text-align: left;">Syntax</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Line</td>
+<td style="text-align: left;"><code>!line (x1,y1) (x2,y2)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Arrow</td>
+<td style="text-align: left;"><code>!arrow (x1,y1) (x2,y2)</code> — head
+at the second point</td>
+</tr>
+<tr>
+<td style="text-align: left;">Circle</td>
+<td style="text-align: left;"><code>!circle (cx,cy) r</code> —
+<code>r</code> is a fraction of slide height or pixels</td>
+</tr>
+<tr>
+<td style="text-align: left;">Ellipse</td>
+<td style="text-align: left;"><code>!ellipse (cx,cy) (rx,ry)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Rectangle</td>
+<td style="text-align: left;"><code>!rect (x,y) (w,h)</code> — top-left
+at <code>(x,y)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Text box</td>
+<td
+style="text-align: left;"><code>!textbox (x,y) (w,h) Your text</code> —
+a rect with wrapped text inside</td>
+</tr>
+<tr>
+<td style="text-align: left;">Polygon</td>
+<td style="text-align: left;"><code>!polygon (x,y)(x,y)(x,y)…</code> —
+any number of vertices (closed)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Polyline</td>
+<td style="text-align: left;"><code>!polyline (x,y)(x,y)…</code> — the
+open version</td>
+</tr>
+<tr>
+<td style="text-align: left;">Triangle</td>
+<td style="text-align: left;"><code>!triangle (x,y)(x,y)(x,y)</code> —
+3-point shorthand</td>
+</tr>
+<tr>
+<td style="text-align: left;">Diamond</td>
+<td style="text-align: left;"><code>!diamond (cx,cy) (w,h)</code> —
+centered</td>
+</tr>
+<tr>
+<td style="text-align: left;">Star</td>
+<td style="text-align: left;"><code>!star (cx,cy) n r [r_in]</code> — n
+points, outer radius <code>r</code> (inner defaults to 0.45·r)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Curve</td>
+<td
+style="text-align: left;"><code>!curve (x1,y1) (cx,cy) (x2,y2)</code> —
+quadratic Bézier; middle pair is the control point</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Any closed shape</strong> (rect, circle, ellipse, polygon,
+diamond, star) can carry inner text — just type it after the geometry,
+e.g. <code>!circle (0.74,0.52) 0.2 centered label</code>. Text boxes
+support <code>fill</code>, <code>textcolor</code>, <code>size</code>,
+<code>align</code>, <code>valign</code>, <code>pad</code>,
+<code>round</code>, and <code>thick</code> (border).</p>
+<hr />
+<h2 id="animations">9. Animations</h2>
+<p>Target a <code>[label]</code>; the duration suffix
+(<code>1.2s</code>) is optional and defaults to <strong>0.7
+s</strong>.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Verb</th>
+<th style="text-align: left;">Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>hide</code> / <code>show</code></td>
+<td style="text-align: left;">Fade out / fade in</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>move (x, y)</code></td>
+<td style="text-align: left;">Move to a new position (shapes move by
+their first-listed point)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>point n (x, y)</code></td>
+<td style="text-align: left;">Move vertex <code>n</code> of
+<strong>any</strong> multi-point shape (line/arrow/polygon/…)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>size w</code></td>
+<td style="text-align: left;">Animate an image/embed to a new width</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>scale f</code></td>
+<td style="text-align: left;">Scale any element about its center</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>color c</code></td>
+<td style="text-align: left;">Animate text color or shape stroke</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>textsize s</code></td>
+<td style="text-align: left;">Animate font size</td>
+</tr>
+</tbody>
+</table>
+<pre><code>!anim dot move (0.75, 0.30) 1.2s
+!anim arr point 2 (0.80, 0.55) 1.2s   ← these two run together (one keypress)
+&gt;&gt;&gt;
+!anim dot color #c23b22 0.5s          ← starts when the move finishes</code></pre>
+<p><strong>Timing model:</strong> consecutive <code>!anim</code> lines
+fire simultaneously. Put <code>...</code> between groups to wait for
+input, or <code>&gt;&gt;&gt;</code> to auto-chain. Pressing a key
+<em>during</em> an animation finishes it instantly.</p>
+<hr />
+<h2 id="variables-expressions-functions">10. Variables, expressions
+&amp; functions</h2>
+<p>Define variables with <code>!set</code>; numeric values become
+numbers, anything else is a string:</p>
+<pre><code>!set test 5</code></pre>
+<p><code>${…}</code> substitutes an expression <strong>anywhere</strong>
+in text — including labels, coordinates, and durations. Expressions
+evaluate at <strong>parse time, top to bottom</strong>, so results are
+deterministic.</p>
+<ul>
+<li>Operators: <code>+ - * / % ( )</code> with normal precedence.
+<code>+</code> <strong>concatenates</strong> strings.</li>
+<li>Assignment: <code>${test = test + 1}</code> prints the new value
+<em>and</em> updates the variable.</li>
+<li>Comparisons <code>&lt; &lt;= &gt; &gt;= == !=</code> return
+<code>1</code> or <code>0</code>.</li>
+<li>Functions:
+<code>min max sin cos tan exp log log2 sqrt abs floor ceil round</code>,
+plus built-in <code>pi</code>.</li>
+<li>Built-in variables: <code>slide_num</code>, <code>num_slides</code>
+(pocket slides included), <code>slide_hidden</code>,
+<code>slide_w</code>, <code>slide_h</code>, <code>aspect</code>.</li>
+</ul>
+<p><strong>Member access</strong> — any <code>[label]</code>ed element
+exposes its geometry (in px, as declared):</p>
+<ul>
+<li>All elements: <code>x y</code> (plus <code>w h cx cy</code> when
+known)</li>
+<li>Lines/arrows: <code>x1 y1 x2 y2</code></li>
+<li>Circles: <code>r</code> · Ellipses: <code>rx ry</code></li>
+<li>Polygons/polylines/curves: <code>n</code> plus per-vertex
+<code>x1 y1 x2 y2 …</code></li>
+</ul>
+<p>This is ideal for attaching one element to another:</p>
+<pre><code>[sq]  !rect (120, 260) (0.32, 0.32)
+[rng] !circle (${sq.x + sq.w + 330}, ${sq.cy}) 0.16
+      !arrow (${sq.x + sq.w + 14}, ${sq.cy}) (${rng.x - rng.r - 14}, ${sq.cy})</code></pre>
+<hr />
+<h2 id="loops-conditionals">11. Loops &amp; conditionals</h2>
+<p>Both are nestable and work over multiple lines. <code>${…}</code>
+(including <code>${i}</code>) is valid throughout the body, so a single
+loop can build <strong>and</strong> animate a whole family of
+elements.</p>
+<p><strong><code>!foreach</code></strong> — inclusive range; step may be
+fractional or negative:</p>
+<pre><code>!foreach i 0 5
+[dot${i}] {fill=#1f6f6b} !circle (${180 + i*180}, ${560 - 80*sin(i*pi/5)}) ${14 + i*4}
+!endfor
+...
+!foreach i 0 5
+!anim dot${i} move (${180 + i*180}, 300) ${0.4 + i*0.15}s
+!endfor</code></pre>
+<p><strong><code>!if … !else … !endif</code></strong> — truthy means a
+non-zero number or non-empty string:</p>
+<pre><code>!if num_slides &gt; 10
+- Only shown when the deck has more than 10 slides
+!else
+- Shown otherwise
+!endif</code></pre>
+<hr />
+<h2 id="deck-wide-settings">12. Deck-wide settings</h2>
+<p><strong>Reserved <code>!set</code> names</strong> configure the whole
+deck’s default look:</p>
+<pre><code>!set bg #14212b
+!set color #e8e4dc
+!set accent #e2a84b
+!set font Georgia, serif
+!set headfont Helvetica, sans-serif
+!set dim 0.3
+!set tint #000</code></pre>
+<p>A slide’s own <code>!bg</code> overrides the deck default for that
+slide.</p>
+<p><strong><code>!all</code></strong> — everything after
+<code>!all</code> (to the end of that slide) is pasted at the
+<strong>top of every slide</strong> and re-evaluated per slide, so
+<code>${slide_num}</code> is always correct. Use it for footers, page
+numbers, watermarks, and running counters. One <code>!all</code> block
+per deck:</p>
+<pre><code>!all
+@(1225, 688) {size=18px, anchor=center} ${slide_num} / ${num_slides}
+!if slide_hidden
+@(640, 42) {color=#b03030, anchor=center} — POCKET SLIDE —
+!endif</code></pre>
+<hr />
+<h2 id="presenting-publishing">13. Presenting &amp; publishing</h2>
+<p><strong>Keyboard while presenting:</strong></p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Key</th>
+<th style="text-align: left;">Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>space</code> / <code>→</code> /
+click</td>
+<td style="text-align: left;">Advance one step (or finish a running
+animation)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>←</code></td>
+<td style="text-align: left;">Back one step</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Backspace</code></td>
+<td style="text-align: left;">Back one whole slide</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>n</code> / <code>p</code></td>
+<td style="text-align: left;">Next / previous slide (skip remaining
+steps)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>v</code></td>
+<td style="text-align: left;">Slide overview; click to jump (pocket
+slides shown dashed)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>b</code></td>
+<td style="text-align: left;">Blackout</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>f</code> / <code>⛶</code></td>
+<td style="text-align: left;">Fullscreen</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>home</code> / <code>end</code></td>
+<td style="text-align: left;">First / last slide</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>esc</code></td>
+<td style="text-align: left;">Exit</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Presenter view:</strong> the ⧉ button opens the slides in a
+separate window — drag it to the projector and press <code>F</code>
+there for fullscreen. The original window becomes your console
+(auto-scrolled script as notes, thumbnails to click-jump). Both windows’
+keyboards drive the show. On Chromium with an extended display, a “▶ 2nd
+screen” button presents fullscreen on the other monitor.</p>
+<p><strong>Publishing:</strong> host <code>slidedown.html</code> and
+your <code>.psl</code> file anywhere (e.g. GitHub Pages) and share:</p>
+<pre><code>slidedown.html?present=my_talk.psl        → opens straight into the show
+slidedown.html?present=my_talk.psl&amp;slide=5 → starts on slide 5</code></pre>
+<p>Same-site scripts always load; cross-origin URLs work if the host
+sends CORS headers.</p>
+<hr />
+<h2 id="quick-reference">14. Quick reference</h2>
+<pre><code>STRUCTURE          --- new slide   !--- pocket slide   % comment
+                   # Title   ## Subtitle   ### Heading   - bullet (2-sp indent)
+                   ...  pause      &gt;&gt;&gt;  auto-chain
+PREFIXES           @(x,y)  [label]  {style}      (any order, before content)
+STYLE KEYS         size color font fill w h thick align valign anchor opacity
+                   + shapes/boxes: textcolor pad round tint dim
+IMAGES/BG          ![cap](url)   !bg(url|#hex)   !dim 0.4   !embed(url)
+SHAPES             line arrow circle ellipse rect textbox polygon polyline
+                   triangle diamond star curve   (closed shapes hold inner text)
+ANIMATE [label]    hide show   move (x,y)   point n (x,y)   size w
+                   scale f   color c   textsize s     (dur suffix &quot;1s&quot;, default 0.7s)
+VARS/EXPR          !set name val    ${expr}    + - * / %    == != &lt; &lt;= &gt; &gt;=
+                   min max sin cos tan exp log log2 sqrt abs floor ceil round, pi
+                   built-ins: slide_num num_slides slide_hidden slide_w slide_h aspect
+MEMBERS            label.x .y .w .h .cx .cy  ·  .x1..y2 (lines)  ·  .r  ·  .rx .ry  ·  .n
+CONTROL            !foreach i a b [step] … !endfor    !if e … !else … !endif
+DECK-WIDE          !set bg color accent font headfont dim tint
+                   !set coords absolute | fraction     !all (per-slide overlay)
+COORDS             ≤1 = fraction, &gt;1 = pixels (1280×720)
+PUBLISH            slidedown.html?present=deck.psl&amp;slide=N</code></pre>
+<hr />
+<h2 id="a-complete-small-deck">15. A complete small deck</h2>
+<pre><code># Digital Evolution
+## a five-minute primer
+
+!all
+@(1225, 690) {size=16px, anchor=center} ${slide_num} / ${num_slides}
+---
+### What we&#39;ll cover
+- Replication with variation
+...
+- Selection
+...
+- Open-ended novelty
+
+---
+!set coords absolute
+### A simple feedback loop
+[org]  {fill=#1f6f6b22, color=#1f6f6b, thick=4} !circle (300, 360) 0.16 organisms
+[env]  {fill=#e2a84b22, color=#e2a84b, thick=4} !circle (960, 360) 0.16 environment
+{thick=4} !arrow (${org.cx + org.r + 12}, ${org.cy - 40}) (${env.cx - env.r - 12}, ${env.cy - 40})
+{thick=4} !arrow (${env.cx - env.r - 12}, ${env.cy + 40}) (${org.cx + org.r + 12}, ${org.cy + 40})
+@(640, 250) {size=22px, anchor=center} act on
+@(640, 470) {size=22px, anchor=center} selects
+!set coords fraction
+---
+# Questions?
+## press v for the overview</code></pre>
+<p>Copy any block above straight into the editor to see it render.</p>
+</body>
+</html>
