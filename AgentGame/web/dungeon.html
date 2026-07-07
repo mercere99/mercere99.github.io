@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<!--
+  Dungeon web Interface for the Agent Game System.
+
+  A turn-based Interface: nothing happens until the human issues an action.
+  Every key press / button / inventory click becomes an action *name* sent
+  to ags_input(), followed by one ags_tick().  The World decides what the
+  action means (or explains why it failed).
+
+  Save / load round-trips the engine's own serialization string through
+  the browser's localStorage, with file export/import as a backup channel.
+
+  Build the engine first:  ./build.sh   (produces web/dungeon.js)
+  Then serve this directory:  python3 -m http.server  ->  open /web/dungeon.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dungeon of Evolution &mdash; Agent Game System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pit:    #191008;    /* near-black warm brown        */
+    --panel:  #241809;
+    --edge:   #4a3416;
+    --amber:  #ffb545;    /* phosphor amber               */
+    --amber2: #d98c1f;
+    --dimmed: #6e5426;    /* remembered-terrain amber     */
+    --bone:   #efe3c8;
+    --blood:  #e4574d;
+    --herb:   #7ac74f;
+    --arcane: #7fb8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    background:
+      radial-gradient(ellipse 80% 55% at 50% 0%, #2a1c0c 0%, transparent 65%),
+      var(--pit);
+    color: var(--bone);
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  h1 { font-family: "Press Start 2P", ui-monospace, monospace; font-size: 15px;
+       color: var(--amber); text-shadow: 0 0 16px rgba(255,181,69,.35);
+       letter-spacing: 1px; margin: 4px 0 0; }
+  .layout { display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap;
+            justify-content: center; }
+  .frame { background: var(--panel); border: 2px solid var(--edge);
+           border-radius: 10px; box-shadow: 0 16px 50px rgba(0,0,0,.6); }
+  .mapwrap { padding: 12px; }
+  canvas { display: block; background: #120b04; border-radius: 6px; }
+
+  .side { width: 300px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .side h2 { font-family: "Press Start 2P", monospace; font-size: 9px; margin: 0;
+             color: var(--amber2); letter-spacing: 1px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; }
+  .stats b { color: var(--amber); font-weight: 600; }
+  .hpbar { grid-column: 1 / -1; height: 12px; background: #120b04;
+           border: 1px solid var(--edge); border-radius: 6px; overflow: hidden; }
+  .hpbar div { height: 100%; background: linear-gradient(90deg, var(--blood), var(--amber));
+               transition: width .2s; }
+  #inv { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;
+         gap: 4px; min-height: 60px; max-height: 200px; overflow-y: auto; }
+  #inv li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  #inv .glyph { width: 20px; text-align: center; color: var(--amber); font-weight: 600; }
+  #inv button { flex: 1; text-align: left; background: none; border: 1px solid transparent;
+                color: var(--bone); font: inherit; padding: 3px 6px; border-radius: 5px;
+                cursor: pointer; }
+  #inv button:hover:not(:disabled) { border-color: var(--edge); background: #1c1206; }
+  #inv button:disabled { cursor: default; opacity: .8; }
+  #inv .eq { color: var(--herb); font-size: 11px; }
+  #inv .empty { color: var(--dimmed); font-size: 12px; }
+  #log { font-size: 12.5px; line-height: 1.55; min-height: 120px; color: var(--bone); }
+  #log .old { color: var(--dimmed); }
+
+  .controls, .persist { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button.act, .persist button, .persist label {
+    font: 600 12px "IBM Plex Mono", monospace; padding: 8px 12px; cursor: pointer;
+    color: var(--amber); background: var(--panel); border: 1.5px solid var(--edge);
+    border-radius: 7px;
+  }
+  button.act:hover, .persist button:hover, .persist label:hover { border-color: var(--amber2); }
+  button:focus-visible, label:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .help { font-size: 11.5px; color: var(--dimmed); text-align: center; max-width: 640px;
+          line-height: 1.7; }
+  kbd { border: 1px solid var(--edge); border-radius: 4px; padding: 0 5px; color: var(--amber2); }
+  #boot { font-size: 12px; color: var(--blood); text-align: center; line-height: 1.8; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+             background: rgba(10,6,2,.82); z-index: 5; }
+  #overlay .card { text-align: center; padding: 34px 44px; }
+  #overlay h2 { font-family: "Press Start 2P", monospace; font-size: 16px; color: var(--amber); }
+  #overlay p { color: var(--bone); }
+</style>
+</head>
+<body>
+  <h1>DUNGEON OF EVOLUTION</h1>
+
+  <div class="layout">
+    <div class="frame mapwrap"><canvas id="cv" width="828" height="396"></canvas></div>
+
+    <div class="frame side">
+      <h2>ADVENTURER</h2>
+      <div class="stats">
+        <div class="hpbar"><div id="hpfill" style="width:100%"></div></div>
+        <span>HP <b id="hp">-</b></span>       <span>Depth <b id="depth">-</b></span>
+        <span>Attack <b id="atk">-</b></span>  <span>Defense <b id="def">-</b></span>
+        <span>Gold <b id="gold">-</b></span>   <span>Turn <b id="turn">-</b></span>
+      </div>
+      <h2>PACK <span id="packn" style="color:var(--dimmed)"></span></h2>
+      <ul id="inv"></ul>
+      <h2>CHRONICLE</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="act" data-act="pickup">Pick up <kbd>g</kbd></button>
+    <button class="act" data-act="descend">Descend <kbd>&gt;</kbd></button>
+    <button class="act" data-act="ascend">Ascend <kbd>&lt;</kbd></button>
+    <button class="act" data-act="drink-potion">Drink potion <kbd>q</kbd></button>
+    <button class="act" data-act="read-scroll">Read scroll <kbd>r</kbd></button>
+    <button class="act" data-act="wait">Wait <kbd>.</kbd></button>
+  </div>
+
+  <div class="persist">
+    <button id="save">Save game</button>
+    <button id="loadls">Load save</button>
+    <button id="export">Export save file</button>
+    <label for="importfile">Import save file</label>
+    <input type="file" id="importfile" accept=".txt,.ags" style="display:none">
+    <button id="newgame">New dungeon</button>
+  </div>
+
+  <div class="help">
+    Move with the arrow keys or <kbd>WASD</kbd> &mdash; walk into monsters to attack
+    them and into chests to open them.  Click an item in your pack to wield,
+    wear, drink, or read it.  Find the Amulet of Evolution on depth 3.
+    Saving keeps your progress in this browser; export a file to move it elsewhere.
+  </div>
+  <div id="boot"></div>
+
+  <div id="overlay"><div class="frame card">
+    <h2 id="ov-title"></h2><p id="ov-text"></p>
+    <button class="act" onclick="newGame()">New dungeon</button>
+  </div></div>
+
+<script>
+"use strict";
+const TILE = 18;
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const $  = id => document.getElementById(id);
+const SAVE_KEY = "ags-dungeon-save";
+
+let api = null;
+
+// Glyph -> color, in phosphor-terminal style.
+const COLORS = {
+  "@": "#ffffff",
+  "#": "#8a6a2f", ".": "#a97e2c", "+": "#c89440", ">": "#ffe9b0", "<": "#ffe9b0",
+  "!": "#e4574d", "?": "#7fb8ff", "/": "#e8e2d2", "]": "#b9c7d1", "$": "#ffd24a",
+  "k": "#ffd24a", "&": "#d98c1f", "_": "#8a6a2f", "^": "#e4574d", "\"": "#ff7ae0",
+  "r": "#c9a06a", "b": "#c9a06a", "g": "#7ac74f", "o": "#8fd14f",
+  "s": "#dfe6ee", "T": "#6fd0c2", "D": "#ff5b5b",
+};
+const IS_TERRAIN = c => "#.+><_".includes(c);
+
+// ---------- Engine bridge ----------
+// postRun (not onRuntimeInitialized!) guarantees C++ main() has already
+// executed -- and main() is what installs the engine hooks behind the
+// ags_* exports.  Any failure below surfaces in the on-page strip.
+var Module = {
+  postRun: [bootEngine],
+  onAbort: what => surface("Engine aborted: " + what),
+  printErr: text => { console.error(text); surface(String(text)); },
+};
+window.addEventListener("error",
+  ev => surface(ev.message + " (" + (ev.filename||"").split("/").pop() + ":" + ev.lineno + ")"));
+function surface(text) {
+  const b = document.getElementById("boot");
+  b.innerHTML += (b.innerHTML ? "<br>" : "") + text.replace(/[&<>]/g,
+    c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+}
+function bootEngine() {
+  api = {
+    reset: Module.cwrap("ags_reset", null, ["number", "number"]),
+    tick:  Module.cwrap("ags_tick",  null, []),
+    input: Module.cwrap("ags_input", null, ["string"]),
+    state: Module.cwrap("ags_state", "string", []),
+    save:  Module.cwrap("ags_save",  "string", []),
+    load:  Module.cwrap("ags_load",  "number", ["string"]),
+  };
+  newGame();
+}
+
+function newGame() {
+  $("overlay").style.display = "none";
+  api.reset((Math.random() * 0xffffffff) >>> 0, 0);
+  refresh();
+}
+
+function act(name) {          // One human action = one world turn.
+  if (!api) return;
+  api.input(name);
+  api.tick();
+  refresh();
+}
+
+function refresh() { render(JSON.parse(api.state())); }
+
+// ---------- Input ----------
+const KEYMAP = {
+  ArrowUp:"up", ArrowDown:"down", ArrowLeft:"left", ArrowRight:"right",
+  w:"up", s:"down", a:"left", d:"right",
+  g:"pickup", ">":"descend", "<":"ascend", q:"drink-potion", r:"read-scroll", ".":"wait",
+};
+document.addEventListener("keydown", ev => {
+  if (ev.target.tagName === "INPUT") return;
+  const name = KEYMAP[ev.key];
+  if (name) { act(name); ev.preventDefault(); }
+});
+document.querySelectorAll("button.act[data-act]").forEach(b =>
+  b.addEventListener("click", () => act(b.dataset.act)));
+
+// ---------- Rendering ----------
+function render(st) {
+  $("hp").textContent    = st.player.hp + " / " + st.player.max_hp;
+  $("hpfill").style.width = Math.max(0, 100 * st.player.hp / st.player.max_hp) + "%";
+  $("depth").textContent = st.depth + " / " + st.max_depth;
+  $("atk").textContent   = st.player.atk;
+  $("def").textContent   = st.player.def;
+  $("gold").textContent  = st.player.gold;
+  $("turn").textContent  = st.turn;
+  $("packn").textContent = "(" + st.inventory.length + "/12)";
+
+  // Inventory: click to use.
+  const inv = $("inv");
+  inv.innerHTML = "";
+  if (!st.inventory.length) {
+    inv.innerHTML = '<li class="empty">Nothing but lint.</li>';
+  }
+  for (const it of st.inventory) {
+    const li = document.createElement("li");
+    const g  = document.createElement("span");
+    g.className = "glyph"; g.textContent = it.glyph;
+    const b  = document.createElement("button");
+    b.textContent = it.name;
+    if (it.equipped) {
+      const eq = document.createElement("span");
+      eq.className = "eq"; eq.textContent = " [equipped]";
+      b.appendChild(eq);
+    }
+    b.disabled = !it.usable;
+    if (it.usable) b.addEventListener("click", () => act("use-" + it.slot));
+    li.append(g, b);
+    inv.appendChild(li);
+  }
+
+  // Message log: newest line bright, older lines dim.
+  const log = $("log");
+  log.innerHTML = st.messages.map((m, i) =>
+    `<div class="${i < st.messages.length - 1 ? "old" : ""}">${esc(m)}</div>`).join("");
+
+  // The map: glyphs on a warm-dark field; remembered terrain dimmed.
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.font = "600 15px 'IBM Plex Mono', monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (let y = 0; y < st.height; ++y) {
+    for (let x = 0; x < st.width; ++x) {
+      const c = st.grid[y][x], seen = st.seen[y][x];
+      if (c === " " || seen === "0") continue;
+      const px = x * TILE + TILE/2, py = y * TILE + TILE/2;
+      if (seen === "2") {
+        if (c === "@") {                       // A soft lantern glow.
+          const g = ctx.createRadialGradient(px, py, 2, px, py, TILE * 2.2);
+          g.addColorStop(0, "rgba(255,181,69,.28)"); g.addColorStop(1, "transparent");
+          ctx.fillStyle = g;
+          ctx.fillRect(px - TILE*2.2, py - TILE*2.2, TILE*4.4, TILE*4.4);
+        }
+        ctx.fillStyle = COLORS[c] || "#efe3c8";
+      } else {
+        ctx.fillStyle = IS_TERRAIN(c) ? "#4a3416" : "transparent";
+      }
+      ctx.fillText(c, px, py + 1);
+    }
+  }
+
+  if (st.status !== "playing") {
+    const won = st.status === "won";
+    $("ov-title").textContent = won ? "YOU HAVE EVOLVED" : "YOU HAVE DIED";
+    $("ov-text").textContent = won
+      ? `The Amulet is yours \u2014 escaped with ${st.player.gold} gold on turn ${st.turn}.`
+      : `The dungeon claims another on depth ${st.depth}, turn ${st.turn}.`;
+    $("overlay").style.display = "flex";
+  }
+}
+const esc = s => s.replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+
+// ---------- Save / load ----------
+$("save").addEventListener("click", () => {
+  try {
+    localStorage.setItem(SAVE_KEY, api.save());
+    toast("Game saved.");
+  } catch (e) { toast("Could not save: " + e.message); }
+});
+$("loadls").addEventListener("click", () => {
+  const data = localStorage.getItem(SAVE_KEY);
+  if (!data) return toast("No save found in this browser.");
+  loadString(data);
+});
+$("export").addEventListener("click", () => {
+  const blob = new Blob([api.save()], { type: "text/plain" });
+  const a = Object.assign(document.createElement("a"),
+                          { href: URL.createObjectURL(blob), download: "dungeon-save.ags" });
+  a.click(); URL.revokeObjectURL(a.href);
+});
+$("importfile").addEventListener("change", ev => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  file.text().then(loadString);
+  ev.target.value = "";
+});
+function loadString(data) {
+  if (api.load(data)) { $("overlay").style.display = "none"; refresh(); toast("Game loaded."); }
+  else toast("That save could not be read.");
+}
+function toast(text) {
+  const log = $("log");
+  log.innerHTML += `<div style="color:var(--arcane)">${esc(text)}</div>`;
+}
+$("newgame").addEventListener("click", newGame);
+</script>
+<script src="dungeon.js"
+        onerror="document.getElementById('boot').innerHTML =
+          'Engine not found: web/dungeon.js is missing.<br>' +
+          'Run <b>./build.sh</b> (requires the Emscripten SDK), then serve ' +
+          'this folder with <b>python3 -m http.server</b>.'"></script>
+</body>
+</html>

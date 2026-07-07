@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<!--
+  Pac-Man web Interface for the Agent Game System.
+
+  This page is a pure Interface module: it never touches game rules.  It
+  (1) maps keys to action names and feeds them to ags_input(),
+  (2) ticks the engine on a timer via ags_tick(), and
+  (3) renders whatever JSON ags_state() reports.
+
+  Build the engine first:  ./build.sh   (produces web/pacman.js)
+  Then serve this directory:  python3 -m http.server  ->  open /web/pacman.html
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pac-Man &mdash; Agent Game System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --field:  #101433;   /* deep indigo cabinet field   */
+    --bezel:  #1b2150;   /* cabinet bezel               */
+    --line:   #2f3a86;   /* maze wall blue              */
+    --gold:   #ffd24a;   /* dots, HUD numerals          */
+    --pac:    #ffe14d;
+    --flesh:  #ff5b5b;   /* blinky red accents          */
+    --paper:  #cfd4ff;   /* soft readout text           */
+    --dim:    #7c84c4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px; padding: 24px;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% -10%, #1a2050 0%, transparent 60%),
+      var(--field);
+    color: var(--paper);
+    font-family: "Press Start 2P", ui-monospace, "Cascadia Mono", Menlo, monospace;
+  }
+  h1 { font-size: 18px; letter-spacing: 2px; color: var(--gold);
+       text-shadow: 0 0 18px rgba(255,210,74,.35); margin: 0; }
+  h1 .ghosty { color: var(--flesh); }
+  .cab {
+    background: var(--bezel); border: 3px solid var(--line); border-radius: 14px;
+    padding: 16px; box-shadow: 0 18px 60px rgba(0,0,0,.55), inset 0 0 0 1px #000;
+  }
+  .hud {
+    display: flex; justify-content: space-between; gap: 18px;
+    font-size: 11px; padding: 2px 4px 12px; color: var(--gold);
+  }
+  .hud .lbl { color: var(--dim); font-size: 8px; display: block; margin-bottom: 5px; }
+  canvas { display: block; background: #05071c; border-radius: 6px; image-rendering: pixelated; }
+  .msg { min-height: 16px; font-size: 9px; color: var(--paper); padding-top: 12px;
+         text-align: center; }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+              justify-content: center; }
+  button, select {
+    font-family: inherit; font-size: 9px; padding: 10px 14px; cursor: pointer;
+    color: var(--gold); background: var(--bezel); border: 2px solid var(--line);
+    border-radius: 8px;
+  }
+  button:hover { border-color: var(--gold); }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .help { font-size: 8px; color: var(--dim); line-height: 2; text-align: center; max-width: 560px; }
+  #boot { font-size: 9px; color: var(--flesh); line-height: 1.9; max-width: 540px; text-align: center; }
+  @media (prefers-reduced-motion: reduce) { .pulse { animation: none !important; } }
+</style>
+</head>
+<body>
+  <h1>PAC-MAN <span class="ghosty">&middot; agent edition</span></h1>
+
+  <div class="cab">
+    <div class="hud">
+      <div><span class="lbl">SCORE</span><span id="score">0</span></div>
+      <div><span class="lbl">LEVEL</span><span id="level">1</span></div>
+      <div><span class="lbl">LIVES</span><span id="lives">3</span></div>
+      <div><span class="lbl">POWER</span><span id="power">&mdash;</span></div>
+    </div>
+    <canvas id="cv" width="456" height="504"></canvas>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="controls">
+    <select id="difficulty" aria-label="Ghost difficulty">
+      <option value="1">Hard ghosts (chasers)</option>
+      <option value="0">Easy ghosts (wanderers)</option>
+    </select>
+    <button id="newgame">New game</button>
+    <button id="pause">Pause</button>
+  </div>
+  <div class="help">
+    Steer with the arrow keys or WASD. Eat every dot; power pellets turn the
+    tables. The same maze, different brains: hard-mode ghosts run a BFS
+    pursuit, easy-mode ghosts just wander.
+  </div>
+  <div id="boot"></div>
+
+<script>
+"use strict";
+const TILE = 24;
+const cv  = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const $   = id => document.getElementById(id);
+
+let api = null, timer = null, paused = false, frame = 0;
+
+// ---------- Engine bridge ----------
+// postRun (not onRuntimeInitialized!) guarantees C++ main() has already
+// executed -- and main() is what installs the engine hooks behind the
+// ags_* exports.  Any failure below surfaces in the on-page strip.
+var Module = {
+  postRun: [bootEngine],
+  onAbort: what => surface("Engine aborted: " + what),
+  printErr: text => { console.error(text); surface(String(text)); },
+};
+window.addEventListener("error",
+  ev => surface(ev.message + " (" + (ev.filename||"").split("/").pop() + ":" + ev.lineno + ")"));
+function surface(text) {
+  const b = document.getElementById("boot");
+  b.innerHTML += (b.innerHTML ? "<br>" : "") + text.replace(/[&<>]/g,
+    c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+}
+function bootEngine() {
+  api = {
+    reset: Module.cwrap("ags_reset", null, ["number", "number"]),
+    tick:  Module.cwrap("ags_tick",  null, []),
+    input: Module.cwrap("ags_input", null, ["string"]),
+    state: Module.cwrap("ags_state", "string", []),
+  };
+  newGame();
+}
+
+function newGame() {
+  const seed = (Math.random() * 0xffffffff) >>> 0;
+  api.reset(seed, parseInt($("difficulty").value, 10));
+  paused = false;
+  $("pause").textContent = "Pause";
+  if (timer) clearInterval(timer);
+  timer = setInterval(step, 150);
+  step();
+}
+
+function step() {
+  if (paused || !api) return;
+  api.tick();
+  render(JSON.parse(api.state()));
+}
+
+// ---------- Input: keys become action *names* ----------
+const KEYMAP = { ArrowUp:"up", ArrowDown:"down", ArrowLeft:"left", ArrowRight:"right",
+                 w:"up", s:"down", a:"left", d:"right" };
+document.addEventListener("keydown", ev => {
+  const name = KEYMAP[ev.key];
+  if (name && api) { api.input(name); ev.preventDefault(); }
+});
+
+// ---------- Rendering ----------
+const DIR_ANGLE = { right: 0, down: Math.PI/2, left: Math.PI, up: -Math.PI/2 };
+const GHOST_COLORS = ["#ff5b5b", "#ffb3de", "#5bd9e8", "#ffb86b"];
+
+function render(st) {
+  frame++;
+  $("score").textContent = st.score;
+  $("level").textContent = st.level;
+  $("lives").textContent = "\u25CF".repeat(Math.max(0, st.lives));
+  $("power").textContent = st.power > 0 ? "!".repeat(Math.min(6, Math.ceil(st.power / 10))) : "\u2014";
+  if (st.message) $("msg").textContent = st.message;
+  if (st.status === "gameover") $("msg").textContent = "GAME OVER \u2014 press New game";
+
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  // Maze & consumables.
+  for (let y = 0; y < st.height; ++y) {
+    for (let x = 0; x < st.width; ++x) {
+      const c = st.grid[y][x];
+      const px = x * TILE, py = y * TILE;
+      if (c === "#") {
+        ctx.fillStyle = "#0a0e2e";
+        ctx.fillRect(px, py, TILE, TILE);
+        ctx.strokeStyle = "#3a49b8";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px + 4.5, py + 4.5, TILE - 9, TILE - 9);
+      } else if (c === "-") {
+        ctx.fillStyle = "#b57edc";
+        ctx.fillRect(px + 3, py + TILE/2 - 2, TILE - 6, 4);
+      } else if (c === ".") {
+        ctx.fillStyle = "#ffd24a";
+        ctx.beginPath(); ctx.arc(px + TILE/2, py + TILE/2, 2.6, 0, 7); ctx.fill();
+      } else if (c === "o") {
+        const r = 6 + Math.sin(frame * 0.35) * 1.6;      // Gentle pulse.
+        ctx.fillStyle = "#ffd24a";
+        ctx.beginPath(); ctx.arc(px + TILE/2, py + TILE/2, r, 0, 7); ctx.fill();
+      } else if (c === "F") {
+        drawFruit(px + TILE/2, py + TILE/2);
+      }
+    }
+  }
+
+  // Ghosts.
+  st.ghosts.forEach((g, i) => drawGhost(g, GHOST_COLORS[i % 4]));
+
+  // Pac-Man (drawn last, on top).
+  drawPac(st.pacman);
+}
+
+function drawPac(p) {
+  const cx = p.x * TILE + TILE/2, cy = p.y * TILE + TILE/2;
+  const mouth = 0.26 + 0.2 * Math.sin(frame * 0.7);      // Chomp animation.
+  const a = DIR_ANGLE[p.dir] ?? 0;
+  ctx.fillStyle = "#ffe14d";
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, TILE/2 - 2, a + mouth, a - mouth + Math.PI * 2);
+  ctx.closePath(); ctx.fill();
+}
+
+function drawGhost(g, color) {
+  const px = g.x * TILE, py = g.y * TILE;
+  const cx = px + TILE/2;
+  const body = g.frightened ? "#3a49b8" : color;
+  ctx.fillStyle = g.home ? "rgba(255,255,255,.25)" : body;
+  ctx.beginPath();
+  ctx.arc(cx, py + TILE/2, TILE/2 - 3, Math.PI, 0);
+  ctx.lineTo(px + TILE - 3, py + TILE - 4);
+  for (let k = 3; k >= 0; --k) {                          // Skirt scallops.
+    const w = (TILE - 6) / 4;
+    ctx.arc(px + 3 + w * k + w/2, py + TILE - 4, w/2, 0, Math.PI);
+  }
+  ctx.closePath(); ctx.fill();
+  // Eyes.
+  const ey = py + TILE/2 - 2;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(cx - 4, ey, 3.2, 0, 7); ctx.arc(cx + 4, ey, 3.2, 0, 7); ctx.fill();
+  ctx.fillStyle = g.frightened ? "#ff5b5b" : "#141a4a";
+  ctx.beginPath(); ctx.arc(cx - 4, ey, 1.6, 0, 7); ctx.arc(cx + 4, ey, 1.6, 0, 7); ctx.fill();
+}
+
+function drawFruit(cx, cy) {
+  ctx.fillStyle = "#ff5b5b";
+  ctx.beginPath(); ctx.arc(cx - 3, cy + 2, 5, 0, 7); ctx.arc(cx + 3, cy + 2, 5, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#7ac74f"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx, cy - 1); ctx.quadraticCurveTo(cx + 2, cy - 8, cx + 6, cy - 9);
+  ctx.stroke();
+}
+
+// ---------- Buttons ----------
+$("newgame").addEventListener("click", newGame);
+$("pause").addEventListener("click", () => {
+  paused = !paused;
+  $("pause").textContent = paused ? "Resume" : "Pause";
+});
+</script>
+<!-- The engine (built by build.sh).  If missing, explain how to build. -->
+<script src="pacman.js"
+        onerror="document.getElementById('boot').innerHTML =
+          'Engine not found: web/pacman.js is missing.<br>' +
+          'Run <b>./build.sh</b> (requires the Emscripten SDK), then serve ' +
+          'this folder with <b>python3 -m http.server</b>.'"></script>
+</body>
+</html>
