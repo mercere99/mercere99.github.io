@@ -56,6 +56,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .thumb-rail{width:168px;overflow-y:auto;padding:12px 10px;border-right:1px solid var(--line);background:var(--panel)}
 .thumb{position:relative;margin:0 0 12px;cursor:pointer;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:#000}
 .thumb.sel{border-color:var(--amber)}
+.thumb.hid{border-style:dashed;border-color:#4a5568}
+.thumb.hid .frame{opacity:.55}
+.thumb.hid.sel{border-color:var(--amber)}
 .thumb .num{position:absolute;left:5px;top:4px;z-index:2;font-family:var(--mono);font-size:10px;color:#fff;background:rgba(20,24,32,.72);border-radius:4px;padding:1px 5px}
 .thumb .frame{width:144px;height:81px;overflow:hidden;position:relative}
 .stage-wrap{flex:1;display:flex;flex-direction:column;min-width:0}
@@ -173,7 +176,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <h3>Structure</h3>
     <table>
       <tr><td>---</td><td>Start a new slide.</td></tr>
-      <tr><td>!---</td><td>Start a <b>hidden</b> slide — skipped entirely (not shown, not numbered, not executed). Handy for backup slides; switch back with a plain <code>---</code> later.</td></tr>
+      <tr><td>!---</td><td>Start a <b>pocket</b> slide: rendered in the editor and reachable by direct navigation (overview, thumbnails, <code>?slide=N</code>), but skipped when advancing with space/n. It still <i>executes</i>, so <code>!set</code> and <code>\${…}</code> math there affect later slides. Built-in <code>slide_hidden</code> is 1 on these slides.</td></tr>
+      <tr><td>!if expr … !else … !endif</td><td>Conditional lines (nestable). Truthy = non-zero number or non-empty string; combine with comparisons, e.g. <code>!if slide_num > 3</code> or <code>!if \${x*2} == 10</code>.</td></tr>
+      <tr><td>!foreach i 1 6 [step] … !endfor</td><td>Repeat the body once per value (inclusive; step may be fractional or negative; nestable). <code>\${i}</code> works everywhere in the body — labels, coordinates, durations — so one loop can build and animate a whole family of elements. Use <code>\${…}</code> for computed bounds.</td></tr>
       <tr><td># Title / ## Subtitle</td><td>Big centered title and subtitle (title slides).</td></tr>
       <tr><td>### Slide title</td><td>Heading at the top of a regular slide.</td></tr>
       <tr><td>- item / &nbsp;&nbsp;- sub-item</td><td>Bullets; indent 2 spaces per level. <code>**bold**</code>, <code>*italic*</code>, <code>`code`</code> work in any text.</td></tr>
@@ -190,7 +195,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>The value is \${test}</td><td><code>\${…}</code> anywhere in slide text substitutes an expression: variables, numbers, strings, <code>+ - * / % ( )</code>. <code>+</code> concatenates strings.</td></tr>
       <tr><td>\${test*2 + 1}</td><td>Math works, with normal precedence.</td></tr>
       <tr><td>\${test = test + 1}</td><td>Assignment: prints the new value <i>and</i> updates the variable. Expressions run at parse time, top to bottom, so results are deterministic.</td></tr>
-      <tr><td>\${slide_num} · \${num_slides}</td><td>Built-ins: current slide number and total slide count.</td></tr>
+      <tr><td>\${slide_num} · \${num_slides} · \${slide_hidden}</td><td>Built-ins: current slide number, total slide count (pocket slides included), and whether this slide is hidden.</td></tr>
+      <tr><td>&amp;nbsp; &amp;mdash; &amp;rarr; &amp;#x1F600; · \${nbsp} · \${chr(8594)}</td><td>Special characters: HTML entities work in any text (never tags — markup stays escaped), emojis paste straight in, <code>\${nbsp}</code> is a non-breaking space, and <code>chr(n)</code> gives any code point.</td></tr>
       <tr><td>\${min(3,7)} · \${sin(pi/2)} · \${test > 4}</td><td>Functions: <code>min max sin cos tan exp log log2 sqrt abs floor ceil round</code> (with built-in <code>pi</code>). Comparisons <code>< <= > >= == !=</code> return 1 or 0.</td></tr>
       <tr><td>\${pic.x} · \${box.cy} · \${arr.x2}</td><td>Members of any <code>[label]</code>ed element (values as declared, in px): all elements have <code>x y</code> (+ <code>w h cx cy</code> when known); lines/arrows add <code>x1 y1 x2 y2</code>; circles <code>r</code>; ellipses <code>rx ry</code>. Great for attaching one element to another.</td></tr>
       <tr><td>!all<br>&nbsp;&nbsp;…lines…</td><td>Everything after <code>!all</code> (to the end of that slide) is pasted at the top of <b>every</b> slide, then evaluated per slide — so <code>\${slide_num}</code> is correct. Build footers, headers, watermarks, running counters. One block per deck.</td></tr>
@@ -220,7 +226,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!ellipse (cx,cy) (rx,ry)</td><td>Ellipse.</td></tr>
       <tr><td>!rect (x,y) (w,h)</td><td>Rectangle, top-left at (x,y).</td></tr>
       <tr><td>!textbox (x,y) (w,h) Your text</td><td>A rectangle with wrapped text inside. Style: <code>fill</code>, <code>textcolor</code>, <code>size</code>, <code>align</code>, <code>valign</code>, <code>pad</code>, <code>round</code>, <code>thick</code> (border).</td></tr>
-      <tr><td>!rect (x,y) (w,h) Some text</td><td>Any rect / circle / ellipse can carry inner text — just type it after the geometry.</td></tr>
+      <tr><td>!rect (x,y) (w,h) Some text</td><td>Any closed shape (rect, circle, ellipse, polygon, diamond, star) can carry inner text — just type it after the geometry.</td></tr>
+      <tr><td>!polygon (x,y) (x,y) (x,y) …</td><td>Closed polygon, any number of vertices. <code>!triangle</code> = 3-point shorthand; <code>!polyline</code> is the open version.</td></tr>
+      <tr><td>!diamond (cx,cy) (w,h) · !star (cx,cy) n r [r_in]</td><td>Centered diamond; n-pointed star with outer radius r (inner defaults to 0.45·r).</td></tr>
+      <tr><td>!curve (x1,y1) (cx,cy) (x2,y2)</td><td>Quadratic Bézier — ideal for diagram connectors; the middle pair is the control point.</td></tr>
+      <tr><td>!anim poly point 4 (x,y) 1s</td><td><code>point</code> now animates <b>any</b> vertex of any multi-point shape. Members: polygons expose <code>x y w h cx cy n</code> plus per-vertex <code>x1 y1 x2 y2 …</code>.</td></tr>
     </table>
 
     <h3>Animations (target a [label]; duration optional, default 0.7s)</h3>
@@ -241,7 +251,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>←</td><td>Back one step.</td></tr>
       <tr><td>Backspace</td><td>Back one whole slide.</td></tr>
       <tr><td>n / p</td><td>Next / previous slide (skipping remaining steps).</td></tr>
-      <tr><td>v</td><td>Slide overview sidebar; click a slide to jump.</td></tr>
+      <tr><td>v</td><td>Slide overview sidebar; click a slide to jump — including pocket (<code>!---</code>) slides, shown dashed.</td></tr>
       <tr><td>⧉ Presenter view</td><td>Opens the slides in a separate window — drag it to the projector and press <code>F</code> (or click once) there for fullscreen. This window becomes your console: the script is your notes, auto-scrolled to the current slide, with thumbnails as a click-to-jump overview. Both windows' keyboards drive the show.</td></tr>
       <tr><td>b · f / ⛶ · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit. The Present buttons enter fullscreen automatically; "▶ 2nd screen" (shown when an extended display is detected, Chromium browsers) presents fullscreen on your other monitor.</td></tr>
     </table>
@@ -270,6 +280,8 @@ const cx = v => px(v, SW), cy = v => px(v, SH);
 function escapeHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function inlineMd(s){
   let h = escapeHtml(s);
+  // entities stay usable: &nbsp; &mdash; &rarr; &#8594; &#x1F600; ... (never tags)
+  h = h.replace(/&amp;(#\d{1,7}|#x[0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,30});/g,"&$1;");
   h = h.replace(/`([^`]+)`/g,"<code>$1</code>");
   h = h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
   h = h.replace(/\*([^*]+)\*/g,"<i>$1</i>");
@@ -337,8 +349,10 @@ function styleLen(v, span, vars){
 
 function parseScript(text){
   const warnings=[];
-  const vars={ __labels:{}, slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI };
-  const slabs=splitSlides(text).filter(sl=>!sl.hidden);   // !--- slides are skipped entirely
+  const vars={ __labels:{}, slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI, nbsp:"\u00A0" };
+  // Hidden (!---) "pocket" slides ARE parsed and executed — their variable
+  // math affects later slides — but presentation skips them when advancing.
+  const slabs=splitSlides(text);
   vars.num_slides=slabs.length;
 
   // Extract the !all block: everything from an `!all` line to the end of that
@@ -370,9 +384,12 @@ function parseScript(text){
 
   const slides=slabs.map((sl,si)=>{
     vars.slide_num=si+1;
+    vars.slide_hidden=sl.hidden?1:0;
     const prepend = allText && si!==allSlab;
     const body = prepend ? allText+"\n"+sl.body : sl.body;
-    return parseSlide(body, si, warnings, vars, prepend?allLines.length:0);
+    const slide=parseSlide(body, si, warnings, vars, prepend?allLines.length:0);
+    slide.hidden=!!sl.hidden;
+    return slide;
   });
   return {slides, settings:vars, warnings};
 }
@@ -385,7 +402,7 @@ function parseScript(text){
    assignments are deterministic and re-renders never re-run them. */
 const EXPR_FNS={min:Math.min,max:Math.max,sin:Math.sin,cos:Math.cos,tan:Math.tan,
   exp:Math.exp,log:Math.log,log2:Math.log2,sqrt:Math.sqrt,abs:Math.abs,
-  floor:Math.floor,ceil:Math.ceil,round:Math.round};
+  floor:Math.floor,ceil:Math.ceil,round:Math.round,chr:n=>String.fromCodePoint(Math.round(n))};
 
 function evalExpr(src, vars){
   let i=0;
@@ -486,6 +503,15 @@ function memberOf(def, m, vars){
       return pick({x,y,cx:x,cy:y,rx:def.rx,ry:def.ry,w:2*def.rx,h:2*def.ry}); }
     case "rect": case "textbox": { const [[x,y]]=c;
       return pick({x,y,w:def.w,h:def.h,cx:x+def.w/2,cy:y+def.h/2}); }
+    case "polygon": case "polyline": case "curve": {
+      const vm=m.match(/^([xy])(\d+)$/);                 // x3 / y3 -> vertex 3
+      if(vm){ const p=c[+vm[2]-1]; return p ? (vm[1]==="x"?p[0]:p[1]) : undefined; }
+      const xs=c.map(p=>p[0]), ys=c.map(p=>p[1]);
+      const minx=Math.min(...xs), maxx=Math.max(...xs), miny=Math.min(...ys), maxy=Math.max(...ys);
+      return pick({x:c[0][0], y:c[0][1], w:maxx-minx, h:maxy-miny, n:c.length,
+                   cx:def.ccx!==undefined?def.ccx:(minx+maxx)/2,
+                   cy:def.ccy!==undefined?def.ccy:(miny+maxy)/2});
+    }
     default: {                          // text, images, embeds, code, tables
       const x=def.pos?def.pos.x:undefined, y=def.pos?def.pos.y:undefined;
       let w=styleLen(st.w,SW,vars), h=styleLen(st.h,SH,vars);
@@ -543,10 +569,12 @@ function pairs(s){
 function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
   const slide={items:[], steps:[[newPhase()]], bg:null, hasH1:false, hasH3:false};
   let step=0, phase=0, nextId=0;
+  let loopBudget=20000;                    // total foreach iterations per slide
   function cur(){ return slide.steps[step][phase]; }
   // Warning locations account for a prepended !all block.
   const where=l=>{ const n=l-lnOff;
     return n>=1 ? `slide ${slideIndex+1}, line ${n}` : `!all block (on slide ${slideIndex+1})`; };
+  const truthy=v=> typeof v==="number" ? (v!==0 && !Number.isNaN(v)) : String(v).length>0;
   // Finalize an item: bake @() position to px (honoring the coords mode at
   // THIS point in the script), stamp the mode, register its label for
   // ${label.member} access, and reveal it in the current step/phase.
@@ -556,10 +584,27 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     if(item.label) vars.__labels[item.label]=item;
     slide.items.push(item); cur().reveals.push(item.id);
   }
+  // Find the end of an !if / !foreach block (fence-aware, nesting-aware).
+  function findBlockEnd(L,k,openRe,closeRe,elseRe){
+    let depth=1, inF=false, elseIdx=-1;
+    for(let j=k+1;j<L.length;j++){
+      const t=L[j].text.trim();
+      if(inF){ if(t.startsWith("```")) inF=false; continue; }
+      if(FENCE_OPEN.test(t)){ inF=true; continue; }
+      if(openRe.test(t)) depth++;
+      else if(closeRe.test(t)){ if(--depth===0) return {endIdx:j, elseIdx}; }
+      else if(elseRe && depth===1 && elseRe.test(t) && elseIdx<0) elseIdx=j;
+    }
+    return {endIdx:-1, elseIdx};
+  }
 
-  const lines=body.split("\n");
-  for(let ln=0; ln<lines.length; ln++){
-    const raw=lines[ln];
+  const srcLines=body.split("\n").map((text,i)=>({text, n:i+1}));
+  processLines(srcLines);
+  return slide;
+
+  function processLines(L){
+  for(let k=0; k<L.length; k++){
+    const raw=L[k].text, lnNo=L[k].n;
     if(!raw.trim()) continue;
     const indent=(raw.match(/^ */)[0].length);
     let line=raw.trim();
@@ -571,8 +616,46 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     let m;
     if(/^!all\b/i.test(line)) continue;   // handled by parseScript's extraction
 
+    // --- control flow: !if <expr> … [!else …] !endif ---
+    if((m=line.match(/^!if\b(.*)$/i))){
+      const {endIdx,elseIdx}=findBlockEnd(L,k,/^!if\b/i,/^!endif\b/i,/^!else\b/i);
+      const end = endIdx<0 ? L.length : endIdx;
+      if(endIdx<0) warnings.push(`${where(lnNo)}: !if without !endif (block runs to end of slide)`);
+      let cond=false;
+      try{ cond=truthy(evalExpr(substVars(m[1].trim(),vars,warnings,where(lnNo)),vars)); }
+      catch(e){ warnings.push(`${where(lnNo)}: ${e.message} in !if condition`); }
+      const bodyA=L.slice(k+1, elseIdx>=0?elseIdx:end);
+      const bodyB=elseIdx>=0 ? L.slice(elseIdx+1, end) : [];
+      processLines(cond?bodyA:bodyB);
+      k=end; continue;
+    }
+    // --- control flow: !foreach var start end [step] … !endfor ---
+    if((m=line.match(/^!for(?:each)?\s+([A-Za-z_]\w*)\s+(.*)$/i))){
+      const {endIdx}=findBlockEnd(L,k,/^!for(?:each)?\b/i,/^!endfor(?:each)?\b/i,null);
+      const end = endIdx<0 ? L.length : endIdx;
+      if(endIdx<0) warnings.push(`${where(lnNo)}: !foreach without !endfor (block runs to end of slide)`);
+      const args=substVars(m[2].trim(),vars,warnings,where(lnNo)).split(/\s+/).map(Number);
+      const [start,stop]=args; const stp = args.length>2 ? args[2] : 1;
+      if(args.length<2 || args.some(Number.isNaN))
+        warnings.push(`${where(lnNo)}: !foreach needs numeric “start end [step]” (use \${…} for expressions)`);
+      else if(stp===0)
+        warnings.push(`${where(lnNo)}: !foreach step of 0 would never end`);
+      else{
+        const bodyL=L.slice(k+1,end), eps=Math.abs(stp)*1e-9;
+        for(let v=start; (stp>0 ? v<=stop+eps : v>=stop-eps); v=+(v+stp)){
+          if(--loopBudget<0){ warnings.push(`${where(lnNo)}: !foreach stopped after 20000 total iterations`); break; }
+          vars[m[1]]=v;
+          processLines(bodyL);
+        }
+      }
+      k=end; continue;
+    }
+    if(/^!(endif|endfor(each)?|else)\b/i.test(line)){
+      warnings.push(`${where(lnNo)}: stray “${line.split(/\s/)[0]}”`); continue;
+    }
+
     // --- ${expr} substitution (everywhere except code-fence bodies) ---
-    line=substVars(line, vars, warnings, where(ln+1));
+    line=substVars(line, vars, warnings, where(lnNo));
 
     // --- prefixes: @(x,y), [label], {style} — any order ---
     let {pos,label,style,rest}=extractPrefixes(line);
@@ -582,23 +665,23 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     // --- fenced code block: ```lang ... ``` (lines kept verbatim) ---
     if(line.startsWith("```")){
       const lang=line.slice(3).trim().toLowerCase();
-      const buf=[]; let j=ln+1, closed=false;
-      for(; j<lines.length; j++){
-        if(lines[j].trim().startsWith("```")){ closed=true; break; }
-        buf.push(lines[j]);
+      const buf=[]; let j=k+1, closed=false;
+      for(; j<L.length; j++){
+        if(L[j].text.trim().startsWith("```")){ closed=true; break; }
+        buf.push(L[j].text);
       }
-      if(!closed) warnings.push(`${where(ln+1)}: unterminated code fence`);
-      ln=j;                                   // skip past the closing fence
+      if(!closed) warnings.push(`${where(lnNo)}: unterminated code fence`);
+      k=j;                                   // skip past the closing fence
       addItem({id:nextId++, kind:"code", lang, code:buf.join("\n"), label, style, pos});
       continue;
     }
 
     // --- Markdown table: consecutive |-prefixed lines ---
     if(line.startsWith("|")){
-      const rowsRaw=[line]; let j=ln+1;
-      for(; j<lines.length && lines[j].trim().startsWith("|"); j++)
-        rowsRaw.push(substVars(lines[j].trim(), vars, warnings, where(j+1)));
-      ln=j-1;
+      const rowsRaw=[line]; let j=k+1;
+      for(; j<L.length && L[j].text.trim().startsWith("|"); j++)
+        rowsRaw.push(substVars(L[j].text.trim(), vars, warnings, where(L[j].n)));
+      k=j-1;
       const splitRow=t=>t.replace(/^\|/,"").replace(/\|\s*$/,"").split("|").map(c=>c.trim());
       const all=rowsRaw.map(splitRow);
       const isSep=r=>r.length>0 && r.every(c=>/^:?-{2,}:?$/.test(c));
@@ -621,7 +704,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
 
     // --- animation lines ---
     if((m=line.match(/^!anim\s+([\w-]+)\s+(\w+)\s*(.*)$/i))){
-      const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,where(ln+1),vars);
+      const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,where(lnNo),vars);
       if(a) cur().anims.push(a);
       continue;
     }
@@ -647,8 +730,8 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       addItem({id:nextId++, kind:"embed", src:m[1].trim(), label, style, pos});
       continue;
     }
-    // --- shapes (rect/circle/ellipse may carry inner text; !textbox is rect+text) ---
-    if((m=line.match(/^!(line|arrow|circle|ellipse|rect|textbox|box)\b(.*)$/i))){
+    // --- shapes ---
+    if((m=line.match(/^!(line|arrow|circle|ellipse|rect|textbox|box|polygon|polyline|triangle|diamond|star|curve)\b(.*)$/i))){
       let kind=m[1].toLowerCase(); if(kind==="box") kind="textbox";
       const rest2=m[2];
       const item={id:nextId++, kind, label, style, pos:null};
@@ -656,27 +739,57 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       RE_PAIR.lastIndex=0;                     // matchAll clones the regex WITH its lastIndex
       const pm=[...rest2.matchAll(RE_PAIR)];
       const endOf=mm=>mm.index+mm[0].length;
+      const P=i2=>[cvx(+pm[i2][1],vars), cvy(+pm[i2][2],vars)];
       if(kind==="line"||kind==="arrow"){
-        if(pm.length<2){ok=false;} else {
-          item.coords=[[cvx(+pm[0][1],vars),cvy(+pm[0][2],vars)],[cvx(+pm[1][1],vars),cvy(+pm[1][2],vars)]]; geomEnd=endOf(pm[1]);
-        }
+        if(pm.length<2){ok=false;} else { item.coords=[P(0),P(1)]; geomEnd=endOf(pm[1]); }
       }else if(kind==="circle"){
         if(pm.length<1){ok=false;} else {
           const after=rest2.slice(endOf(pm[0])); const rm=after.match(/^\s*(-?[\d.]+)/);
-          if(!rm){ok=false;} else { item.coords=[[cvx(+pm[0][1],vars),cvy(+pm[0][2],vars)]]; item.r=cvlen(parseFloat(rm[1]),vars,SH); geomEnd=endOf(pm[0])+rm[0].length; }
+          if(!rm){ok=false;} else { item.coords=[P(0)]; item.r=cvlen(parseFloat(rm[1]),vars,SH); geomEnd=endOf(pm[0])+rm[0].length; }
         }
       }else if(kind==="ellipse"){
-        if(pm.length<2){ok=false;} else { item.coords=[[cvx(+pm[0][1],vars),cvy(+pm[0][2],vars)]]; item.rx=cvx(+pm[1][1],vars); item.ry=cvy(+pm[1][2],vars); geomEnd=endOf(pm[1]); }
-      }else{ // rect / textbox
-        if(pm.length<2){ok=false;} else { item.coords=[[cvx(+pm[0][1],vars),cvy(+pm[0][2],vars)]]; item.w=cvx(+pm[1][1],vars); item.h=cvy(+pm[1][2],vars); geomEnd=endOf(pm[1]); }
+        if(pm.length<2){ok=false;} else { item.coords=[P(0)]; item.rx=cvx(+pm[1][1],vars); item.ry=cvy(+pm[1][2],vars); geomEnd=endOf(pm[1]); }
+      }else if(kind==="rect"||kind==="textbox"){
+        if(pm.length<2){ok=false;} else { item.coords=[P(0)]; item.w=cvx(+pm[1][1],vars); item.h=cvy(+pm[1][2],vars); geomEnd=endOf(pm[1]); }
+      }else if(kind==="polygon"||kind==="polyline"||kind==="triangle"){
+        const need = kind==="polyline" ? 2 : 3;
+        if(pm.length<need){ok=false;} else {
+          item.coords=pm.map((_,i2)=>P(i2)); geomEnd=endOf(pm[pm.length-1]);
+          if(kind==="triangle"){ item.coords=item.coords.slice(0,3); item.kind="polygon"; geomEnd=endOf(pm[2]); }
+        }
+      }else if(kind==="curve"){
+        if(pm.length<3){ok=false;} else { item.coords=[P(0),P(1),P(2)]; geomEnd=endOf(pm[2]); }
+      }else if(kind==="diamond"){
+        if(pm.length<2){ok=false;} else {
+          const [cx0,cy0]=P(0), w2=cvx(+pm[1][1],vars)/2, h2=cvy(+pm[1][2],vars)/2;
+          item.coords=[[cx0,cy0-h2],[cx0+w2,cy0],[cx0,cy0+h2],[cx0-w2,cy0]];
+          item.kind="polygon"; item.ccx=cx0; item.ccy=cy0; geomEnd=endOf(pm[1]);
+        }
+      }else if(kind==="star"){
+        if(pm.length<1){ok=false;} else {
+          const nums=[...rest2.slice(endOf(pm[0])).matchAll(/-?[\d.]+/g)].map(x=>parseFloat(x[0]));
+          if(nums.length<2){ok=false;} else {
+            const [cx0,cy0]=P(0), pts=Math.max(3,Math.round(nums[0]));
+            const rOut=cvlen(nums[1],vars,SH), rIn=nums.length>2?cvlen(nums[2],vars,SH):rOut*0.45;
+            item.coords=[];
+            for(let j2=0;j2<2*pts;j2++){
+              const r=(j2%2? rIn:rOut), a=-Math.PI/2 + j2*Math.PI/pts;
+              item.coords.push([cx0+r*Math.cos(a), cy0+r*Math.sin(a)]);
+            }
+            item.kind="polygon"; item.ccx=cx0; item.ccy=cy0;
+            const tm=rest2.slice(endOf(pm[0])).match(/^(\s*-?[\d.]+){2,3}/);
+            geomEnd=endOf(pm[0])+(tm?tm[0].length:0);
+          }
+        }
       }
-      if(!ok){ warnings.push(`${where(ln+1)}: could not read !${kind} coordinates`); continue; }
+      if(!ok){ warnings.push(`${where(lnNo)}: could not read !${kind} coordinates`); continue; }
       const inner=rest2.slice(geomEnd).trim();
-      if(inner && kind!=="line" && kind!=="arrow") item.text=inner;   // fo geometry needs a box
+      const textOK=!["line","arrow","polyline","curve"].includes(item.kind);
+      if(inner && textOK) item.text=inner;   // fo geometry needs a box
       addItem(item);
       continue;
     }
-    if(line.startsWith("!") && !line.startsWith("![")){ warnings.push(`${where(ln+1)}: unknown directive “${line.split(/\s/)[0]}”`); continue; }
+    if(line.startsWith("!") && !line.startsWith("![")){ warnings.push(`${where(lnNo)}: unknown directive “${line.split(/\s/)[0]}”`); continue; }
 
     // --- images ---
     if((m=line.match(/^!\[([^\]]*)\]\((.+)\)\s*$/))){
@@ -700,7 +813,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     }
     addItem(item);
   }
-  return slide;
+  }
 }
 function newPhase(){ return {reveals:[], anims:[]}; }
 
@@ -723,7 +836,7 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
     case "move":{ const p=pairs(args); if(!p.length) return bad("move needs (x,y)");
       return {target,verb,dur,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
     case "point":{ const n=parseInt(args); const p=pairs(args);
-      if(!(n===1||n===2)||!p.length) return bad("point needs an index (1 or 2) and (x,y)");
+      if(!(n>=1)||!p.length) return bad("point needs a point index and (x,y)");
       return {target,verb,dur,n,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
     case "size":{ const v=parseFloat(args); if(isNaN(v)) return bad("size needs a width");
       return {target,verb,dur,w:cvlen(v,vars,SW)}; }
@@ -921,6 +1034,17 @@ function buildShape(it,svg){
     ln.setAttribute("stroke",stroke); ln.setAttribute("stroke-width",thick); ln.setAttribute("stroke-linecap","round");
     g.appendChild(ln); it.lineEl=ln;
     if(d.kind==="arrow"){ const head=document.createElementNS(SVGNS,"polygon"); head.setAttribute("fill",stroke); g.appendChild(head); it.headEl=head; }
+  }else if(d.kind==="polygon"||d.kind==="polyline"){
+    const sh=document.createElementNS(SVGNS,d.kind);
+    sh.setAttribute("stroke",stroke); sh.setAttribute("stroke-width",thick);
+    sh.setAttribute("fill", d.kind==="polyline" ? (st.fill||"none") : fill);
+    sh.setAttribute("stroke-linejoin","round");
+    g.appendChild(sh); it.shapeEl=sh;
+  }else if(d.kind==="curve"){
+    const sh=document.createElementNS(SVGNS,"path");
+    sh.setAttribute("stroke",stroke); sh.setAttribute("stroke-width",thick);
+    sh.setAttribute("fill",st.fill||"none"); sh.setAttribute("stroke-linecap","round");
+    g.appendChild(sh); it.shapeEl=sh;
   }else{
     const tag = isBox ? "rect" : {circle:"circle",ellipse:"ellipse",rect:"rect"}[d.kind];
     const sh=document.createElementNS(SVGNS,tag);
@@ -970,12 +1094,22 @@ function updateShape(it){
   }else if(d.kind==="rect"||d.kind==="textbox"){
     const [[x,y]]=it.coords; it.shapeEl.setAttribute("x",x); it.shapeEl.setAttribute("y",y);
     it.shapeEl.setAttribute("width",it.w); it.shapeEl.setAttribute("height",it.h);
+  }else if(d.kind==="polygon"||d.kind==="polyline"){
+    it.shapeEl.setAttribute("points", it.coords.map(p=>p[0]+","+p[1]).join(" "));
+  }else if(d.kind==="curve"){
+    const [a,b,c2]=it.coords;
+    it.shapeEl.setAttribute("d",`M ${a[0]} ${a[1]} Q ${b[0]} ${b[1]} ${c2[0]} ${c2[1]}`);
   }
   // keep inner text glued to the shape's bounding box
   if(it.fo){
     let bx,by,bw,bh;
     if(d.kind==="circle"){ const [[x,y]]=it.coords; const r=it.r; bx=x-r; by=y-r; bw=bh=2*r; }
     else if(d.kind==="ellipse"){ const [[x,y]]=it.coords; bx=x-it.rx; by=y-it.ry; bw=2*it.rx; bh=2*it.ry; }
+    else if(d.kind==="polygon"){
+      const xs=it.coords.map(p=>p[0]), ys=it.coords.map(p=>p[1]);
+      bx=Math.min(...xs); by=Math.min(...ys);
+      bw=Math.max(...xs)-bx; bh=Math.max(...ys)-by;
+    }
     else { const [[x,y]]=it.coords; bx=x; by=y; bw=it.w; bh=it.h; }
     it.fo.setAttribute("x",bx); it.fo.setAttribute("y",by);
     it.fo.setAttribute("width",Math.max(0,bw)); it.fo.setAttribute("height",Math.max(0,bh));
@@ -1024,7 +1158,7 @@ function makeAnim(a, render, warnings){
         el.style.left=it.x+"px"; el.style.top=it.y+"px"; });
     }
     case "point":{
-      if(!it.coords||it.coords.length<2) return null;
+      if(!it.coords||a.n>it.coords.length) return null;
       const i=a.n-1, s=it.coords[i].slice();
       return new Tween(a.dur,t=>{ it.coords[i]=[s[0]+(a.x-s[0])*t, s[1]+(a.y-s[1])*t]; updateShape(it); });
     }
@@ -1190,13 +1324,14 @@ function refresh(){
 function buildThumbs(container,onPick,markSelected){
   container.innerHTML="";
   deck.slides.forEach((sd,i)=>{
-    const t=document.createElement("div"); t.className="thumb"+((markSelected&&i===selected)?" sel":"");
-    t.innerHTML=`<span class="num">${i+1}</span>`;
+    const t=document.createElement("div");
+    t.className="thumb"+((markSelected&&i===selected)?" sel":"")+(sd.hidden?" hid":"");
+    t.innerHTML=`<span class="num">${i+1}${sd.hidden?" · hidden":""}</span>`;
     const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
     const p=new Player(sd,frame,{thumb:true,settings:deck.settings,index:i,total:deck.slides.length}); p.jumpToStep(sd.steps.length-1);
     fitInto(frame,144,81);
     t.addEventListener("click",()=>onPick(i));
-    t.addEventListener("dblclick",()=>startPresent(i,{fs:true}));
+    t.addEventListener("dblclick",()=>startPresent(i,{fs:true,exact:true}));
     container.appendChild(t);
   });
 }
@@ -1246,8 +1381,11 @@ function scrollCaretIntoView(pos){
 /* editor caret moved -> select the slide being edited (no rebuild unless changed) */
 function syncFromCaret(){
   if(document.activeElement!==srcEl || presentOn || presenterMode) return;
-  const i=slideIndexAt(srcEl.selectionStart);
-  if(i!==selected){ selected=i; showPreview(); }
+  // The text can be newer than the last (debounced) parse; stale ranges made
+  // the preview jump to the wrong slide while typing. Recompute — it's cheap.
+  slideRanges=computeSlideRanges(srcEl.value);
+  const i=Math.min(slideIndexAt(srcEl.selectionStart), deck.slides.length-1);
+  if(i!==selected && i>=0){ selected=i; showPreview(); }
   else { [...thumbRail.children].forEach((el,k)=>el.classList.toggle("sel",k===selected)); }
 }
 document.addEventListener("selectionchange",()=>{ if(document.activeElement===srcEl) syncFromCaret(); });
@@ -1262,6 +1400,12 @@ let presentOn=false, curSlide=0, player=null;
 let presenterMode=false, presenterWin=null, presenterHolder=null, presenterBlack=null;
 
 function activeHolder(){ return presenterMode ? presenterHolder : pholder; }
+/* Hidden "pocket" slides are skipped when ADVANCING but remain reachable by
+   direct navigation (overview, thumbnails, ?slide=N). */
+function nextVisible(i){ for(let k=i+1;k<deck.slides.length;k++) if(!deck.slides[k].hidden) return k; return -1; }
+function prevVisible(i){ for(let k=i-1;k>=0;k--) if(!deck.slides[k].hidden) return k; return -1; }
+function firstVisible(){ const k=deck.slides.findIndex(s=>!s.hidden); return k<0?0:k; }
+function lastVisible(){ for(let k=deck.slides.length-1;k>=0;k--) if(!deck.slides[k].hidden) return k; return deck.slides.length-1; }
 function layoutPresent(){
   if(presenterMode){
     if(!presenterWin||presenterWin.closed) return;
@@ -1284,9 +1428,13 @@ function startPresent(fromIndex, o={}){
   if(presenterMode) exitPresenter();
   refresh();
   if(!deck.slides.length) return;
+  let idx=clamp(fromIndex,0,deck.slides.length-1);
+  if(deck.slides[idx].hidden && !o.exact){          // don't OPEN on a pocket slide
+    const nx=nextVisible(idx); if(nx>=0) idx=nx;
+  }
   srcEl.blur();
   presentOn=true; presentEl.classList.add("on");
-  gotoSlide(clamp(fromIndex,0,deck.slides.length-1),{animate:true});
+  gotoSlide(idx,{animate:true});
   if(o.fs && !document.fullscreenElement) enterFullscreen();   // valid only within a user gesture
 }
 function exitPresent(){
@@ -1307,13 +1455,13 @@ function gotoSlide(i,{animate=false,lastStep=false}={}){
 function updateHud(){
   if(presenterMode){
     $("#pconsole").innerHTML=
-      `<b>Presenting</b> · slide ${curSlide+1} / ${deck.slides.length}`
+      `<b>Presenting</b> · slide ${curSlide+1} / ${deck.slides.length}${deck.slides[curSlide].hidden?" (hidden)":""}`
       +(player.stepCount>1?` · step ${player.step+1}/${player.stepCount}`:"")
       +` &nbsp;—&nbsp; space next · ←/Backspace back · click a thumbnail to jump · Esc ends`;
     revealSlideInEditor(curSlide);
     return;
   }
-  hudCount.textContent=`${curSlide+1} / ${deck.slides.length}`;
+  hudCount.textContent=`${curSlide+1} / ${deck.slides.length}`+(deck.slides[curSlide].hidden?" · hidden":"");
   hudDots.innerHTML="";
   if(player.stepCount>1)
     for(let s=0;s<player.stepCount;s++){
@@ -1330,13 +1478,14 @@ function revealSlideInEditor(i){
 function advance(){
   if(!player) return;
   if(player.advance()){ updateHud(); return; }
-  if(curSlide+1<deck.slides.length) gotoSlide(curSlide+1,{animate:true});
+  const nx=nextVisible(curSlide);
+  if(nx>=0) gotoSlide(nx,{animate:true});
 }
 function backStep(){
   if(!player) return;
   if(player.busy){ player.fastForward(); updateHud(); return; }
   if(player.step>0){ const target=player.step-1; gotoSlide(curSlide); player.jumpToStep(target); }
-  else if(curSlide>0) gotoSlide(curSlide-1,{lastStep:true});
+  else{ const pv=prevVisible(curSlide); if(pv>=0) gotoSlide(pv,{lastStep:true}); }
   updateHud();
 }
 function toggleOverview(){
@@ -1345,8 +1494,8 @@ function toggleOverview(){
   if(on){
     overviewList.innerHTML="";
     deck.slides.forEach((sd,i)=>{
-      const t=document.createElement("div"); t.className="thumb"+(i===curSlide?" sel":"");
-      t.innerHTML=`<span class="num">${i+1}</span>`;
+      const t=document.createElement("div"); t.className="thumb"+(i===curSlide?" sel":"")+(sd.hidden?" hid":"");
+      t.innerHTML=`<span class="num">${i+1}${sd.hidden?" · hidden":""}</span>`;
       const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
       const p=new Player(sd,frame,{thumb:true,settings:deck.settings,index:i,total:deck.slides.length}); p.jumpToStep(sd.steps.length-1);
       fitInto(frame,144,81);
@@ -1361,9 +1510,9 @@ function handleShowKey(e){
   switch(e.key){
     case " ": case "ArrowRight": case "PageDown": e.preventDefault(); advance(); break;
     case "ArrowLeft": case "PageUp": e.preventDefault(); backStep(); break;
-    case "Backspace": e.preventDefault(); gotoSlide(Math.max(0,curSlide-1)); break;
-    case "n": case "N": gotoSlide(curSlide+1,{animate:true}); break;
-    case "p": case "P": gotoSlide(Math.max(0,curSlide-1)); break;
+    case "Backspace": e.preventDefault(); { const pv=prevVisible(curSlide); if(pv>=0) gotoSlide(pv); } break;
+    case "n": case "N": { const nx=nextVisible(curSlide); if(nx>=0) gotoSlide(nx,{animate:true}); } break;
+    case "p": case "P": { const pv=prevVisible(curSlide); if(pv>=0) gotoSlide(pv); } break;
     case "v": case "V": if(!presenterMode) toggleOverview(); break;   // presenter: thumbnails are the overview
     case "b": case "B":
       if(presenterMode){ if(presenterBlack) presenterBlack.style.display=presenterBlack.style.display==="none"?"block":"none"; }
@@ -1373,8 +1522,8 @@ function handleShowKey(e){
       if(presenterMode){ try{ presenterWin.document.documentElement.requestFullscreen().catch(()=>{});}catch(_){} }
       else toggleFullscreen();
       break;
-    case "Home": gotoSlide(0); break;
-    case "End": gotoSlide(deck.slides.length-1,{lastStep:true}); break;
+    case "Home": gotoSlide(firstVisible()); break;
+    case "End": gotoSlide(lastVisible(),{lastStep:true}); break;
     case "?": toggleHelp(true); break;
     case "Escape":
       if(presenterMode) exitPresenter();
@@ -1476,7 +1625,7 @@ if(window.screen && "isExtended" in screen){
   updExt();
   if(screen.addEventListener) screen.addEventListener("change",updExt);
 }
-$("#btnPresentHere").addEventListener("click",()=>startPresent(selected,{fs:true}));
+$("#btnPresentHere").addEventListener("click",()=>startPresent(selected,{fs:true,exact:true}));
 $("#btnOpen").addEventListener("click",()=>$("#fileIn").click());
 $("#fileIn").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
@@ -1513,6 +1662,9 @@ const SAMPLE=`% ===== A tour of the Portable Slide Language (PSL) =====
 % Everything after !all is pasted onto EVERY slide (evaluated per slide):
 !all
 @(1225, 688) {size=18px, anchor=center} \${slide_num} / \${num_slides}
+!if slide_hidden
+@(640, 42) {size=22px, color=#b03030, anchor=center} &mdash; POCKET SLIDE &mdash;
+!endif
 ---
 ### Basics
 Plain lines become paragraphs. Inline **bold**, *italic*, and \`code\` all work.
@@ -1649,8 +1801,37 @@ def fib(n):
 @(\${rng.cx}, \${rng.y + rng.r + 22}) {size=24px, anchor=center} placed via sq.cy and rng.r
 !set coords fraction
 !---
-### Hidden slide (the separator above is !--- )
-This slide is skipped: never shown, numbered, or executed. Backup material lives here.
+### Pocket slide (the separator above is !--- )
+!set bonus 42
+Skipped when advancing &mdash; but reachable from the overview (v) or a thumbnail.
+- It still *executes*: \`!set bonus 42\` above gives bonus = \${bonus} here and on later slides
+- The watermark on top comes from \`!if slide_hidden\` inside the \`!all\` block
+---
+### Loops & conditionals
+!foreach i 0 5
+[dot\${i}] {fill=#1f6f6b, color=#1f6f6b} !circle (\${180 + i*180}, \${560 - 80*sin(i*pi/5)}) \${14 + i*4}
+!endfor
+- Six circles from one \`!foreach\` &mdash; \${nbsp}size and height vary with \`\${i}\`
+...
+!foreach i 0 5
+!anim dot\${i} move (\${180 + i*180}, 300) \${0.4 + i*0.15}s
+!endfor
+- One keypress, six simultaneous animations with staggered durations
+...
+!if num_slides > 10
+- This bullet exists because \`!if num_slides > 10\` is true (\${num_slides} slides)
+!endif
+---
+### More shapes
+[hex] {color=#1f6f6b, thick=5} !polygon (140,330)(240,270)(340,330)(340,440)(240,500)(140,440)
+[dia] {color=#8a4b9b, thick=5} !diamond (580, 385) (190, 200) choice?
+[st] {color=#e2a84b, fill=#e2a84b33, thick=4} !star (880, 385) 5 115 46
+[wave] {color=#b03030, thick=5} !polyline (1040,300)(1090,410)(1140,300)(1190,410)(1240,300)
+{thick=4} !curve (\${hex.cx + 115}, \${hex.cy}) (\${(hex.cx + dia.cx)/2}, \${hex.cy - 160}) (\${dia.cx - 110}, \${dia.cy - 30})
+@(140, 570) {size=24px} polygon &middot; diamond &middot; star &middot; curve &middot; polyline &mdash; every vertex animates via \`point n\`
+...
+!anim st point 1 (880, 160) 0.7s
+!anim wave move (1040, 460) 0.7s
 ---
 ### Tables
 Markdown pipe tables, with optional alignment markers:
@@ -1683,7 +1864,7 @@ Markdown pipe tables, with optional alignment markers:
     .then(txt=>{
       srcEl.value=txt; selected=0; refresh();
       const s=parseInt(q.get("slide"),10);
-      startPresent(isNaN(s)?0:s-1);            // fullscreen needs a gesture: press f or ⛶
+      startPresent(isNaN(s)?0:s-1,{exact:!isNaN(s)});   // fullscreen needs a gesture: press f or ⛶
     })
     .catch(err=>{
       srcEl.value="### Could not load the presentation\n"
