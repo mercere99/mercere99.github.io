@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
   --ink:#171c24;         /* app chrome background */
@@ -44,6 +45,31 @@ button{font-family:var(--ui)}
 .spacer{flex:1}
 .kbd-hint{color:var(--chrome-dim);font-size:12px}
 kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--chrome-text)}
+
+
+/* ---------- application menus ---------- */
+.menu{position:relative;display:flex;align-items:center;height:100%}
+.mbtn{height:32px;padding:0 10px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--chrome-text);font-family:var(--ui);font-size:13px;cursor:pointer}
+.mbtn:hover,.menu.open>.mbtn{background:var(--panel2);border-color:var(--line)}
+.mbtn:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.mlist{display:none;position:absolute;left:0;top:calc(100% - 5px);z-index:100;min-width:210px;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.menu.open>.mlist{display:block}
+.mitem{display:block;width:100%;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:var(--chrome-text);font-family:var(--ui);font-size:13px;text-align:left;white-space:nowrap;cursor:pointer}
+.mitem:hover,.mitem:focus-visible{background:var(--panel2);outline:none}
+.msep{height:1px;margin:5px 4px;background:var(--line)}
+.btn.icon{min-width:34px;padding:7px 9px;font-size:15px;line-height:1}
+
+/* ---------- insertion dialogs ---------- */
+.dlg{display:none;position:fixed;inset:0;z-index:120;align-items:center;justify-content:center;padding:24px;background:rgba(10,13,18,.78)}
+.dlg.on{display:flex}
+.dcard{width:min(520px,92vw);max-height:88vh;overflow:auto;padding:22px 24px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 55px rgba(0,0,0,.55)}
+.dcard h3{margin:0 0 18px;font-family:var(--display);font-size:22px;color:var(--chrome-text)}
+.dfield{display:grid;grid-template-columns:130px minmax(0,1fr);align-items:center;gap:12px;margin:10px 0}
+.dfield label{color:var(--chrome-dim);font-size:13px}
+.dfield input,.dfield select,.dfield textarea{width:100%;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--ink);color:var(--chrome-text);font-family:var(--ui);font-size:13px;outline:none}
+.dfield textarea{min-height:92px;resize:vertical;font-family:var(--mono)}
+.dfield input:focus,.dfield select:focus,.dfield textarea:focus{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+.drow{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
 
 /* ---------- editor layout ---------- */
 .split{display:flex;height:calc(100% - 52px)}
@@ -131,17 +157,56 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
 <div class="topbar">
   <div class="brand"><b>Slide<em>Down</em></b><span>Portable Slide Language</span></div>
-  <button class="btn" id="btnOpen">Open script…</button>
-  <button class="btn" id="btnSave">Save script</button>
-  <button class="btn" id="btnSample">Load sample deck</button>
-  <button class="btn" id="btnHelp">Syntax reference</button>
+
+  <div class="menu" id="mFile"><button class="mbtn">File</button><div class="mlist">
+    <button class="mitem" id="miNew">New Script</button>
+    <button class="mitem" id="miOpen">Open Script…</button>
+    <button class="mitem" id="miSave">Save Script</button>
+    <button class="mitem" id="miSample">Load Sample Deck</button>
+    <div class="msep"></div>
+    <button class="mitem" id="miPptx">Import PowerPoint…</button>
+    <div class="msep"></div>
+    <button class="mitem" id="miPrint">Print / Save as PDF…</button>
+  </div></div>
+
+  <div class="menu" id="mInsert"><button class="mbtn">Insert</button><div class="mlist">
+    <button class="mitem" data-ins="image">Image…</button>
+    <button class="mitem" data-ins="link">Link…</button>
+    <button class="mitem" data-ins="table">Table…</button>
+    <div class="msep"></div>
+    <button class="mitem" data-ins="line">Line…</button>
+    <button class="mitem" data-ins="arrow">Arrow…</button>
+    <button class="mitem" data-ins="rect">Rectangle…</button>
+    <button class="mitem" data-ins="textbox">Text Box…</button>
+    <button class="mitem" data-ins="circle">Circle…</button>
+    <button class="mitem" data-ins="ellipse">Ellipse…</button>
+    <button class="mitem" data-ins="triangle">Triangle…</button>
+    <button class="mitem" data-ins="polygon">Polygon…</button>
+    <button class="mitem" data-ins="polyline">Polyline…</button>
+    <button class="mitem" data-ins="diamond">Diamond…</button>
+    <button class="mitem" data-ins="star">Star…</button>
+    <button class="mitem" data-ins="curve">Curve…</button>
+    <div class="msep"></div>
+    <button class="mitem" data-ins="anim">Animation…</button>
+  </div></div>
+
+  <div class="menu" id="mPresent"><button class="mbtn">Present</button><div class="mlist">
+    <button class="mitem" id="miPresent">▶ Present</button>
+    <button class="mitem" id="miPresentHere">Present from Selected</button>
+    <button class="mitem" id="miPresenter">⧉ Presenter View</button>
+    <button class="mitem" id="miPresent2" style="display:none">Present on 2nd Screen</button>
+  </div></div>
+
+  <div class="menu" id="mHelp"><button class="mbtn">Help</button><div class="mlist">
+    <button class="mitem" id="miSyntax">Syntax Reference</button>
+  </div></div>
+
   <div class="spacer"></div>
   <span class="kbd-hint"><kbd>space</kbd> advance · <kbd>n</kbd>/<kbd>p</kbd> slide · <kbd>v</kbd> overview · <kbd>b</kbd> black · <kbd>esc</kbd> exit</span>
-  <button class="btn" id="btnPresentHere">Present from selected</button>
-  <button class="btn" id="btnPresenter" title="Slides open in a separate window (drag it to the projector); this window becomes your notes">⧉ Presenter view</button>
-  <button class="btn primary" id="btnPresent">▶ Present</button>
-  <button class="btn" id="btnPresent2" style="display:none" title="Present fullscreen on your second display">▶ 2nd screen</button>
+  <button class="btn icon" id="btnPresenterQ" title="Presenter view — slides in a separate window, notes here">⧉</button>
+  <button class="btn icon primary" id="btnPresentQ" title="Present (fullscreen)">▶</button>
   <input type="file" id="fileIn" accept=".psl,.txt,.md,.slides" style="display:none">
+  <input type="file" id="pptxIn" accept=".pptx" style="display:none">
 </div>
 
 <div class="split">
@@ -166,6 +231,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 </div>
 
 <div class="pconsole" id="pconsole"></div>
+<div id="printRoot"></div>
+<div class="dlg" id="dlg"><div class="dcard"><h3 id="dlgTitle"></h3><div id="dlgBody"></div>
+  <div class="drow"><button class="btn" id="dlgCancel">Cancel</button><button class="btn primary" id="dlgOk">Insert</button></div>
+</div></div>
 
 <div class="help" id="help">
   <div class="card">
@@ -178,6 +247,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>---</td><td>Start a new slide.</td></tr>
       <tr><td>!---</td><td>Start a <b>pocket</b> slide: rendered in the editor and reachable by direct navigation (overview, thumbnails, <code>?slide=N</code>), but skipped when advancing with space/n. It still <i>executes</i>, so <code>!set</code> and <code>\${…}</code> math there affect later slides. Built-in <code>slide_hidden</code> is 1 on these slides.</td></tr>
       <tr><td>!if expr … !else … !endif</td><td>Conditional lines (nestable). Truthy = non-zero number or non-empty string; combine with comparisons, e.g. <code>!if slide_num > 3</code> or <code>!if \${x*2} == 10</code>.</td></tr>
+      <tr><td>!import(theme.psl)</td><td>Splice a PSL template file in at this point — perfect for shared <code>!set</code>/<code>!all</code> house styles. Fetched relative to the page (CORS applies); imports may nest but cannot add slides.</td></tr>
+      <tr><td>[shown text](https://…)</td><td>Inline link, opens in a new tab.</td></tr>
       <tr><td>!foreach i 1 6 [step] … !endfor</td><td>Repeat the body once per value (inclusive; step may be fractional or negative; nestable). <code>\${i}</code> works everywhere in the body — labels, coordinates, durations — so one loop can build and animate a whole family of elements. Use <code>\${…}</code> for computed bounds.</td></tr>
       <tr><td># Title / ## Subtitle</td><td>Big centered title and subtitle (title slides).</td></tr>
       <tr><td>### Slide title</td><td>Heading at the top of a regular slide.</td></tr>
@@ -243,7 +314,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!anim word color #cc2244 0.5s</td><td>Animate text color / shape stroke.</td></tr>
       <tr><td>!anim word textsize 54px 0.7s</td><td>Animate font size.</td></tr>
     </table>
-    <p class="sub" style="margin-top:14px">Consecutive <code>!anim</code> lines run <b>simultaneously</b>. Separate with <code>...</code> to wait for a keypress, or <code>&gt;&gt;&gt;</code> to auto-run in sequence.</p>
+    <table style="margin-top:6px">
+      <tr><td>{ease=bounce} !anim pic move …</td><td>Easing on any animation: <code>linear easein easeout back bounce elastic</code> (default is ease in-out).</td></tr>
+      <tr><td>!anim pic path (cx,cy) (x,y) 1s</td><td>Move along a quadratic Bézier from the current position via a control point.</td></tr>
+      <tr><td>!anim pic enter drop<br>!anim pic exit slideleft 0.4s</td><td>Entrance / exit effects: <code>fade slideleft slideright slideup slidedown grow drop spin</code> (exit also <code>shrink</code>). For an entrance, declare the element and its <code>enter</code> in the <i>same</i> step — it appears with the effect. <code>drop</code> defaults to a bounce.</td></tr>
+    </table>
+    <p class="sub" style="margin-top:14px">Consecutive <code>!anim</code> lines run <b>simultaneously</b>. Separate with <code>...</code> to wait for a keypress, or <code>&gt;&gt;&gt;</code> to auto-run in sequence. The <b>Insert ▸ Animation…</b> menu builds these lines for you.</p>
 
     <h3>Presenting</h3>
     <table>
@@ -255,6 +331,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>⧉ Presenter view</td><td>Opens the slides in a separate window — drag it to the projector and press <code>F</code> (or click once) there for fullscreen. This window becomes your console: the script is your notes, auto-scrolled to the current slide, with thumbnails as a click-to-jump overview. Both windows' keyboards drive the show.</td></tr>
       <tr><td>b · f / ⛶ · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit. The Present buttons enter fullscreen automatically; "▶ 2nd screen" (shown when an extended display is detected, Chromium browsers) presents fullscreen on your other monitor.</td></tr>
     </table>
+    <h3>Printing &amp; handouts</h3>
+    <p class="sub" style="margin:6px 0 0"><b>File ▸ Print / Save as PDF</b> lays out one 16:9 page per slide, fully advanced (all reveal steps shown), with pocket slides omitted and embeds shown as placeholders. Use your browser's print dialog to save a PDF handout with real selectable text.</p>
     <h3>Publishing a deck online</h3>
     <p class="sub" style="margin:6px 0 0">Host this HTML file and your <code>.psl</code> script anywhere (e.g. GitHub Pages), then share a link like <code>slidedown.html?present=my_talk.psl</code> — visitors land directly in the slideshow and can step through with space. Add <code>&amp;slide=5</code> to start on a specific slide. Cross-origin script URLs work if the host sends CORS headers; same-site files always work.</p>
     <p class="sub" style="margin-top:14px"><b>Editor ↔ preview.</b> Moving the caret in the script selects the slide you're editing; clicking a thumbnail jumps the caret to that slide.</p>
@@ -283,6 +361,10 @@ function inlineMd(s){
   // entities stay usable: &nbsp; &mdash; &rarr; &#8594; &#x1F600; ... (never tags)
   h = h.replace(/&amp;(#\d{1,7}|#x[0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,30});/g,"&$1;");
   h = h.replace(/`([^`]+)`/g,"<code>$1</code>");
+  h = h.replace(/(^|[^!])\[([^\]]+)\]\(([^)\s]+)\)/g,(all,pre,txt,url)=>{
+    if(/^javascript:/i.test(url)) return all;
+    return pre+'<a href="'+url.replace(/"/g,"%22")+'" target="_blank" rel="noopener">'+txt+"</a>";
+  });
   h = h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
   h = h.replace(/\*([^*]+)\*/g,"<i>$1</i>");
   return h;
@@ -347,6 +429,45 @@ function styleLen(v, span, vars){
   return isNaN(n)?null:cvlen(n,vars,span);
 }
 
+/* !import(url): splice a .psl template's lines INTO the current slide.
+   Files are fetched asynchronously into a cache; while a fetch is pending the
+   import is skipped with a notice, and the deck re-parses when it lands.
+   Imports may not add slides (a --- inside is dropped with a warning) so the
+   editor's caret->slide mapping stays exact. */
+const PSL_IMPORTS={cache:new Map(), onUpdate:null, fetcher:null};
+const RE_IMPORT=/^!import\s*\(?\s*([^)\s]+)\s*\)?\s*$/i;
+function expandImports(bodyText, warnings, slideIndex, depth){
+  if(depth>4){ warnings.push(`slide ${slideIndex+1}: !import nesting too deep`); return bodyText; }
+  const out=[]; let inF=false;
+  for(const L of bodyText.split("\n")){
+    const t=L.trim();
+    if(inF){ out.push(L); if(t.startsWith("```")) inF=false; continue; }
+    if(FENCE_OPEN.test(t)){ inF=true; out.push(L); continue; }
+    const m=t.match(RE_IMPORT);
+    if(!m){ out.push(L); continue; }
+    const url=m[1], entry=PSL_IMPORTS.cache.get(url);
+    if(!entry){
+      PSL_IMPORTS.cache.set(url,{pending:true});
+      if(PSL_IMPORTS.fetcher) PSL_IMPORTS.fetcher(url);
+      warnings.push(`slide ${slideIndex+1}: importing ${url} …`);
+    }else if(entry.pending){
+      warnings.push(`slide ${slideIndex+1}: importing ${url} …`);
+    }else if(entry.error){
+      warnings.push(`slide ${slideIndex+1}: !import ${url} failed — ${entry.error}`);
+    }else{
+      let txt=expandImports(entry.text, warnings, slideIndex, depth+1);
+      for(const IL of txt.split("\n")){
+        if(IL.trim()==="---"||IL.trim()==="!---"){
+          warnings.push(`slide ${slideIndex+1}: !import cannot add slides — “---” in ${url} ignored`);
+          continue;
+        }
+        out.push(IL);
+      }
+    }
+  }
+  return out.join("\n");
+}
+
 function parseScript(text){
   const warnings=[];
   const vars={ __labels:{}, slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI, nbsp:"\u00A0" };
@@ -386,7 +507,8 @@ function parseScript(text){
     vars.slide_num=si+1;
     vars.slide_hidden=sl.hidden?1:0;
     const prepend = allText && si!==allSlab;
-    const body = prepend ? allText+"\n"+sl.body : sl.body;
+    let body = prepend ? allText+"\n"+sl.body : sl.body;
+    if(/^\s*!import\b/im.test(body)) body=expandImports(body, warnings, si, 0);
     const slide=parseSlide(body, si, warnings, vars, prepend?allLines.length:0);
     slide.hidden=!!sl.hidden;
     return slide;
@@ -539,7 +661,7 @@ function substVars(text, vars, warnings, whereStr){
 }
 
 const RE_POS   = /^@\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)\s*/;
-const RE_LABEL = /^\[([A-Za-z_][\w-]*)\]\s*/;
+const RE_LABEL = /^\[([A-Za-z_][\w-]*)\](?!\()\s*/;   // (?!\() so [text](url) links survive
 const RE_STYLE = /^\{([^}]*)\}\s*/;
 const RE_PAIR  = /\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)/g;
 const RE_DUR   = /(?:^|\s)([\d.]+)\s*s\s*$/;
@@ -705,7 +827,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     // --- animation lines ---
     if((m=line.match(/^!anim\s+([\w-]+)\s+(\w+)\s*(.*)$/i))){
       const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,where(lnNo),vars);
-      if(a) cur().anims.push(a);
+      if(a){ if(style.ease) a.ease=String(style.ease).toLowerCase(); cur().anims.push(a); }
       continue;
     }
     // --- background (optional {dim=..,tint=..} via style prefix) ---
@@ -833,6 +955,11 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
   const bad=msg=>{warnings.push(`${whereStr}: ${msg}`); return null;};
   switch(verb){
     case "hide": case "show": return {target,verb,dur};
+    case "path":{ const p=pairs(args); if(p.length<2) return bad("path needs (ctrlx,ctrly) (destx,desty)");
+      return {target,verb,dur,cxp:cvx(p[0][0],vars),cyp:cvy(p[0][1],vars),x:cvx(p[1][0],vars),y:cvy(p[1][1],vars)}; }
+    case "enter": case "exit":{
+      const em=args.match(/^([a-z]+)/i);
+      return {target,verb,dur,effect:em?em[1].toLowerCase():"fade"}; }
     case "move":{ const p=pairs(args); if(!p.length) return bad("move needs (x,y)");
       return {target,verb,dur,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
     case "point":{ const n=parseInt(args); const p=pairs(args);
@@ -1124,13 +1251,24 @@ function setVisible(it,on){
 /* ============================================================
    ANIMATION ENGINE
    ============================================================ */
+const EASINGS={
+  linear:t=>t,
+  ease:easeInOut, easeinout:easeInOut,
+  easein:t=>t*t*t,
+  easeout:t=>1-Math.pow(1-t,3),
+  back:t=>{const c=1.70158; return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2);},
+  bounce:t=>{const n=7.5625,d=2.75;
+    if(t<1/d)return n*t*t; if(t<2/d)return n*(t-=1.5/d)*t+.75;
+    if(t<2.5/d)return n*(t-=2.25/d)*t+.9375; return n*(t-=2.625/d)*t+.984375;},
+  elastic:t=> t===0?0 : t===1?1 : Math.pow(2,-10*t)*Math.sin((t*10-0.75)*(2*Math.PI/3))+1,
+};
 class Tween{
-  constructor(dur,onUpdate){ this.dur=Math.max(0.01,dur)*1000; this.onUpdate=onUpdate; this.done=false; }
+  constructor(dur,onUpdate,ease){ this.dur=Math.max(0.01,dur)*1000; this.onUpdate=onUpdate; this.ease=ease||easeInOut; this.done=false; }
   start(){ return new Promise(res=>{
     this.resolve=res; this.t0=performance.now();
     const tick=now=>{ if(this.done) return;
       const t=clamp((now-this.t0)/this.dur,0,1);
-      this.onUpdate(easeInOut(t));
+      this.onUpdate(this.ease(t));
       if(t>=1){ this.done=true; res(); } else this.raf=requestAnimationFrame(tick);
     };
     this.raf=requestAnimationFrame(tick);
@@ -1139,74 +1277,122 @@ class Tween{
 }
 
 /* Build a Tween (or instant applier) for one animation on a rendered slide. */
+/* entry/exit effect presets: [dx, dy, scale, rotate(deg)] offsets at full effect */
+const FX={ fade:[0,0,1,0], slideleft:[-120,0,1,0], slideright:[120,0,1,0],
+           slideup:[0,120,1,0], slidedown:[0,-120,1,0],
+           grow:[0,0,0.2,0], shrink:[0,0,0.2,0], drop:[0,-200,1,0], spin:[0,0,0.35,-180] };
 function makeAnim(a, render, warnings){
   const it=render.labels.get(a.target);
   if(!it){ warnings&&warnings.push(`animation targets unknown label “${a.target}”`); return null; }
   const el=it.el;
+  const EZ=EASINGS[a.ease] || (a.verb==="enter"&&a.effect==="drop" ? EASINGS.bounce : undefined);
+  const T=(dur,fn)=>new Tween(dur,fn,EZ);
   switch(a.verb){
-    case "hide": return new Tween(a.dur,t=>{ el.style.opacity=String(1-t); if(t>=1){setVisible(it,false); el.style.opacity="";} });
-    case "show": return new Tween(a.dur,t=>{ if(!it.visible) setVisible(it,true); el.style.opacity=String(t); if(t>=1) el.style.opacity=""; });
+    case "enter": case "exit":{
+      const [dx,dy,sc,rot]=FX[a.effect]||FX.fade;
+      const entering=a.verb==="enter";
+      const apply=k=>{                    // k: 1 = fully offset, 0 = in place
+        const s2=1+(sc-1)*k, r=rot*k, ox=dx*k, oy=dy*k;
+        if(it.shape){
+          const bb=el.getBBox(), cx0=bb.x+bb.width/2, cy0=bb.y+bb.height/2;
+          el.setAttribute("transform",
+            `translate(${ox} ${oy}) translate(${cx0} ${cy0}) scale(${s2}) rotate(${r}) translate(${-cx0} ${-cy0})`);
+        }else{
+          const base=it.def.pos&&it.def.style.anchor==="center" ? "translate(-50%,-50%) " : "";
+          el.style.transformOrigin="center center";
+          el.style.transform=base+`translate(${ox}px,${oy}px) scale(${s2}) rotate(${r}deg)`;
+        }
+        el.style.opacity=String(entering ? 1-k : (a.effect==="fade"?1-k:Math.min(1,1.4*(1-k))));
+      };
+      if(entering){ setVisible(it,true); apply(1); }
+      return T(a.dur,t=>{
+        apply(entering ? 1-t : t);
+        if(t>=1){
+          if(entering){ el.style.opacity=""; if(!it.shape) el.style.transform= (it.def.pos&&it.def.style.anchor==="center")?"translate(-50%,-50%)":""; else el.removeAttribute("transform"); }
+          else { setVisible(it,false); el.style.opacity=""; if(!it.shape) el.style.transform=(it.def.pos&&it.def.style.anchor==="center")?"translate(-50%,-50%)":""; else el.removeAttribute("transform"); }
+        }
+      });
+    }
+    case "path":{
+      const q=(p0,p1,p2,t)=>{ const u=1-t; return u*u*p0 + 2*u*t*p1 + t*t*p2; };
+      if(it.shape){
+        const start=it.coords.map(c=>c.slice()), p0=start[0];
+        return T(a.dur,t=>{
+          const bx=q(p0[0],a.cxp,a.x,t), by=q(p0[1],a.cyp,a.y,t);
+          const dx=bx-p0[0], dy=by-p0[1];
+          it.coords=start.map(c=>[c[0]+dx,c[1]+dy]); updateShape(it);
+        });
+      }
+      liftOutOfFlow(it,render);
+      const x0=it.x, y0=it.y;
+      return T(a.dur,t=>{
+        it.x=q(x0,a.cxp,a.x,t); it.y=q(y0,a.cyp,a.y,t);
+        el.style.left=it.x+"px"; el.style.top=it.y+"px";
+      });
+    }
+    case "hide": return T(a.dur,t=>{ el.style.opacity=String(1-t); if(t>=1){setVisible(it,false); el.style.opacity="";} });
+    case "show": return T(a.dur,t=>{ if(!it.visible) setVisible(it,true); el.style.opacity=String(t); if(t>=1) el.style.opacity=""; });
     case "move":{
       if(it.shape){
         const start=it.coords.map(c=>c.slice());
         const dx=a.x-start[0][0], dy=a.y-start[0][1];
-        return new Tween(a.dur,t=>{ it.coords=start.map(c=>[c[0]+dx*t,c[1]+dy*t]); updateShape(it); });
+        return T(a.dur,t=>{ it.coords=start.map(c=>[c[0]+dx*t,c[1]+dy*t]); updateShape(it); });
       }
       liftOutOfFlow(it,render);
       const x0=it.x,y0=it.y;
-      return new Tween(a.dur,t=>{ it.x=x0+(a.x-x0)*t; it.y=y0+(a.y-y0)*t;
+      return T(a.dur,t=>{ it.x=x0+(a.x-x0)*t; it.y=y0+(a.y-y0)*t;
         el.style.left=it.x+"px"; el.style.top=it.y+"px"; });
     }
     case "point":{
       if(!it.coords||a.n>it.coords.length) return null;
       const i=a.n-1, s=it.coords[i].slice();
-      return new Tween(a.dur,t=>{ it.coords[i]=[s[0]+(a.x-s[0])*t, s[1]+(a.y-s[1])*t]; updateShape(it); });
+      return T(a.dur,t=>{ it.coords[i]=[s[0]+(a.x-s[0])*t, s[1]+(a.y-s[1])*t]; updateShape(it); });
     }
     case "size":{
       if(it.embedBox){                   // embedded app: scale box, keep aspect
         const w0=it.embedW, ratio=it.embedH/it.embedW;
-        return new Tween(a.dur,t=>{ const w=w0+(a.w-w0)*t;
+        return T(a.dur,t=>{ const w=w0+(a.w-w0)*t;
           it.embedW=w; it.embedH=w*ratio;
           it.embedBox.style.width=w+"px"; it.embedBox.style.height=(w*ratio)+"px"; });
       }
       const img=it.img||(it.inner&&it.inner.querySelector&&it.inner.querySelector("img"));
       if(!img) return null;
       const w0=img.getBoundingClientRect().width/currentScale(render);
-      return new Tween(a.dur,t=>{ img.style.width=(w0+(a.w-w0)*t)+"px"; });
+      return T(a.dur,t=>{ img.style.width=(w0+(a.w-w0)*t)+"px"; });
     }
     case "scale":{
       const f0=it.scale;
       const base=it.def.pos&&it.def.style.anchor==="center" ? "translate(-50%,-50%) " : "";
       if(it.shape){
         const bb=el.getBBox(), ox=bb.x+bb.width/2, oy=bb.y+bb.height/2;
-        return new Tween(a.dur,t=>{ it.scale=f0+(a.f-f0)*t;
+        return T(a.dur,t=>{ it.scale=f0+(a.f-f0)*t;
           el.setAttribute("transform",`translate(${ox} ${oy}) scale(${it.scale}) translate(${-ox} ${-oy})`); });
       }
       el.style.transformOrigin="center center";
-      return new Tween(a.dur,t=>{ it.scale=f0+(a.f-f0)*t; el.style.transform=base+`scale(${it.scale})`; });
+      return T(a.dur,t=>{ it.scale=f0+(a.f-f0)*t; el.style.transform=base+`scale(${it.scale})`; });
     }
     case "color":{
       const B=resolveColor(a.color);
       if(it.foBody){                     // shape carrying text -> animate the text color
         const A=resolveColor(getComputedStyle(it.foBody).color);
-        return new Tween(a.dur,t=>{ it.foBody.style.color=mixColor(A,B,t); });
+        return T(a.dur,t=>{ it.foBody.style.color=mixColor(A,B,t); });
       }
       if(it.shape){
         const A=resolveColor(it.stroke);
-        return new Tween(a.dur,t=>{ const c=mixColor(A,B,t); it.stroke=t>=1?a.color:it.stroke;
+        return T(a.dur,t=>{ const c=mixColor(A,B,t); it.stroke=t>=1?a.color:it.stroke;
           it.lineEl&&it.lineEl.setAttribute("stroke",c);
           it.headEl&&it.headEl.setAttribute("fill",c);
           it.shapeEl&&it.shapeEl.setAttribute("stroke",c); });
       }
       const tgt=it.inner||el, A=resolveColor(getComputedStyle(tgt).color);
-      return new Tween(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
+      return T(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
     }
     case "textsize":{
       const tgt=it.foBody||it.inner||el;
       const s0=parseFloat(getComputedStyle(tgt).fontSize);
       const s1=sizeToPx(a.size,SW);
       if(s1==null) return null;
-      return new Tween(a.dur,t=>{ tgt.style.fontSize=(s0+(s1-s0)*t)+"px"; });
+      return T(a.dur,t=>{ tgt.style.fontSize=(s0+(s1-s0)*t)+"px"; });
     }
   }
   return null;
@@ -1549,10 +1735,36 @@ presentEl.addEventListener("click",e=>{
 });
 
 /* ---------- files, buttons ---------- */
-$("#btnPresent").addEventListener("click",()=>startPresent(0,{fs:true}));
-$("#btnPresent2").addEventListener("click",presentOnSecondScreen);
+$("#btnPresentQ").addEventListener("click",()=>startPresent(0,{fs:true}));
+$("#miPresent").addEventListener("click",()=>startPresent(0,{fs:true}));
+$("#miPresentHere").addEventListener("click",()=>startPresent(selected,{fs:true,exact:true}));
+$("#miPresent2").addEventListener("click",presentOnSecondScreen);
 $("#hudFs").addEventListener("click",toggleFullscreen);
-$("#btnPresenter").addEventListener("click",openPresenterView);
+$("#btnPresenterQ").addEventListener("click",openPresenterView);
+$("#miPresenter").addEventListener("click",openPresenterView);
+
+/* ---------- menubar behavior ---------- */
+document.querySelectorAll(".menu>.mbtn").forEach(b=>{
+  b.addEventListener("click",e=>{
+    const menu=b.parentElement, was=menu.classList.contains("open");
+    document.querySelectorAll(".menu.open").forEach(m2=>m2.classList.remove("open"));
+    if(!was) menu.classList.add("open");
+    e.stopPropagation();
+  });
+  // slide between open menus on hover, like native menubars
+  b.addEventListener("mouseenter",()=>{
+    if(document.querySelector(".menu.open") && !b.parentElement.classList.contains("open")){
+      document.querySelectorAll(".menu.open").forEach(m2=>m2.classList.remove("open"));
+      b.parentElement.classList.add("open");
+    }
+  });
+});
+document.addEventListener("click",e=>{
+  if(!e.target.closest(".menu")) document.querySelectorAll(".menu.open").forEach(m2=>m2.classList.remove("open"));
+});
+document.querySelectorAll(".mitem").forEach(it=>it.addEventListener("click",()=>{
+  document.querySelectorAll(".menu.open").forEach(m2=>m2.classList.remove("open"));
+}));
 
 /* ---------- presenter view: slides in a popup, notes (the script) here ----------
    The popup is scripted directly by this window (no channels needed), so it
@@ -1598,14 +1810,14 @@ function openPresenterView(){
   presenterMode=true;
   srcEl.readOnly=true;                      // the script is notes now
   $("#pconsole").classList.add("on");
-  $("#btnPresenter").textContent="⧉ End presenter view";
+  $("#btnPresenterQ").title="End presenter view"; $("#btnPresenterQ").style.color="var(--amber)";
   gotoSlide(selected,{animate:true});
 }
 function exitPresenter(closeWin=true){
   presenterMode=false;
   srcEl.readOnly=false;
   $("#pconsole").classList.remove("on");
-  $("#btnPresenter").textContent="⧉ Presenter view";
+  $("#btnPresenterQ").title="Presenter view — slides in a separate window, notes here"; $("#btnPresenterQ").style.color="";
   if(closeWin && presenterWin && !presenterWin.closed) presenterWin.close();
   presenterWin=null; presenterHolder=null; presenterBlack=null;
 }
@@ -1621,27 +1833,47 @@ async function presentOnSecondScreen(){
   }catch(e){ enterFullscreen(); }
 }
 if(window.screen && "isExtended" in screen){
-  const updExt=()=>{ $("#btnPresent2").style.display = screen.isExtended ? "" : "none"; };
+  const updExt=()=>{ $("#miPresent2").style.display = screen.isExtended ? "" : "none"; };
   updExt();
   if(screen.addEventListener) screen.addEventListener("change",updExt);
 }
-$("#btnPresentHere").addEventListener("click",()=>startPresent(selected,{fs:true,exact:true}));
-$("#btnOpen").addEventListener("click",()=>$("#fileIn").click());
+$("#miOpen").addEventListener("click",()=>$("#fileIn").click());
 $("#fileIn").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
   const rd=new FileReader();
   rd.onload=()=>{ srcEl.value=rd.result; selected=0; refresh(); };
   rd.readAsText(f); e.target.value="";
 });
-$("#btnSave").addEventListener("click",()=>{
+$("#miSave").addEventListener("click",()=>{
   const blob=new Blob([srcEl.value],{type:"text/plain"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob); a.download="presentation.psl"; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 });
-$("#btnSample").addEventListener("click",()=>{ srcEl.value=SAMPLE; selected=0; refresh(); });
+$("#miSample").addEventListener("click",()=>{ srcEl.value=SAMPLE; selected=0; refresh(); });
+$("#miNew").addEventListener("click",()=>{
+  if(srcEl.value.trim() && srcEl.value!==SAMPLE && !confirm("Replace the current script with a new one?")) return;
+  srcEl.value="# Untitled\n## \n---\n### First slide\n- \n"; selected=0; refresh();
+});
+$("#miPptx").addEventListener("click",()=>$("#pptxIn").click());
+$("#miPrint").addEventListener("click",()=>{ buildPrintLayout(); setTimeout(()=>window.print(),30); });
+window.addEventListener("beforeprint",buildPrintLayout);
+window.addEventListener("afterprint",()=>{ $("#printRoot").innerHTML=""; });
+
+/* ---------- print layout: every visible slide, fully advanced ---------- */
+function buildPrintLayout(){
+  refresh();
+  const root=$("#printRoot"); root.innerHTML="";
+  deck.slides.forEach((sd,i)=>{
+    if(sd.hidden) return;                       // pocket slides stay out of handouts
+    const page=document.createElement("div"); page.className="pslide";
+    root.appendChild(page);
+    const p=new Player(sd,page,{thumb:true,settings:deck.settings,index:i,total:deck.slides.length});
+    p.jumpToStep(sd.steps.length-1);            // print the final state of each slide
+  });
+}
 function toggleHelp(on){ $("#help").classList.toggle("on",on); }
-$("#btnHelp").addEventListener("click",()=>toggleHelp(true));
+$("#miSyntax").addEventListener("click",()=>toggleHelp(true));
 $("#btnHelpClose").addEventListener("click",()=>toggleHelp(false));
 $("#help").addEventListener("click",e=>{ if(e.target===$("#help")) toggleHelp(false); });
 
@@ -1717,12 +1949,14 @@ Each press of the spacebar reveals the next chunk:
 % A >>> chain: each part starts when the previous one finishes.
 !anim dot color #c23b22 0.5s
 >>>
-!anim dot scale 3 0.6s
+{ease=bounce} !anim dot scale 3 0.6s
 >>>
-!anim dot scale 1 0.4s
+{ease=elastic} !anim dot scale 1 0.5s
 !anim cap color #c23b22 0.4s
 ...
-!anim arr hide 0.5s
+% path = move along a curve; enter/exit add effects (see Insert > Animation):
+!anim dot path (0.45, 0.95) (0.15, 0.55) 1.2s
+!anim arr exit slidedown 0.6s
 !anim cap textsize 40px 0.7s
 ---
 ### Image animations
@@ -1756,12 +1990,12 @@ Each press of the spacebar reveals the next chunk:
 ---
 % Embed any web app you've built by URL. Position and size like an image.
 ### Embedded web apps
-[app] @(0.40, 0.16) {w=0.62, h=0.68} !embed(https://ofria.com)
+[app] @(0.30, 0.16) {w=0.62, h=0.68} !embed(https://example.com)
 - Live iframe in present mode
 - Thumbnails show a lightweight placeholder
 - Animate it: move, scale, size, hide/show
 ...
-!anim app scale 0.4 0.7s
+!anim app scale 0.9 0.5s
 ---
 ### Code blocks
 Fenced code is highlighted automatically (C++, Python, JS, and more):
@@ -1849,6 +2083,238 @@ Markdown pipe tables, with optional alignment markers:
 # That's the tour
 ## space · n/p · Backspace · v · b · f — and ? for the full reference
 `;
+
+/* ================= dialogs, Insert menu, imports, pptx ================= */
+function showDialog(title, fields, okText){
+  return new Promise(res=>{
+    $("#dlgTitle").textContent=title;
+    const body=$("#dlgBody"); body.innerHTML="";
+    for(const f of fields){
+      const w=document.createElement("div"); w.className="dfield";
+      const lab=document.createElement("label"); lab.textContent=f.label; w.appendChild(lab);
+      let el;
+      if(f.type==="select"){ el=document.createElement("select");
+        for(const o of f.options){ const op=document.createElement("option"); op.value=o[0]; op.textContent=o[1]; el.appendChild(op); } }
+      else if(f.type==="textarea"){ el=document.createElement("textarea"); }
+      else{ el=document.createElement("input"); el.type="text"; }
+      el.value=f.value||""; el.placeholder=f.placeholder||""; el.dataset.key=f.key;
+      if(f.list){ const dl=document.createElement("datalist"); dl.id="dl_"+f.key;
+        for(const v of f.list){ const o=document.createElement("option"); o.value=v; dl.appendChild(o); }
+        el.setAttribute("list",dl.id); w.appendChild(dl); }
+      if(f.onChange) el.addEventListener("change",()=>f.onChange(el, body));
+      w.appendChild(el); body.appendChild(w);
+    }
+    $("#dlgOk").textContent=okText||"Insert";
+    $("#dlg").classList.add("on");
+    const first=body.querySelector("input,select,textarea"); first&&first.focus();
+    const done=vals=>{ $("#dlg").classList.remove("on");
+      $("#dlgOk").onclick=$("#dlgCancel").onclick=null; document.removeEventListener("keydown",keys,true); res(vals); };
+    const collect=()=>{ const v={}; body.querySelectorAll("[data-key]").forEach(el=>v[el.dataset.key]=el.value.trim()); return v; };
+    const keys=e=>{ if(!$("#dlg").classList.contains("on")) return;
+      if(e.key==="Escape"){ e.stopPropagation(); done(null); }
+      if(e.key==="Enter" && e.target.tagName!=="TEXTAREA"){ e.stopPropagation(); done(collect()); } };
+    document.addEventListener("keydown",keys,true);
+    $("#dlgOk").onclick=()=>done(collect());
+    $("#dlgCancel").onclick=()=>done(null);
+  });
+}
+function insertAtCursor(text, inline){
+  const a=srcEl.selectionStart, b=srcEl.selectionEnd, v=srcEl.value;
+  let ins=text;
+  if(!inline){                                  // block inserts get their own lines
+    const nlBefore = a>0 && v[a-1]!=="\n" ? "\n" : "";
+    const nlAfter  = b<v.length && v[b]!=="\n" ? "\n" : "";
+    ins=nlBefore+text+nlAfter;
+  }
+  srcEl.value=v.slice(0,a)+ins+v.slice(b);
+  const caret=a+ins.length;
+  srcEl.focus(); srcEl.setSelectionRange(caret,caret);
+  srcEl.dispatchEvent(new Event("input"));
+}
+const stylePrefix=v=>{
+  const parts=[];
+  if(v.color) parts.push("color="+v.color);
+  if(v.fill)  parts.push("fill="+v.fill);
+  if(v.thick) parts.push("thick="+v.thick);
+  return (v.lbl?`[${v.lbl}] `:"") + (parts.length?`{${parts.join(", ")}} `:"");
+};
+const COMMON=[{key:"lbl",label:"Label (optional — lets you animate it)",placeholder:"myShape"},
+              {key:"color",label:"Stroke color (optional)",placeholder:"#1f6f6b"},
+              {key:"thick",label:"Thickness (optional)",placeholder:"4"}];
+const FILLF={key:"fill",label:"Fill color (optional)",placeholder:"#1f6f6b33"};
+const PT=(k,l,d)=>({key:k,label:l+"  (x,y — fractions ≤1 or px)",value:d});
+const INSERTS={
+  image: async()=>{ const v=await showDialog("Insert image",[
+      {key:"url",label:"Image URL",placeholder:"https://… or data:…"},
+      {key:"alt",label:"Caption / alt text",value:"image"},
+      {key:"w",label:"Width (optional — fraction of slide or px)",placeholder:"0.3"},
+      {key:"pos",label:"Position (optional)",placeholder:"0.55, 0.2"}]);
+    if(!v||!v.url) return;
+    insertAtCursor((v.pos?`@(${v.pos}) `:"")+(v.w?`{w=${v.w}} `:"")+`![${v.alt||"image"}](${v.url})`); },
+  link: async()=>{ const sel=srcEl.value.slice(srcEl.selectionStart,srcEl.selectionEnd);
+    const v=await showDialog("Insert link",[
+      {key:"text",label:"Link text",value:sel||"",placeholder:"shown text"},
+      {key:"url",label:"URL",placeholder:"https://…"}]);
+    if(!v||!v.url) return;
+    insertAtCursor(`[${v.text||v.url}](${v.url})`, true); },
+  table: async()=>{ const v=await showDialog("Insert table",[
+      {key:"cols",label:"Columns",value:"3"},{key:"rows",label:"Body rows",value:"2"}]);
+    if(!v) return;
+    const c=clamp(parseInt(v.cols)||3,1,12), r=clamp(parseInt(v.rows)||2,1,30);
+    const row=f=>"| "+Array.from({length:c},f).join(" | ")+" |";
+    const lines=[row((_,i)=>"Header "+(i+1)), row(()=>":---"),
+                 ...Array.from({length:r},()=>row(()=>"…"))];
+    insertAtCursor(lines.join("\n")); },
+  line:    async()=>shapeDialog("Line","!line",[PT("p1","Start","0.2, 0.5"),PT("p2","End","0.5, 0.5")],false),
+  arrow:   async()=>shapeDialog("Arrow","!arrow",[PT("p1","Start","0.2, 0.5"),PT("p2","End (arrowhead)","0.5, 0.5")],false),
+  rect:    async()=>shapeDialog("Rectangle","!rect",[PT("p1","Top-left","0.3, 0.3"),PT("p2","Size (w,h)","0.25, 0.2")],true,true),
+  textbox: async()=>shapeDialog("Text box","!textbox",[PT("p1","Top-left","0.3, 0.3"),PT("p2","Size (w,h)","0.3, 0.2")],true,true),
+  circle:  async()=>shapeDialog("Circle","!circle",[PT("p1","Center","0.5, 0.5"),{key:"r",label:"Radius (fraction of height or px)",value:"0.12"}],true,true),
+  ellipse: async()=>shapeDialog("Ellipse","!ellipse",[PT("p1","Center","0.5, 0.5"),PT("p2","Radii (rx,ry)","0.15, 0.1")],true,true),
+  triangle:async()=>shapeDialog("Triangle","!triangle",[PT("p1","Point 1","0.4, 0.6"),PT("p2","Point 2","0.6, 0.6"),PT("p3","Point 3","0.5, 0.35")],true,true),
+  diamond: async()=>shapeDialog("Diamond","!diamond",[PT("p1","Center","0.5, 0.5"),PT("p2","Size (w,h)","0.2, 0.25")],true,true),
+  star:    async()=>shapeDialog("Star","!star",[PT("p1","Center","0.5, 0.5"),
+      {key:"n",label:"Points",value:"5"},{key:"r",label:"Outer radius",value:"0.15"},
+      {key:"r2",label:"Inner radius (optional)",placeholder:"defaults to 0.45 × outer"}],true,true),
+  curve:   async()=>shapeDialog("Curve (quadratic Bézier)","!curve",[PT("p1","Start","0.25, 0.6"),PT("p2","Control point","0.5, 0.25"),PT("p3","End","0.75, 0.6")],false),
+  polygon: async()=>polyDialog("Polygon","!polygon","0.4,0.35  0.6,0.35  0.68,0.55  0.5,0.68  0.32,0.55"),
+  polyline:async()=>polyDialog("Polyline","!polyline","0.3,0.4  0.4,0.6  0.5,0.4  0.6,0.6"),
+  anim: animDialog,
+};
+async function shapeDialog(title, cmd, geo, fillable, canText){
+  const fields=[...geo,...COMMON]; if(fillable) fields.splice(geo.length,0,FILLF);
+  if(canText) fields.push({key:"txt",label:"Inner text (optional)",placeholder:"wrapped inside the shape"});
+  const v=await showDialog("Insert "+title.toLowerCase(),fields);
+  if(!v) return;
+  let geom="";
+  if(cmd==="!circle") geom=`(${v.p1}) ${v.r||"0.1"}`;
+  else if(cmd==="!star") geom=`(${v.p1}) ${v.n||5} ${v.r||"0.15"}${v.r2?" "+v.r2:""}`;
+  else geom=geo.map(g=>g.key.startsWith("p")?`(${v[g.key]})`:"").filter(Boolean).join(" ");
+  insertAtCursor(stylePrefix(v)+cmd+" "+geom+(v.txt?" "+v.txt:""));
+}
+async function polyDialog(title,cmd,def){
+  const v=await showDialog("Insert "+title.toLowerCase(),[
+    {key:"pts",label:"Points — “x,y” pairs separated by spaces",type:"textarea",value:def},
+    ...COMMON, FILLF]);
+  if(!v||!v.pts) return;
+  const pts=v.pts.trim().split(/\s+/).map(p=>`(${p})`).join(" ");
+  insertAtCursor(stylePrefix(v)+cmd+" "+pts);
+}
+const ANIM_HINTS={move:"(x, y) — destination", path:"(ctrlx, ctrly) (destx, desty)",
+  enter:"fade · slideleft · slideright · slideup · slidedown · grow · drop · spin",
+  exit:"fade · slideleft · slideright · slideup · slidedown · shrink · spin",
+  point:"n (x, y) — vertex number, then destination", size:"new width (fraction or px)",
+  scale:"factor, e.g. 1.5", color:"any CSS color", textsize:"e.g. 44px", hide:"(no arguments)", show:"(no arguments)"};
+async function animDialog(){
+  const labels=[...new Set((deck.slides[selected]?.items||[]).filter(i=>i.label).map(i=>i.label))];
+  const v=await showDialog("Insert animation",[
+    {key:"target",label:"Target label"+(labels.length?"":" (label an element first — e.g. [pic])"),list:labels,placeholder:labels[0]||"myLabel"},
+    {key:"verb",label:"Effect",type:"select",options:[["move","Move to position"],["path","Move along a curve"],
+      ["enter","Entrance effect"],["exit","Exit effect"],["hide","Fade out"],["show","Fade in"],
+      ["size","Resize image / embed"],["scale","Scale"],["color","Change color"],["textsize","Change text size"],["point","Move one vertex"]],
+     onChange:(el,body)=>{ const args=body.querySelector('[data-key="args"]'); if(args) args.placeholder=ANIM_HINTS[el.value]||""; }},
+    {key:"args",label:"Arguments",placeholder:ANIM_HINTS.move},
+    {key:"dur",label:"Duration (seconds)",value:"0.7"},
+    {key:"ease",label:"Easing",type:"select",options:[["","default (ease in-out)"],["linear","linear"],["easein","ease in"],["easeout","ease out"],["back","back (overshoot)"],["bounce","bounce"],["elastic","elastic"]]},
+    {key:"when",label:"Starts",type:"select",options:[["now","Immediately (with previous)"],["after","After previous animation (>>>)"],["click","On click / spacebar (…)"]]}]);
+  if(!v||!v.target) return;
+  const lines=[];
+  if(v.when==="after") lines.push(">>>");
+  if(v.when==="click") lines.push("...");
+  const dur=(v.verb==="hide"||v.verb==="show")&&!v.args ? (v.dur&&v.dur!=="0.7"?` ${v.dur}s`:"") : ` ${v.dur||"0.7"}s`;
+  lines.push((v.ease?`{ease=${v.ease}} `:"")+`!anim ${v.target} ${v.verb}${v.args?" "+v.args:""}${dur}`);
+  insertAtCursor(lines.join("\n"));
+}
+document.querySelectorAll("[data-ins]").forEach(b=>b.addEventListener("click",()=>INSERTS[b.dataset.ins]()));
+
+/* ---------- !import fetcher: parse asks, we fetch, then re-parse ---------- */
+PSL_IMPORTS.onUpdate=()=>refresh();
+PSL_IMPORTS.fetcher=url=>{
+  fetch(url).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
+    .then(txt=>{ PSL_IMPORTS.cache.set(url,{text:txt}); PSL_IMPORTS.onUpdate(); })
+    .catch(err=>{ PSL_IMPORTS.cache.set(url,{error:String(err)}); PSL_IMPORTS.onUpdate(); });
+};
+
+/* ---------- crude PowerPoint (.pptx) import ---------- */
+$("#pptxIn").addEventListener("change",async e=>{
+  const f=e.target.files[0]; e.target.value=""; if(!f) return;
+  if(!window.JSZip){ alert("The zip library (JSZip) did not load — check your connection."); return; }
+  try{
+    const psl=await pptxToPsl(f);
+    if(srcEl.value.trim() && !confirm("Replace the current script with the imported presentation?")) return;
+    srcEl.value=psl; selected=0; refresh();
+  }catch(err){ alert("PowerPoint import failed: "+err.message); }
+});
+async function pptxToPsl(file){
+  const zip=await JSZip.loadAsync(file);
+  const EMU=9525;                               // EMUs per px @96dpi (12192000 EMU = 1280px)
+  let scale=1;
+  const pres=zip.file("ppt/presentation.xml");
+  if(pres){ const px=new DOMParser().parseFromString(await pres.async("string"),"application/xml");
+    const sz=px.getElementsByTagName("p:sldSz")[0];
+    if(sz) scale=Math.min(SW/(+sz.getAttribute("cx")/EMU), SH/(+sz.getAttribute("cy")/EMU));
+  }
+  const names=Object.keys(zip.files).filter(k=>/^ppt\/slides\/slide\d+\.xml$/.test(k))
+    .sort((a,b)=>+a.match(/(\d+)/)[1]-+b.match(/(\d+)/)[1]);
+  if(!names.length) throw new Error("no slides found — is this a .pptx file?");
+  const out=["% Imported from "+file.name+" — crude conversion: titles, bullets,",
+             "% positioned text boxes, and images. Expect to clean up by hand.",""];
+  const esc=t=>t.replace(/\s+/g," ").trim();
+  for(let si=0; si<names.length; si++){
+    if(si>0) out.push("---");
+    const xml=new DOMParser().parseFromString(await zip.file(names[si]).async("string"),"application/xml");
+    // relationship map for images
+    const rels={}, rf=zip.file(names[si].replace("slides/","slides/_rels/")+".rels");
+    if(rf){ const rx=new DOMParser().parseFromString(await rf.async("string"),"application/xml");
+      for(const r of rx.getElementsByTagName("Relationship"))
+        rels[r.getAttribute("Id")]=r.getAttribute("Target").replace("../","ppt/"); }
+    const getPos=sp=>{ const off=sp.getElementsByTagName("a:off")[0], ext=sp.getElementsByTagName("a:ext")[0];
+      return off&&ext ? {x:Math.round(+off.getAttribute("x")/EMU*scale), y:Math.round(+off.getAttribute("y")/EMU*scale),
+                         w:Math.round(+ext.getAttribute("cx")/EMU*scale), h:Math.round(+ext.getAttribute("cy")/EMU*scale)} : null; };
+    for(const sp of xml.getElementsByTagName("p:sp")){
+      const ph=sp.getElementsByTagName("p:ph")[0];
+      const type=ph?(ph.getAttribute("type")||"body"):null;
+      const paras=[];
+      for(const p of sp.getElementsByTagName("a:p")){
+        let txt=""; for(const r of p.getElementsByTagName("a:r")){
+          const t=r.getElementsByTagName("a:t")[0]; if(!t) continue;
+          let piece=esc(t.textContent); if(!piece) continue;
+          const pr=r.getElementsByTagName("a:rPr")[0];
+          if(pr&&pr.getAttribute("b")==="1") piece="**"+piece+"**";
+          if(pr&&pr.getAttribute("i")==="1") piece="*"+piece+"*";
+          txt+=(txt?" ":"")+piece;
+        }
+        const pPr=p.getElementsByTagName("a:pPr")[0];
+        paras.push({txt, lvl:pPr?+(pPr.getAttribute("lvl")||0):0});
+      }
+      const nonEmpty=paras.filter(p=>p.txt);
+      if(!nonEmpty.length) continue;
+      if(type==="ctrTitle")      out.push("# "+nonEmpty.map(p=>p.txt).join(" "));
+      else if(type==="subTitle") out.push("## "+nonEmpty.map(p=>p.txt).join(" "));
+      else if(type==="title")    out.push("### "+nonEmpty.map(p=>p.txt).join(" "));
+      else if(type){             // body placeholder -> bullets with levels
+        for(const p of nonEmpty) out.push("  ".repeat(Math.min(p.lvl,2))+"- "+p.txt);
+      }else{                     // free text box -> positioned paragraphs
+        const pos=getPos(sp);
+        if(pos){ const lineH=Math.max(34, Math.round(pos.h/Math.max(1,nonEmpty.length)));
+          nonEmpty.forEach((p,i)=>out.push(`@(${pos.x}, ${pos.y+i*lineH}) {w=${pos.w}px} ${p.txt}`));
+        }else nonEmpty.forEach(p=>out.push(p.txt));
+      }
+    }
+    for(const pic of xml.getElementsByTagName("p:pic")){
+      const blip=pic.getElementsByTagName("a:blip")[0]; if(!blip) continue;
+      const rid=blip.getAttribute("r:embed")||blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed");
+      const target=rels[rid]; if(!target||!zip.file(target)) continue;
+      const ext=target.split(".").pop().toLowerCase();
+      const mime={png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",svg:"image/svg+xml",webp:"image/webp"}[ext];
+      if(!mime) continue;
+      const b64=await zip.file(target).async("base64");
+      const pos=getPos(pic)||{x:200,y:150,w:500};
+      out.push(`@(${pos.x}, ${pos.y}) {w=${pos.w}px} ![image](data:${mime};base64,${b64})`);
+    }
+  }
+  return out.join("\n")+"\n";
+}
 
  /* ---------- boot: viewer mode via URL, else the sample deck ----------
     Post slidedown.html + your .psl script online, then share:
