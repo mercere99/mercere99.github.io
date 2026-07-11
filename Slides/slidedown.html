@@ -166,26 +166,21 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .help td:first-child{font-family:var(--mono);white-space:pre;color:#9fd0c0;width:44%}
 .help .close{float:right}
 /* ---------- printing: one slide per page ----------
-   #printRoot is rendered off-screen (not display:none) so that getBBox /
-   getBoundingClientRect measurements inside animations stay meaningful
-   while the print layout is being built.
-   Where exact @page sizes are honored (Chrome/Edge/Firefox) pages are
-   full-bleed 16:9 landscape; anywhere else the slide is scaled to fit
-   BOTH page dimensions and centered, so any paper or orientation works. */
+   Print into true 16:9 landscape pages. The logical slide is 1280×720 CSS px;
+   13.333333in × 7.5in is exactly the same size at 96 CSS px/in, so no
+   browser-specific trig/min scaling is needed. For PDF output this produces
+   one full-bleed landscape page per visible slide. */
 #printRoot{position:fixed;left:-9999px;top:0;visibility:hidden}
 @media print{
-  @page{size:letter landscape;margin:0}     /* fallback where exact page sizes are unsupported */
-  @page{size:1280px 720px;margin:0}         /* exact 16:9 pages — Chrome, Edge, Firefox */
-  html,body{height:auto;overflow:visible;background:#fff}
+  @page{size:13.333333in 7.5in;margin:0}
+  html,body{width:13.333333in;height:auto;margin:0!important;overflow:visible;background:#fff}
   body>:not(#printRoot){display:none!important}
-  #printRoot{position:static;visibility:visible}
-  .pslide{position:relative;width:100vw;height:calc(100vh - 1px);overflow:hidden;
+  #printRoot{position:static;visibility:visible;width:13.333333in;margin:0;padding:0}
+  .pslide{position:relative;width:13.333333in;height:7.5in;margin:0;overflow:hidden;
           break-inside:avoid;page-break-inside:avoid;
           print-color-adjust:exact;-webkit-print-color-adjust:exact}
   .pslide+.pslide{break-before:page;page-break-before:always}
-  .pslide .slide{left:50%;top:50%;transform-origin:50% 50%;
-    transform:translate(-50%,-50%)
-      scale(min(tan(atan2(100vw,1280px)), tan(atan2(100vh - 1px,720px))))}
+  .pslide .slide{position:absolute;left:0;top:0;transform:none!important}
 }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
 </style>
@@ -374,7 +369,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>b · f / ⛶ · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit. The Present buttons enter fullscreen automatically; "▶ 2nd screen" (shown when an extended display is detected, Chromium browsers) presents fullscreen on your other monitor.</td></tr>
     </table>
     <h3>Printing &amp; handouts</h3>
-    <p class="sub" style="margin:6px 0 0"><b>File ▸ Print / Save as PDF</b> lays out one slide per page, fully advanced (all reveal steps shown), with pocket slides omitted and embeds shown as placeholders. Chrome and Edge produce full-bleed 16:9 landscape pages automatically. Other browsers may follow the print dialog's paper and orientation settings — the slide is always scaled to fit and centered, but pick <b>landscape</b> there for full-bleed pages. Enable “background graphics” if slide backgrounds look washed out.</p>
+    <p class="sub" style="margin:6px 0 0"><b>File ▸ Print / Save as PDF</b> lays out one slide per page, fully advanced (all reveal steps shown), with pocket slides omitted and embeds shown as placeholders. The print stylesheet requests full-bleed 16:9 landscape pages. Enable “background graphics” if slide backgrounds look washed out; for physical paper, use “Fit to printable area” if your printer cannot print borderlessly.</p>
     <h3>Publishing a deck online</h3>
     <p class="sub" style="margin:6px 0 0">Host this HTML file and your <code>.psl</code> script anywhere (e.g. GitHub Pages), then share a link like <code>slidedown.html?present=my_talk.psl</code> — visitors land directly in the slideshow and can step through with space. Add <code>&amp;slide=5</code> to start on a specific slide. Cross-origin script URLs work if the host sends CORS headers; same-site files always work.</p>
     <p class="sub" style="margin-top:14px"><b>Editor ↔ preview.</b> Moving the caret in the script selects the slide you're editing; clicking a thumbnail jumps the caret to that slide. Drag the divider between the panes to resize them; the ◂/▸ buttons on it collapse one side, and double-clicking it (or <code>Ctrl/Cmd + \</code>) toggles a full-width editor. The thin strip beside the thumbnails hides the rail. The layout is remembered between sessions.</p>
