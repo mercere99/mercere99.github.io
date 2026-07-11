@@ -72,8 +72,23 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .drow{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
 
 /* ---------- editor layout ---------- */
-.split{display:flex;height:calc(100% - 52px)}
-.editor-pane{width:44%;min-width:340px;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.split{display:flex;height:calc(100% - 52px);--edw:44%}
+.editor-pane{width:var(--edw);min-width:0;display:flex;flex-direction:column}
+.split.ed-min .editor-pane{display:none}
+.split.ed-max .preview-pane{display:none}
+.split.ed-max .editor-pane{width:auto;flex:1}
+/* drag gutter between editor and preview */
+.gutter{flex:0 0 9px;cursor:col-resize;background:var(--panel);border-left:1px solid var(--line);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;user-select:none;touch-action:none}
+.gutter:hover{background:#20262f}
+.gbtn{width:17px;height:34px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel);
+      color:var(--chrome-dim);font-size:11px;line-height:1;cursor:pointer;flex:0 0 auto}
+.gbtn:hover{color:#e8edf5;background:#2a3140}
+/* collapsible thumbnail rail */
+.rail-toggle{flex:0 0 11px;align-self:stretch;padding:0;border:0;border-right:1px solid var(--line);background:var(--panel);
+             color:var(--chrome-dim);font-size:10px;cursor:pointer;user-select:none}
+.rail-toggle:hover{color:#e8edf5;background:#20262f}
+.preview-pane.rail-off .thumb-rail{display:none}
 .editor-pane textarea{flex:1;resize:none;border:0;outline:none;background:var(--ink);color:#cdd6e4;font-family:var(--mono);font-size:13.5px;line-height:1.55;padding:16px 18px;tab-size:2;white-space:pre;overflow:auto}
 .editor-pane textarea::selection{background:#3b4a61}
 .warnbar{max-height:90px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:11.5px;color:#d9a05a;padding:6px 12px;display:none}
@@ -150,6 +165,28 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .help td{padding:5px 10px 5px 0;border-bottom:1px solid var(--line);vertical-align:top}
 .help td:first-child{font-family:var(--mono);white-space:pre;color:#9fd0c0;width:44%}
 .help .close{float:right}
+/* ---------- printing: one slide per page ----------
+   #printRoot is rendered off-screen (not display:none) so that getBBox /
+   getBoundingClientRect measurements inside animations stay meaningful
+   while the print layout is being built.
+   Where exact @page sizes are honored (Chrome/Edge/Firefox) pages are
+   full-bleed 16:9 landscape; anywhere else the slide is scaled to fit
+   BOTH page dimensions and centered, so any paper or orientation works. */
+#printRoot{position:fixed;left:-9999px;top:0;visibility:hidden}
+@media print{
+  @page{size:letter landscape;margin:0}     /* fallback where exact page sizes are unsupported */
+  @page{size:1280px 720px;margin:0}         /* exact 16:9 pages — Chrome, Edge, Firefox */
+  html,body{height:auto;overflow:visible;background:#fff}
+  body>:not(#printRoot){display:none!important}
+  #printRoot{position:static;visibility:visible}
+  .pslide{position:relative;width:100vw;height:calc(100vh - 1px);overflow:hidden;
+          break-inside:avoid;page-break-inside:avoid;
+          print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .pslide+.pslide{break-before:page;page-break-before:always}
+  .pslide .slide{left:50%;top:50%;transform-origin:50% 50%;
+    transform:translate(-50%,-50%)
+      scale(min(tan(atan2(100vw,1280px)), tan(atan2(100vh - 1px,720px))))}
+}
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
 </style>
 </head>
@@ -209,13 +246,18 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   <input type="file" id="pptxIn" accept=".pptx" style="display:none">
 </div>
 
-<div class="split">
+<div class="split" id="split">
   <div class="editor-pane">
     <textarea id="src" spellcheck="false" aria-label="Slide script"></textarea>
     <div class="warnbar" id="warnbar"></div>
   </div>
+  <div class="gutter" id="gutter" title="Drag to resize · double-click to maximize the editor (Ctrl/Cmd+\)">
+    <button class="gbtn" id="gLeft"  title="Collapse editor (show preview only)">◂</button>
+    <button class="gbtn" id="gRight" title="Maximize editor (hide preview)">▸</button>
+  </div>
   <div class="preview-pane">
     <div class="thumb-rail" id="thumbRail"></div>
+    <button class="rail-toggle" id="railToggle" title="Hide thumbnails">‹</button>
     <div class="stage-wrap">
       <div class="stage"><div class="stage-holder" id="stageHolder"></div></div>
       <div class="stage-note">Preview shows the selected slide fully advanced. Double-click a thumbnail to present from it.</div>
@@ -332,10 +374,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>b · f / ⛶ · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit. The Present buttons enter fullscreen automatically; "▶ 2nd screen" (shown when an extended display is detected, Chromium browsers) presents fullscreen on your other monitor.</td></tr>
     </table>
     <h3>Printing &amp; handouts</h3>
-    <p class="sub" style="margin:6px 0 0"><b>File ▸ Print / Save as PDF</b> lays out one 16:9 page per slide, fully advanced (all reveal steps shown), with pocket slides omitted and embeds shown as placeholders. Use your browser's print dialog to save a PDF handout with real selectable text.</p>
+    <p class="sub" style="margin:6px 0 0"><b>File ▸ Print / Save as PDF</b> lays out one slide per page, fully advanced (all reveal steps shown), with pocket slides omitted and embeds shown as placeholders. Chrome and Edge produce full-bleed 16:9 landscape pages automatically. Other browsers may follow the print dialog's paper and orientation settings — the slide is always scaled to fit and centered, but pick <b>landscape</b> there for full-bleed pages. Enable “background graphics” if slide backgrounds look washed out.</p>
     <h3>Publishing a deck online</h3>
     <p class="sub" style="margin:6px 0 0">Host this HTML file and your <code>.psl</code> script anywhere (e.g. GitHub Pages), then share a link like <code>slidedown.html?present=my_talk.psl</code> — visitors land directly in the slideshow and can step through with space. Add <code>&amp;slide=5</code> to start on a specific slide. Cross-origin script URLs work if the host sends CORS headers; same-site files always work.</p>
-    <p class="sub" style="margin-top:14px"><b>Editor ↔ preview.</b> Moving the caret in the script selects the slide you're editing; clicking a thumbnail jumps the caret to that slide.</p>
+    <p class="sub" style="margin-top:14px"><b>Editor ↔ preview.</b> Moving the caret in the script selects the slide you're editing; clicking a thumbnail jumps the caret to that slide. Drag the divider between the panes to resize them; the ◂/▸ buttons on it collapse one side, and double-clicking it (or <code>Ctrl/Cmd + \</code>) toggles a full-width editor. The thin strip beside the thumbnails hides the rail. The layout is remembered between sessions.</p>
   </div>
 </div>
 
@@ -1508,6 +1550,7 @@ function refresh(){
   showPreview();          // rebuilds only if the selected slide's source changed
 }
 function buildThumbs(container,onPick,markSelected){
+  const keepScroll=container.scrollTop;           // rebuilds happen on every parse; don't jump the rail
   container.innerHTML="";
   deck.slides.forEach((sd,i)=>{
     const t=document.createElement("div");
@@ -1520,6 +1563,7 @@ function buildThumbs(container,onPick,markSelected){
     t.addEventListener("dblclick",()=>startPresent(i,{fs:true,exact:true}));
     container.appendChild(t);
   });
+  container.scrollTop=keepScroll;
 }
 /* Rebuild the big preview only when the selected slide's own source text changes.
    This keeps a live-embed preview from reloading its iframe on every keystroke
@@ -1535,13 +1579,19 @@ function showPreview(){
     lastPreviewKey=key;
   }
   const stage=stageHolder.parentElement, r=stage.getBoundingClientRect();
-  fitInto(stageHolder, r.width-44, r.height-44);
+  if(r.width>60 && r.height>60) fitInto(stageHolder, r.width-44, r.height-44);   // skip when the preview pane is collapsed
+  markSelectedThumb();
+}
+/* highlight the selected thumbnail and keep it visible in the rail */
+function markSelectedThumb(behavior){
   [...thumbRail.children].forEach((el,i)=>el.classList.toggle("sel",i===selected));
+  const el=thumbRail.children[selected];
+  if(el) el.scrollIntoView({block:"nearest",behavior:behavior||"smooth"});
 }
 window.addEventListener("resize",()=>{ if(presentOn) layoutPresent(); else showPreview(); });
 
 /* thumbnails need a stable click handler (rebuild-free selection) */
-function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>jumpEditorToSlide(i),true); }
+function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>jumpEditorToSlide(i),true); markSelectedThumb("auto"); }
 
 /* click a preview thumbnail -> move the editor caret into that slide
    (in presenter mode it also drives the show — thumbnails are the overview) */
@@ -1572,7 +1622,7 @@ function syncFromCaret(){
   slideRanges=computeSlideRanges(srcEl.value);
   const i=Math.min(slideIndexAt(srcEl.selectionStart), deck.slides.length-1);
   if(i!==selected && i>=0){ selected=i; showPreview(); }
-  else { [...thumbRail.children].forEach((el,k)=>el.classList.toggle("sel",k===selected)); }
+  else { markSelectedThumb(); }
 }
 document.addEventListener("selectionchange",()=>{ if(document.activeElement===srcEl) syncFromCaret(); });
 srcEl.addEventListener("click",syncFromCaret);
@@ -1857,8 +1907,79 @@ $("#miNew").addEventListener("click",()=>{
 });
 $("#miPptx").addEventListener("click",()=>$("#pptxIn").click());
 $("#miPrint").addEventListener("click",()=>{ buildPrintLayout(); setTimeout(()=>window.print(),30); });
-window.addEventListener("beforeprint",buildPrintLayout);
+window.addEventListener("beforeprint",()=>{ if(!$("#printRoot").children.length) buildPrintLayout(); });   // Ctrl/Cmd-P path; menu path already built
 window.addEventListener("afterprint",()=>{ $("#printRoot").innerHTML=""; });
+
+/* ---------- resizable & collapsible panels ----------
+   Drag the gutter to resize; ◂ hides the editor, ▸ maximizes it (either
+   button restores from a collapsed state); double-click the gutter to
+   toggle a maximized editor; Ctrl/Cmd+\ does the same from the keyboard.
+   The thin strip right of the thumbnails collapses the rail. */
+const splitEl=$("#split"), gutterEl=$("#gutter"), previewPane=$(".preview-pane");
+const LAYOUT_KEY="slidedown.layout";
+function saveLayout(){
+  try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify({
+    edw:splitEl.style.getPropertyValue("--edw")||"",
+    mode:splitEl.classList.contains("ed-max")?"ed":splitEl.classList.contains("ed-min")?"pv":"both",
+    rail:!previewPane.classList.contains("rail-off")})); }catch(e){}
+}
+function setSplitMode(mode){                    // "both" | "ed" (editor only) | "pv" (preview only)
+  splitEl.classList.toggle("ed-max",mode==="ed");
+  splitEl.classList.toggle("ed-min",mode==="pv");
+  $("#gRight").textContent = mode==="ed" ? "◂" : "▸";
+  $("#gRight").title       = mode==="ed" ? "Restore preview" : "Maximize editor (hide preview)";
+  $("#gLeft").textContent  = mode==="pv" ? "▸" : "◂";
+  $("#gLeft").title        = mode==="pv" ? "Restore editor" : "Collapse editor (show preview only)";
+  if(mode!=="ed") showPreview();                // re-fit the stage when it becomes visible
+  saveLayout();
+}
+$("#gLeft").addEventListener("click",()=>setSplitMode(splitEl.classList.contains("ed-min")?"both":"pv"));
+$("#gRight").addEventListener("click",()=>setSplitMode(splitEl.classList.contains("ed-max")?"both":"ed"));
+window.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==="\\"&&!presentOn){ e.preventDefault();
+    setSplitMode(splitEl.classList.contains("ed-max")?"both":"ed"); }
+});
+{ let dragging=false, moved=false, sx=0, lastDown=0, fitQueued=false;
+  const queueFit=()=>{ if(fitQueued) return; fitQueued=true;
+    requestAnimationFrame(()=>{ fitQueued=false; showPreview(); }); };
+  gutterEl.addEventListener("pointerdown",e=>{
+    if(e.target.closest(".gbtn")) return;
+    const now=performance.now();
+    if(now-lastDown<350){                        // manual double-click (preventDefault suppresses dblclick)
+      lastDown=0;
+      setSplitMode(splitEl.classList.contains("ed-max")?"both":"ed");
+      return;
+    }
+    lastDown=now;
+    dragging=true; moved=false; sx=e.clientX;
+    gutterEl.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  gutterEl.addEventListener("pointermove",e=>{
+    if(!dragging) return;
+    if(!moved && Math.abs(e.clientX-sx)<3) return;   // ignore press jitter
+    moved=true;
+    const r=splitEl.getBoundingClientRect();
+    const pct=clamp((e.clientX-r.left)/r.width*100, 12, 88);
+    splitEl.classList.remove("ed-max","ed-min");
+    splitEl.style.setProperty("--edw",pct.toFixed(2)+"%");
+    queueFit();
+  });
+  gutterEl.addEventListener("pointerup",()=>{
+    if(!dragging) return; dragging=false;
+    if(moved) setSplitMode("both");              // refresh glyphs, re-fit, save
+  });
+}
+$("#railToggle").addEventListener("click",()=>{
+  const off=previewPane.classList.toggle("rail-off");
+  $("#railToggle").textContent = off? "›" : "‹";
+  $("#railToggle").title = off? "Show thumbnails" : "Hide thumbnails";
+  showPreview(); saveLayout();
+});
+try{ const st=JSON.parse(localStorage.getItem(LAYOUT_KEY)||"{}");
+  if(st.edw) splitEl.style.setProperty("--edw",st.edw);
+  if(st.rail===false){ previewPane.classList.add("rail-off"); $("#railToggle").textContent="›"; $("#railToggle").title="Show thumbnails"; }
+  if(st.mode==="ed"||st.mode==="pv") setSplitMode(st.mode); else setSplitMode("both");
+}catch(e){}
 
 /* ---------- print layout: every visible slide, fully advanced ---------- */
 function buildPrintLayout(){
@@ -2235,7 +2356,11 @@ PSL_IMPORTS.fetcher=url=>{
     .catch(err=>{ PSL_IMPORTS.cache.set(url,{error:String(err)}); PSL_IMPORTS.onUpdate(); });
 };
 
-/* ---------- crude PowerPoint (.pptx) import ---------- */
+/* ---------- PowerPoint (.pptx) import ----------
+   Converts titles, bullets, text boxes, images, tables, common preset
+   shapes (fills, strokes, theme colors, groups), connectors, and the
+   animation timing tree (entrances / exits / emphasis / motion paths,
+   grouped by click) into PSL. A starting point, not a round-trip. */
 $("#pptxIn").addEventListener("change",async e=>{
   const f=e.target.files[0]; e.target.value=""; if(!f) return;
   if(!window.JSZip){ alert("The zip library (JSZip) did not load — check your connection."); return; }
@@ -2245,75 +2370,378 @@ $("#pptxIn").addEventListener("change",async e=>{
     srcEl.value=psl; selected=0; refresh();
   }catch(err){ alert("PowerPoint import failed: "+err.message); }
 });
+
+/* direction bitfield used by PowerPoint presetSubtype: 1=top 2=right 4=bottom 8=left.
+   The names below are PSL enter effects seen from the element's final position,
+   and happen to be correct for exits too (the FX table inverts them). */
+const PPTX_DIR={1:"slidedown",2:"slideright",3:"slideright",4:"slideup",6:"slideright",8:"slideleft",9:"slideleft",12:"slideleft"};
+
 async function pptxToPsl(file){
   const zip=await JSZip.loadAsync(file);
-  const EMU=9525;                               // EMUs per px @96dpi (12192000 EMU = 1280px)
-  let scale=1;
-  const pres=zip.file("ppt/presentation.xml");
-  if(pres){ const px=new DOMParser().parseFromString(await pres.async("string"),"application/xml");
-    const sz=px.getElementsByTagName("p:sldSz")[0];
-    if(sz) scale=Math.min(SW/(+sz.getAttribute("cx")/EMU), SH/(+sz.getAttribute("cy")/EMU));
+  const EMU=9525;                               // EMUs per px @96dpi
+  const XML=async k=>{ const f=zip.file(k); return f? new DOMParser().parseFromString(await f.async("string"),"application/xml") : null; };
+  const lname=n=>{ const l=n.localName||n.nodeName||""; const i=l.indexOf(":"); return i<0? l : l.slice(i+1); };
+  const kid=(el,local)=>{ if(el) for(const c of el.childNodes) if(c.nodeType===1&&lname(c)===local) return c; return null; };
+  const kidsOf=(el,local)=>{ const r=[]; if(el) for(const c of el.childNodes) if(c.nodeType===1&&lname(c)===local) r.push(c); return r; };
+  const q=(el,name)=>el? el.getElementsByTagName(name)[0]||null : null;   // deep, by prefixed name
+  const R=v=>Math.round(v);
+  const esc=t=>t.replace(/\s+/g," ").replace(/\|/g,"/").trim();
+
+  /* slide size -> uniform scale into the 1280x720 logical space */
+  let scale=1, slideWpx=SW, slideHpx=SH;
+  { const px=await XML("ppt/presentation.xml");
+    const sz=px&&q(px,"p:sldSz");
+    if(sz){ const w=+sz.getAttribute("cx")/EMU, h=+sz.getAttribute("cy")/EMU;
+      scale=Math.min(SW/w, SH/h); slideWpx=w*scale; slideHpx=h*scale; } }
+
+  /* theme color scheme (scheme name -> "RRGGBB") */
+  const theme={};
+  { const tx=await XML("ppt/theme/theme1.xml");
+    const cs=tx&&q(tx,"a:clrScheme");
+    if(cs) for(const c of cs.childNodes){ if(c.nodeType!==1) continue;
+      const s=kid(c,"srgbClr"), sys=kid(c,"sysClr");
+      theme[lname(c)]= s? s.getAttribute("val") : sys? (sys.getAttribute("lastClr")||"000000") : null; }
+    theme.tx1=theme.tx1||theme.dk1; theme.bg1=theme.bg1||theme.lt1;
+    theme.tx2=theme.tx2||theme.dk2; theme.bg2=theme.bg2||theme.lt2; }
+
+  /* a fill node (srgbClr / schemeClr / sysClr + shade/tint/lum transforms) -> css color */
+  function cssColor(node){
+    if(!node) return null;
+    let el=kid(node,"srgbClr"), hex=el&&el.getAttribute("val");
+    if(!el){ el=kid(node,"schemeClr"); if(el) hex=theme[el.getAttribute("val")]; }
+    if(!el){ el=kid(node,"sysClr");    if(el) hex=el.getAttribute("lastClr")||"000000"; }
+    if(!el||!hex||hex.length<6) return null;
+    let ch=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16));
+    const tf=t=>{ const n=kid(el,t); return n? +n.getAttribute("val")/100000 : null; };
+    const shade=tf("shade"), tint=tf("tint"), lm=tf("lumMod"), lo=tf("lumOff"), alpha=tf("alpha");
+    ch=ch.map(v=>{ if(shade!=null)v*=shade; if(tint!=null)v=v*tint+255*(1-tint);
+                   if(lm!=null)v*=lm; if(lo!=null)v+=255*lo; return clamp(R(v),0,255); });
+    const hx=n=>n.toString(16).padStart(2,"0");
+    return "#"+ch.map(hx).join("")+(alpha!=null&&alpha<1? hx(clamp(R(alpha*255),0,255)) : "");
   }
+  function strokeOf(spPr){
+    const ln=spPr&&kid(spPr,"ln"); if(!ln) return {};
+    const st={};
+    if(kid(ln,"noFill")) st.thick=0;
+    else{
+      const c=cssColor(kid(ln,"solidFill")); if(c) st.color=c;
+      const w=+ln.getAttribute("w"); if(w) st.thick=Math.max(1,R(w/EMU*scale));
+    }
+    return st;
+  }
+  function fillOf(spPr){
+    if(!spPr||kid(spPr,"noFill")) return null;
+    const sf=kid(spPr,"solidFill"); if(sf) return cssColor(sf);
+    const gf=kid(spPr,"gradFill");                 // gradients: keep the first stop
+    if(gf){ const gs=q(gf,"a:gs"); return gs? cssColor(gs) : null; }
+    return null;
+  }
+  const styleStr=o=>{ const parts=Object.keys(o).filter(k=>o[k]!=null&&o[k]!=="").map(k=>k+"="+o[k]);
+    return parts.length? "{"+parts.join(", ")+"} " : ""; };
+
+  /* geometry: linear transform (group-aware) from EMU into logical px */
+  const T0={ax:scale/EMU, bx:0, ay:scale/EMU, by:0};
+  function xfrmOf(el){
+    const pr=kid(el,"spPr")||kid(el,"grpSpPr");
+    return pr? kid(pr,"xfrm") : kid(el,"xfrm");    // graphicFrame carries p:xfrm directly
+  }
+  function boxOf(el,T){
+    const xf=xfrmOf(el); if(!xf) return null;
+    const off=kid(xf,"off"), ext=kid(xf,"ext"); if(!off||!ext) return null;
+    return {x:T.bx+T.ax*(+off.getAttribute("x")), y:T.by+T.ay*(+off.getAttribute("y")),
+            w:T.ax*(+ext.getAttribute("cx")),     h:T.ay*(+ext.getAttribute("cy")),
+            rot:(+xf.getAttribute("rot")||0)/60000,
+            flipH:xf.getAttribute("flipH")==="1", flipV:xf.getAttribute("flipV")==="1"};
+  }
+  function parasOf(txBody){                        // [{idx, txt, lvl}] with markdown bold/italic
+    const out2=[]; if(!txBody) return out2;
+    kidsOf(txBody,"p").forEach((p,idx)=>{
+      let txt="";
+      for(const r of p.getElementsByTagName("a:r")){
+        const t=q(r,"a:t"); if(!t) continue;
+        let piece=esc(t.textContent); if(!piece) continue;
+        const pr=q(r,"a:rPr");
+        if(pr&&pr.getAttribute("b")==="1") piece="**"+piece+"**";
+        if(pr&&pr.getAttribute("i")==="1") piece="*"+piece+"*";
+        txt+=(txt?" ":"")+piece;
+      }
+      const pPr=q(p,"a:pPr");
+      out2.push({idx, txt, lvl:pPr? +(pPr.getAttribute("lvl")||0) : 0});
+    });
+    return out2;
+  }
+  const firstRunProps=el=>{ const pr=q(el,"a:rPr"); if(!pr) return {};
+    const o={}; const c=cssColor(kid(pr,"solidFill")); if(c) o.color=c;
+    const sz=+pr.getAttribute("sz"); if(sz) o.size=R(sz/100*4/3*scale)+"px";
+    return o; };
+
   const names=Object.keys(zip.files).filter(k=>/^ppt\/slides\/slide\d+\.xml$/.test(k))
     .sort((a,b)=>+a.match(/(\d+)/)[1]-+b.match(/(\d+)/)[1]);
   if(!names.length) throw new Error("no slides found — is this a .pptx file?");
-  const out=["% Imported from "+file.name+" — crude conversion: titles, bullets,",
-             "% positioned text boxes, and images. Expect to clean up by hand.",""];
-  const esc=t=>t.replace(/\s+/g," ").trim();
+  const out=["% Imported from "+file.name+" — titles, bullets, text boxes, images, tables,",
+             "% common shapes, and animations (grouped by click). Expect to clean up by hand.",""];
+
   for(let si=0; si<names.length; si++){
     if(si>0) out.push("---");
-    const xml=new DOMParser().parseFromString(await zip.file(names[si]).async("string"),"application/xml");
-    // relationship map for images
-    const rels={}, rf=zip.file(names[si].replace("slides/","slides/_rels/")+".rels");
-    if(rf){ const rx=new DOMParser().parseFromString(await rf.async("string"),"application/xml");
-      for(const r of rx.getElementsByTagName("Relationship"))
-        rels[r.getAttribute("Id")]=r.getAttribute("Target").replace("../","ppt/"); }
-    const getPos=sp=>{ const off=sp.getElementsByTagName("a:off")[0], ext=sp.getElementsByTagName("a:ext")[0];
-      return off&&ext ? {x:Math.round(+off.getAttribute("x")/EMU*scale), y:Math.round(+off.getAttribute("y")/EMU*scale),
-                         w:Math.round(+ext.getAttribute("cx")/EMU*scale), h:Math.round(+ext.getAttribute("cy")/EMU*scale)} : null; };
-    for(const sp of xml.getElementsByTagName("p:sp")){
-      const ph=sp.getElementsByTagName("p:ph")[0];
-      const type=ph?(ph.getAttribute("type")||"body"):null;
-      const paras=[];
-      for(const p of sp.getElementsByTagName("a:p")){
-        let txt=""; for(const r of p.getElementsByTagName("a:r")){
-          const t=r.getElementsByTagName("a:t")[0]; if(!t) continue;
-          let piece=esc(t.textContent); if(!piece) continue;
-          const pr=r.getElementsByTagName("a:rPr")[0];
-          if(pr&&pr.getAttribute("b")==="1") piece="**"+piece+"**";
-          if(pr&&pr.getAttribute("i")==="1") piece="*"+piece+"*";
-          txt+=(txt?" ":"")+piece;
-        }
-        const pPr=p.getElementsByTagName("a:pPr")[0];
-        paras.push({txt, lvl:pPr?+(pPr.getAttribute("lvl")||0):0});
-      }
-      const nonEmpty=paras.filter(p=>p.txt);
-      if(!nonEmpty.length) continue;
-      if(type==="ctrTitle")      out.push("# "+nonEmpty.map(p=>p.txt).join(" "));
-      else if(type==="subTitle") out.push("## "+nonEmpty.map(p=>p.txt).join(" "));
-      else if(type==="title")    out.push("### "+nonEmpty.map(p=>p.txt).join(" "));
-      else if(type){             // body placeholder -> bullets with levels
-        for(const p of nonEmpty) out.push("  ".repeat(Math.min(p.lvl,2))+"- "+p.txt);
-      }else{                     // free text box -> positioned paragraphs
-        const pos=getPos(sp);
-        if(pos){ const lineH=Math.max(34, Math.round(pos.h/Math.max(1,nonEmpty.length)));
-          nonEmpty.forEach((p,i)=>out.push(`@(${pos.x}, ${pos.y+i*lineH}) {w=${pos.w}px} ${p.txt}`));
-        }else nonEmpty.forEach(p=>out.push(p.txt));
+    const xml=await XML(names[si]);
+    const rels={};
+    const rx=await XML(names[si].replace("slides/","slides/_rels/")+".rels");
+    if(rx) for(const r of rx.getElementsByTagName("Relationship"))
+      rels[r.getAttribute("Id")]=r.getAttribute("Target").replace("../","ppt/");
+
+    /* preload image media so the tree walk below can stay synchronous */
+    const media={};
+    await Promise.all(Object.values(rels).map(async t=>{
+      const ext=t.split(".").pop().toLowerCase();
+      if(/^(png|jpg|jpeg|gif|svg|webp)$/.test(ext) && zip.file(t))
+        media[t]=await zip.file(t).async("base64");
+    }));
+
+    /* ---- 1. the timing tree -> an ordered list of effects ---- */
+    const effects=[];
+    const tm=q(xml,"p:timing");
+    if(tm) for(const tn of tm.getElementsByTagName("p:cTn")){
+      const cls=tn.getAttribute("presetClass"); if(!cls) continue;
+      const tg=q(tn,"p:spTgt"); if(!tg) continue;
+      const pRg=q(tg,"p:pRg");
+      let dur=0;
+      for(const c of tn.getElementsByTagName("p:cTn")){ const d2=+c.getAttribute("dur"); if(d2>1) dur=Math.max(dur,d2); }
+      const mo=q(tn,"p:animMotion"), sc=q(tn,"p:animScale"), ac=q(tn,"p:animClr");
+      const scTo=sc&&(kid(sc,"to")||kid(sc,"by"));
+      effects.push({spid:tg.getAttribute("spid"),
+        para:pRg? +pRg.getAttribute("st") : null,
+        cls, id:+tn.getAttribute("presetID")||0, sub:+tn.getAttribute("presetSubtype")||0,
+        when:tn.getAttribute("nodeType")||"withEffect",
+        dur: dur>0? Math.min(dur,10000)/1000 : 0.5,
+        mpath: mo? mo.getAttribute("path") : null,
+        scaleTo: scTo? +scTo.getAttribute("x")/100000 : null,
+        clrTo: ac? cssColor(kid(ac,"to")) : null,
+        units:[]});
+    }
+    const animated=new Set(effects.map(e=>e.spid));
+    const enterOf=new Map();                       // "spid" or "spid/para" -> first entrance
+    for(const e of effects) if(e.cls==="entr"){
+      const key=e.spid+(e.para!=null?"/"+e.para:"");
+      if(!enterOf.has(key)) enterOf.set(key,e);
+    }
+
+    /* ---- 2. walk the shape tree into PSL "units" ---- */
+    const units=[], byShape=new Map();
+    const mkLabel=(spid,para)=>("s"+(si+1)+"_"+spid+(para!=null?"p"+para:"")).replace(/[^\w-]/g,"_");
+    function addUnit(u){                           // {spid,para,flow,pre,core,extra,note,ax,ay}
+      u.key=u.spid+(u.para!=null?"/"+u.para:"");
+      if(animated.has(u.spid)) u.label=mkLabel(u.spid,u.para);
+      u.render=()=>{ const first=(u.pre||"")+(u.hidden?"{opacity=0} ":"")+(u.label?`[${u.label}] `:"")+u.core;
+        return (u.note?[u.note]:[]).concat([first], u.extra||[]); };
+      units.push(u);
+      if(!byShape.has(u.spid)) byShape.set(u.spid,[]);
+      byShape.get(u.spid).push(u);
+      const eff=enterOf.get(u.key)||enterOf.get(u.spid);
+      if(eff){                                     // entrance: reveal at its step
+        eff.units.push(u);
+        if(u.flow){ u.hidden=true; emit(u); }      // flow items keep document order
+      }else emit(u);
+    }
+    function emit(u){ out.push(...u.render()); u.declared=true; }
+    const idOf=el=>{ const nv=q(el,"p:cNvPr"); return nv? nv.getAttribute("id") : null; };
+
+    function doSp(sp,T){
+      const spid=idOf(sp);
+      const ph=q(sp,"p:ph"), type=ph? (ph.getAttribute("type")||"body") : null;
+      const spPr=kid(sp,"spPr");
+      const txBody=kid(sp,"txBody");
+      const paras=parasOf(txBody), nonEmpty=paras.filter(p=>p.txt);
+      const prstEl=spPr&&kid(spPr,"prstGeom");
+      const prst=prstEl? prstEl.getAttribute("prst") : null;
+      const cnv=q(sp,"p:cNvSpPr");
+      const isTxBox = cnv&&cnv.getAttribute("txBox")==="1";
+      const stk=strokeOf(spPr), fill=fillOf(spPr);
+      const drawn = prst && !ph && !isTxBox &&
+        (prst!=="rect" || fill!=null || stk.color!=null || (stk.thick||0)>0);
+
+      if(drawn){ doShape(sp,T,spid,prst,{...stk},fill,nonEmpty.map(p=>p.txt).join(" ")); return; }
+      if(!nonEmpty.length) return;
+
+      if(type==="ctrTitle")
+        addUnit({spid, flow:true, core:"# "+nonEmpty.map(p=>p.txt).join(" ")});
+      else if(type==="subTitle")
+        addUnit({spid, flow:true, core:"## "+nonEmpty.map(p=>p.txt).join(" ")});
+      else if(type==="title")
+        addUnit({spid, flow:true, core:"### "+nonEmpty.map(p=>p.txt).join(" ")});
+      else if(type){                               // body placeholder -> bullets, one unit per paragraph
+        for(const p of nonEmpty)
+          addUnit({spid, para:p.idx, flow:true, pre:"  ".repeat(Math.min(p.lvl,2)), core:"- "+p.txt});
+      }else{                                       // free text box -> positioned paragraphs
+        const b=boxOf(sp,T), st=firstRunProps(sp);
+        if(b){
+          const lineH=Math.max(34, R(b.h/nonEmpty.length));
+          nonEmpty.forEach((p,i)=>addUnit({spid, para:p.idx, ax:R(b.x), ay:R(b.y+i*lineH),
+            core:`@(${R(b.x)}, ${R(b.y+i*lineH)}) `+styleStr({w:R(b.w)+"px",...st})+p.txt}));
+        }else for(const p of nonEmpty) addUnit({spid, para:p.idx, flow:true, core:p.txt});
       }
     }
-    for(const pic of xml.getElementsByTagName("p:pic")){
-      const blip=pic.getElementsByTagName("a:blip")[0]; if(!blip) continue;
-      const rid=blip.getAttribute("r:embed")||blip.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","embed");
-      const target=rels[rid]; if(!target||!zip.file(target)) continue;
+
+    function doShape(el,T,spid,prst,st,fill,text){
+      if(prst==="line"||/Connector/.test(prst)){ doCxn(el,T); return; }
+      const b=boxOf(el,T); if(!b) return;
+      if(fill) st.fill=fill;
+      if(text){ const tp=firstRunProps(el);
+        if(tp.color){ st.textcolor=tp.color; } if(tp.size) st.size=tp.size; }
+      const x=R(b.x), y=R(b.y), w=R(b.w), h=R(b.h), cx0=R(b.x+b.w/2), cy0=R(b.y+b.h/2);
+      const P=(a,b2)=>`(${R(a)}, ${R(b2)})`;
+      const REG={pentagon:5,hexagon:6,heptagon:7,octagon:8,decagon:10,dodecagon:12};
+      let core=null, ax=x, ay=y, note=null, m;
+      if(prst==="ellipse"||prst==="pie"||prst==="chord"){
+        core= Math.abs(b.w-b.h)<2 ? `!circle ${P(cx0,cy0)} ${R(b.w/2)}` : `!ellipse ${P(cx0,cy0)} ${P(b.w/2,b.h/2)}`;
+        ax=cx0; ay=cy0;
+      }else if(prst==="diamond"){ core=`!diamond ${P(cx0,cy0)} ${P(w,h)}`; ax=cx0; ay=cy0-h/2; }
+      else if(prst==="triangle"){ core=`!triangle ${P(x+w/2,y)} ${P(x+w,y+h)} ${P(x,y+h)}`; ax=x+w/2; ay=y; }
+      else if(prst==="rtTriangle"){ core=`!triangle ${P(x,y)} ${P(x,y+h)} ${P(x+w,y+h)}`; }
+      else if((m=prst.match(/^star(\d+)$/))){
+        const r=R(Math.min(w,h)/2);
+        core=`!star ${P(cx0,cy0)} ${m[1]} ${r}`; ax=cx0; ay=cy0-r;
+      }else if(REG[prst]){
+        const n=REG[prst], pts=[];
+        for(let i2=0;i2<n;i2++){ const a2=-Math.PI/2+i2*2*Math.PI/n;
+          pts.push(P(cx0+b.w/2*Math.cos(a2), cy0+b.h/2*Math.sin(a2))); }
+        core=`!polygon ${pts.join(" ")}`; ax=cx0; ay=R(cy0-b.h/2);
+      }else if((m=prst.match(/^(right|left|up|down)Arrow$/))){
+        const pts={right:[[x,cy0],[x+w,cy0]], left:[[x+w,cy0],[x,cy0]],
+                   up:[[cx0,y+h],[cx0,y]],    down:[[cx0,y],[cx0,y+h]]}[m[1]];
+        st.color=st.color||fill; st.fill=null; st.thick=Math.max(6,R(Math.min(w,h)/3));
+        core=`!arrow ${P(pts[0][0],pts[0][1])} ${P(pts[1][0],pts[1][1])}`; ax=pts[0][0]; ay=pts[0][1];
+        if(text){                                  // PSL lines/arrows can't hold text — place it on top
+          addUnit({spid, para:"txt", ax:x, ay:cy0-17,
+            core:`@(${x}, ${cy0-17}) `+styleStr({w:w+"px",align:"center",...(st.textcolor?{color:st.textcolor}:{})})+text});
+          text="";
+        }
+      }else{
+        if(prst==="roundRect") st.round=Math.max(8,R(Math.min(w,h)*0.15));
+        else if(!/^(rect|snip|flowChartProcess)/.test(prst))
+          note=`% (PowerPoint shape “${prst}” approximated as a rectangle)`;
+        core=`!rect ${P(x,y)} ${P(w,h)}`;
+      }
+      if(Math.abs(b.rot)>1) note=(note?note+"\n":"")+`% (shape was rotated ${R(b.rot)}° — PSL has no rotation)`;
+      addUnit({spid, core:styleStr(st)+core+(text?" "+text:""), ax:R(ax), ay:R(ay), note});
+    }
+
+    function doCxn(el,T){
+      const spid=idOf(el), b=boxOf(el,T); if(!b) return;
+      const spPr=kid(el,"spPr"), ln=spPr&&kid(spPr,"ln");
+      let x1=b.x, y1=b.y, x2=b.x+b.w, y2=b.y+b.h;
+      if(b.flipH){ const t=x1; x1=x2; x2=t; }
+      if(b.flipV){ const t=y1; y1=y2; y2=t; }
+      const isArr=n=>n&&n.getAttribute("type")&&n.getAttribute("type")!=="none";
+      let cmd="!line";
+      if(isArr(ln&&kid(ln,"tailEnd"))) cmd="!arrow";
+      else if(isArr(ln&&kid(ln,"headEnd"))){ cmd="!arrow"; let t=x1;x1=x2;x2=t; t=y1;y1=y2;y2=t; }
+      addUnit({spid, core:styleStr(strokeOf(spPr))+`${cmd} (${R(x1)}, ${R(y1)}) (${R(x2)}, ${R(y2)})`,
+               ax:R(x1), ay:R(y1)});
+    }
+
+    function doPic(el,T){
+      const spid=idOf(el);
+      const blip=q(el,"a:blip"); if(!blip) return;
+      const rid=blip.getAttribute("r:embed")||blip.getAttribute("embed");
+      const target=rels[rid]; if(!target||media[target]==null) return;
       const ext=target.split(".").pop().toLowerCase();
       const mime={png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",svg:"image/svg+xml",webp:"image/webp"}[ext];
-      if(!mime) continue;
-      const b64=await zip.file(target).async("base64");
-      const pos=getPos(pic)||{x:200,y:150,w:500};
-      out.push(`@(${pos.x}, ${pos.y}) {w=${pos.w}px} ![image](data:${mime};base64,${b64})`);
+      const b=boxOf(el,T)||{x:200,y:150,w:500};
+      addUnit({spid, ax:R(b.x), ay:R(b.y),
+        core:`@(${R(b.x)}, ${R(b.y)}) {w=${R(b.w)}px} ![image](data:${mime};base64,${media[target]})`});
+    }
+
+    function doFrame(el,T){
+      const spid=idOf(el), tbl=q(el,"a:tbl"); if(!tbl) return;
+      const rows=kidsOf(tbl,"tr").map(tr=>kidsOf(tr,"tc").map(tc=>
+        parasOf(kid(tc,"txBody")).map(p=>p.txt).filter(Boolean).join(" ")||" "));
+      if(!rows.length||!rows[0].length) return;
+      const b=boxOf(el,T);
+      const row=r=>"| "+r.join(" | ")+" |";
+      addUnit({spid, core:(b?`@(${R(b.x)}, ${R(b.y)}) `:"")+row(rows[0]), ax:b?R(b.x):null, ay:b?R(b.y):null,
+               extra:["|"+rows[0].map(()=>":---").join("|")+"|", ...rows.slice(1).map(row)]});
+    }
+
+    function walk(node,T){
+      for(const c of node.childNodes){
+        if(c.nodeType!==1) continue;
+        const nm=lname(c);
+        if(nm==="sp") doSp(c,T);
+        else if(nm==="pic") doPic(c,T);
+        else if(nm==="cxnSp") doCxn(c,T);
+        else if(nm==="graphicFrame") doFrame(c,T);
+        else if(nm==="grpSp"){
+          let T2=T;
+          const xf=xfrmOf(c);
+          if(xf){ const off=kid(xf,"off"), ext=kid(xf,"ext"), cho=kid(xf,"chOff"), che=kid(xf,"chExt");
+            if(off&&ext&&cho&&che){
+              const kx=(+ext.getAttribute("cx"))/(+che.getAttribute("cx")||1);
+              const ky=(+ext.getAttribute("cy"))/(+che.getAttribute("cy")||1);
+              T2={ax:T.ax*kx, bx:T.bx+T.ax*((+off.getAttribute("x"))-(+cho.getAttribute("x"))*kx),
+                  ay:T.ay*ky, by:T.by+T.ay*((+off.getAttribute("y"))-(+cho.getAttribute("y"))*ky)};
+            } }
+          walk(c,T2);
+        }
+      }
+    }
+    const tree=q(xml,"p:spTree");
+    if(tree) walk(tree,T0);
+
+    /* ---- 3. animation steps: "..." per click, ">>>" for after-previous ---- */
+    const d=e=>Math.round(e.dur*100)/100;
+    const enterFx=e=>{ switch(e.id){
+      case 1: return null;                                            // appear
+      case 2: case 12: case 22: case 25: return PPTX_DIR[e.sub]||"slideup";   // fly/peek/wipe/crawl in
+      case 4: case 6: case 8: case 23: case 53: return "grow";        // box/circle/diamond/zoom
+      case 26: return "drop";                                         // bounce
+      case 47: return "slideup"; case 42: return "slidedown";         // float/ascend, descend
+      default: return "fade"; } };
+    const exitFx=e=>{ switch(e.id){
+      case 2: case 12: case 22: case 25: return PPTX_DIR[e.sub]||"slidedown";
+      case 4: case 6: case 8: case 23: case 53: return "shrink";
+      default: return "fade"; } };
+
+    for(const e of effects){
+      const lines=[];
+      const targets = (byShape.get(e.spid)||[]).filter(u=>e.para==null||u.para===e.para);
+      if(e.cls==="entr"){
+        for(const u of e.units){
+          if(!u.declared) lines.push(...u.render());
+          const fx=enterFx(e);
+          if(u.declared) lines.push(`!anim ${u.label} ${fx? "enter "+fx : "show"} ${d(e)}s`);
+          else if(fx)    lines.push(`!anim ${u.label} enter ${fx} ${d(e)}s`);
+          u.declared=true;
+        }
+      }else if(e.cls==="exit"){
+        for(const u of targets) if(u.label) lines.push(`!anim ${u.label} exit ${exitFx(e)} ${d(e)}s`);
+      }else if(e.cls==="emph"){
+        for(const u of targets){ if(!u.label) continue;
+          if(e.clrTo)         lines.push(`!anim ${u.label} color ${e.clrTo} ${d(e)}s`);
+          else if(e.scaleTo)  lines.push(`!anim ${u.label} scale ${Math.round(e.scaleTo*100)/100} ${d(e)}s`);
+          else if(e.id===6)   lines.push(`!anim ${u.label} scale 1.5 ${d(e)}s`);
+          else                lines.push(`% (emphasis effect on ${u.label} has no PSL equivalent)`);
+        }
+      }else if(e.cls==="path"&&e.mpath){
+        const nums=(e.mpath.match(/-?\d*\.?\d+(?:[eE][+-]?\d+)?/g)||[]).map(Number);
+        for(const u of targets){
+          if(!u.label||u.ax==null) continue;
+          if(nums.length>=4){
+            const ex2=u.ax+nums[nums.length-2]*slideWpx, ey2=u.ay+nums[nums.length-1]*slideHpx;
+            if(nums.length>=6){
+              let mi=nums.length>>1; if(mi%2) mi--;               // a middle (x,y) pair
+              const cx2=u.ax+nums[mi]*slideWpx, cy2=u.ay+nums[mi+1]*slideHpx;
+              lines.push(`!anim ${u.label} path (${R(cx2)}, ${R(cy2)}) (${R(ex2)}, ${R(ey2)}) ${d(e)}s`);
+            }else lines.push(`!anim ${u.label} move (${R(ex2)}, ${R(ey2)}) ${d(e)}s`);
+          }
+        }
+      }
+      if(!lines.length) continue;
+      if(e.when==="clickEffect")      out.push("...");
+      else if(e.when==="afterEffect") out.push(">>>");
+      out.push(...lines);
     }
   }
-  return out.join("\n")+"\n";
+  return out.join("\n").replace(/\n{3,}/g,"\n\n")+"\n";
 }
 
  /* ---------- boot: viewer mode via URL, else the sample deck ----------
