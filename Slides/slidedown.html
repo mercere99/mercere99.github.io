@@ -2004,15 +2004,8 @@ const DEMO_IMG="data:image/svg+xml;utf8,"+encodeURIComponent(
 </svg>`);
 
 const SAMPLE=`% ===== A tour of the Portable Slide Language (PSL) =====
-% Deck-wide settings can go anywhere; the top is conventional:
 # SlideDown
 ## A tour of the Portable Slide Language.
-% Everything after !all is pasted onto EVERY slide (evaluated per slide):
-!all
-@(1225, 688) {size=18px, anchor=center} \${slide_num} / \${num_slides}
-!if slide_hidden
-@(640, 42) {size=22px, color=#b03030, anchor=center} &mdash; POCKET SLIDE &mdash;
-!endif
 ---
 ### Basics
 Plain lines become paragraphs. Inline **bold**, *italic*, and \`code\` all work.
@@ -2037,7 +2030,7 @@ Each press of the spacebar reveals the next chunk:
 ---
 ### Placement, images, and styling
 % Position anything with @(x,y) — fractions of the slide, or pixels.
-@(0.55, 0.18) {w=0.34} ![A friendly specimen](${DEMO_IMG})
+@(0.6, 0.2) {w=0.34} ![A friendly specimen](${DEMO_IMG})
 - Bullets still flow on the left
 - {color=#b03030, size=36px} Styled text via {color=..., size=...}
 - @(0.58, 0.72) This line was placed with @(0.58, 0.72)
@@ -2088,9 +2081,9 @@ Each press of the spacebar reveals the next chunk:
 @(0.30, 0.45) {size=44px, color=#1f6f6b} *…and it's gone.*
 ---
 % A dimmed background keeps text readable over a busy image.
-{dim=0.55, tint=#0a1a2a} !bg(${DEMO_IMG})
-### Dimmed backgrounds
-{color=#f4f1ea} The background image is scrimmed 55% so this text stays legible.
+{dim=0.85, tint=#0a1a2a} !bg(${DEMO_IMG})
+{color=#f4f1ea} ### Dimmed backgrounds
+{color=#f4f1ea} The background image is scrimmed 85% so this text stays legible.
 - {color=#e8e4dc} Use {dim=0.0–1.0} and an optional {tint=#color}
 - {color=#e8e4dc} Or dim on its own line: \`!dim 0.4\`
 ---
@@ -2106,12 +2099,12 @@ Each press of the spacebar reveals the next chunk:
 ---
 % Embed any web app you've built by URL. Position and size like an image.
 ### Embedded web apps
-[app] @(0.30, 0.16) {w=0.62, h=0.68} !embed(https://example.com)
+[app] @(0.35, 0.25) {w=0.62, h=0.68} !embed(https://msu.edu)
 - Live iframe in present mode
 - Thumbnails show a lightweight placeholder
 - Animate it: move, scale, size, hide/show
 ...
-!anim app scale 0.9 0.5s
+!anim app scale 0.4 0.5s
 ---
 ### Code blocks
 Fenced code is highlighted automatically (C++, Python, JS, and more):
@@ -2157,7 +2150,7 @@ Skipped when advancing &mdash; but reachable from the overview (v) or a thumbnai
 - It still *executes*: \`!set bonus 42\` above gives bonus = \${bonus} here and on later slides
 - The watermark on top comes from \`!if slide_hidden\` inside the \`!all\` block
 ---
-### Loops & conditionals
+### Loops &amp; conditionals
 !foreach i 0 5
 [dot\${i}] {fill=#1f6f6b, color=#1f6f6b} !circle (\${180 + i*180}, \${560 - 80*sin(i*pi/5)}) \${14 + i*4}
 !endfor
@@ -2168,6 +2161,10 @@ Skipped when advancing &mdash; but reachable from the overview (v) or a thumbnai
 !endfor
 - One keypress, six simultaneous animations with staggered durations
 ...
+!foreach i 0 5
+!anim dot\${i} move (\${180 + i*180}, 400) 0.5s
+!endfor
+>>>
 !if num_slides > 10
 - This bullet exists because \`!if num_slides > 10\` is true (\${num_slides} slides)
 !endif
@@ -2177,11 +2174,23 @@ Skipped when advancing &mdash; but reachable from the overview (v) or a thumbnai
 [dia] {color=#8a4b9b, thick=5} !diamond (580, 385) (190, 200) choice?
 [st] {color=#e2a84b, fill=#e2a84b33, thick=4} !star (880, 385) 5 115 46
 [wave] {color=#b03030, thick=5} !polyline (1040,300)(1090,410)(1140,300)(1190,410)(1240,300)
-{thick=4} !curve (\${hex.cx + 115}, \${hex.cy}) (\${(hex.cx + dia.cx)/2}, \${hex.cy - 160}) (\${dia.cx - 110}, \${dia.cy - 30})
+[arc] {thick=6} !curve (\${hex.cx + 115}, \${hex.cy}) (\${(hex.cx + dia.cx)/2}, \${hex.cy - 160}) (\${dia.cx - 110}, \${dia.cy - 30})
 @(140, 570) {size=24px} polygon &middot; diamond &middot; star &middot; curve &middot; polyline &mdash; every vertex animates via \`point n\`
 ...
 !anim st point 1 (880, 160) 0.7s
+!anim st point 5 (980, 660) 0.7s
+>>>
 !anim wave move (1040, 460) 0.7s
+>>>
+!anim hex point 6 (240,270) 0.7s
+!anim hex point 1 (340,330) 0.7s
+!anim hex point 2 (340,440) 0.7s
+!anim hex point 3 (240,500) 0.7s
+!anim hex point 4 (140,440) 0.7s
+!anim hex point 5 (140,330) 0.7s
+>>>
+!anim dia move (645,295)
+!anim arc point 3 (\${dia.cx - 30}, \${dia.cy + 50})
 ---
 ### Tables
 Markdown pipe tables, with optional alignment markers:
@@ -2195,6 +2204,13 @@ Markdown pipe tables, with optional alignment markers:
 - \`!set bg\` / \`!set color\` / \`!set accent\` — default background & colors
 - \`!set font\` and \`!set headfont\` — change every slide's fonts
 - {font=Courier New, monospace} …or per element: {font=Courier New, monospace}
+
+% Everything after !all is pasted onto EVERY slide (evaluated per slide):
+!all
+@(1225, 688) {size=18px, anchor=center} \${slide_num} / \${num_slides}
+!if slide_hidden
+@(640, 42) {size=22px, color=#b03030, anchor=center} &mdash; POCKET SLIDE &mdash;
+!endif
 ---
 # That's the tour
 ## space · n/p · Backspace · v · b · f — and ? for the full reference
