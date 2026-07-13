@@ -16,7 +16,6 @@
     --strike:#B3402F;
     --accent:#2B5FC7;
     --win:#2F7D4F;
-    --warn:#B07A1E;
     --chip:#E7EEF9;
   }
   *{box-sizing:border-box}
@@ -32,6 +31,10 @@
     display:flex; flex-direction:column; align-items:center;
     padding:24px 16px 48px;
   }
+  .gamenav{flex-basis:100%; font-size:.8rem; color:var(--cand); letter-spacing:.03em; margin-top:-4px;}
+  .gamenav a{color:var(--accent); text-decoration:none;}
+  .gamenav a:hover{text-decoration:underline;}
+  .gamenav b{color:var(--ink);}
   header{
     width:min(92vw,600px);
     display:flex; align-items:baseline; justify-content:space-between;
@@ -50,6 +53,13 @@
     cursor:pointer;
   }
   button:hover:not(:disabled){ background:var(--ink); color:var(--paper); }
+  input#symbols{
+    font:inherit; font-size:.85rem; padding:6px 10px; border-radius:6px;
+    border:1.5px solid var(--grid-light); background:var(--paper); color:var(--ink); width:11ch;
+  }
+  input#symbols:focus-visible{ outline:2.5px solid var(--accent); outline-offset:2px; }
+  .cell.samesym{ background:#E7EFFB; }
+  .cell.given.samesym{ box-shadow: inset 0 0 0 9999px rgba(43,95,199,.10); }
   button:disabled{ opacity:.35; cursor:default; }
   button:focus-visible, select:focus-visible, summary:focus-visible{
     outline:2.5px solid var(--accent); outline-offset:2px;
@@ -87,16 +97,6 @@
     padding:1px 6px; margin-right:4px; color:var(--ink); white-space:nowrap;
   }
   .seqstep.hard{ background:var(--accent); color:#fff; }
-
-  /* ---------- assist bar (Check / Help feedback) ---------- */
-  #assist{
-    width:min(92vw,600px); min-height:26px; margin-bottom:10px;
-    font-size:.85rem; line-height:1.45;
-  }
-  #assist .msg{ padding:6px 12px; border-radius:6px; border:1.5px solid; display:inline-block; }
-  #assist .good{ color:var(--win);    border-color:var(--win);    background:#EAF4EC; }
-  #assist .bad { color:var(--strike); border-color:var(--strike); background:#F9ECE9; }
-  #assist .info{ color:var(--ink);    border-color:var(--accent); background:var(--chip); }
 
   .saverow{
     width:min(92vw,600px);
@@ -140,10 +140,7 @@
     opacity:0; pointer-events:none;
     background:#F3F7FE;
   }
-  .cell.empty:hover .cands, .cell.pinned .cands, .cell.reveal .cands{
-    opacity:1; pointer-events:auto;
-  }
-  .cell.reveal .cands{ background:transparent; }
+  .cell.empty:hover .cands, .cell.pinned .cands{ opacity:1; pointer-events:auto; }
   .cand{
     display:flex; align-items:center; justify-content:center;
     font-family:system-ui, sans-serif;
@@ -156,15 +153,6 @@
     color:var(--strike); text-decoration:line-through; opacity:.55; cursor:pointer;
   }
   .cand.x:hover{ opacity:1; background:#F7E4E0; }
-
-  /* ---------- Check / Help highlights ---------- */
-  .cell.wrong{ background:#F7DAD4; }
-  .cell.wrong.user{ color:var(--strike); }
-  .cell.badnote{ box-shadow: inset 0 0 0 2.5px var(--warn); }
-  .cell.hintpat{ box-shadow: inset 0 0 0 2.5px var(--accent); background:#EDF2FC; }
-  .cell.hinttarget{ background:#F7E4E0; }
-  .cell.hintplace{ background:#DEF0E3; box-shadow: inset 0 0 0 2.5px var(--win); }
-
   #banner{
     position:absolute; inset:0; display:none;
     align-items:center; justify-content:center;
@@ -179,27 +167,11 @@
   }
   @keyframes stamp{ from{ transform:rotate(-3deg) scale(1.6); opacity:0; } to{ transform:rotate(-3deg) scale(1); opacity:1; } }
   @media (prefers-reduced-motion: reduce){ #banner .msg{ animation:none; } }
-
   footer{
     width:min(92vw,600px); margin-top:14px;
     font-size:.78rem; color:var(--cand); line-height:1.5;
   }
   footer b{ color:var(--ink); font-weight:600; }
-
-  /* ---------- technique glossary ---------- */
-  #glossary{
-    width:min(92vw,600px); margin-top:12px;
-    background:var(--paper); border:1.5px solid var(--grid-light); border-radius:6px;
-    padding:8px 14px; font-size:.8rem; line-height:1.5;
-  }
-  #glossary summary{
-    cursor:pointer; user-select:none; font-size:.75rem;
-    letter-spacing:.08em; text-transform:uppercase; color:var(--cand);
-  }
-  #glossary dl{ margin:10px 0 4px; }
-  #glossary dt{ font-weight:700; margin-top:8px; }
-  #glossary dt .tno{ color:var(--cand); font-weight:400; font-size:.72rem; margin-left:.4em; }
-  #glossary dd{ margin:1px 0 0 0; color:#3D4657; }
 </style>
 </head>
 <body>
@@ -208,18 +180,15 @@
   <h1>Sudoku<span class="sub">pencil-mark edition</span></h1>
   <div class="controls">
     <select id="difficulty" aria-label="Difficulty">
-      <option value="0">Beginner</option>
-      <option value="1">Easy</option>
-      <option value="2" selected>Medium</option>
-      <option value="3">Hard</option>
-      <option value="4">Expert</option>
+      <option value="40">Easy</option>
+      <option value="32" selected>Medium</option>
+      <option value="26">Hard</option>
     </select>
     <button id="newBtn">New</button>
     <button id="undoBtn" disabled>Undo</button>
     <button id="saveBtn">Save point</button>
-    <button id="checkBtn">Check</button>
-    <button id="helpBtn">Help</button>
   </div>
+  <div class="gamenav"><b>Sudoku</b> · <a href="kakuro.html">Kakuro</a> · <a href="slitherlink.html">Slitherlink</a></div>
 </header>
 
 <div id="profileCard">
@@ -231,8 +200,6 @@
     <div class="seq" id="seqBody"></div>
   </details>
 </div>
-
-<div id="assist"></div>
 
 <div class="saverow" id="saverow">
   <span class="label">Save points</span>
@@ -247,43 +214,10 @@
 <footer>
   <b>Hover</b> an empty cell to see every digit with no immediate conflict.
   <b>Click</b> a digit to place it · <b>Ctrl/⌘-click</b> to strike it from the options (Ctrl/⌘-click again to restore) ·
-  <b>click a placed digit</b> to clear it. Type <b>1–9</b> over a hovered cell, or <b>Backspace</b> to clear.
-  <b>Check</b> flags wrong entries and pencil strikes that removed a correct digit.
-  <b>Help</b> highlights the easiest applicable technique: <span style="color:var(--accent)">blue</span> cells form
-  the pattern, <span style="color:var(--strike)">red</span> cells lose a candidate,
-  <span style="color:var(--win)">green</span> marks a placement.
-  Everything is computed by the C++/WebAssembly engine.
+  <b>click a placed digit</b> to clear it. You can also type <b>1–9</b> over a hovered cell, or <b>Backspace</b> to clear.
+  The difficulty profile is computed in C++/WebAssembly: it repeatedly applies the easiest human technique that makes
+  progress, so the hardest tier reached and the total step count preview the solving experience.
 </footer>
-
-<details id="glossary">
-  <summary>What the techniques mean</summary>
-  <dl>
-    <dt>Naked single<span class="tno">T1</span></dt>
-    <dd>A cell has only one digit left that doesn't conflict with its row, column, and box — place it.</dd>
-    <dt>Hidden single<span class="tno">T2</span></dt>
-    <dd>Within one row, column, or box, there is only one cell where a digit can still go — place it there, even if that cell has other candidates.</dd>
-    <dt>Locked candidates<span class="tno">T3</span></dt>
-    <dd>Inside a box, all of a digit's possible cells lie in a single row or column (or the reverse). The digit must land there, so remove it from the rest of that row/column (or box).</dd>
-    <dt>Naked pair<span class="tno">T4</span></dt>
-    <dd>Two cells in a region allow exactly the same two digits. The pair uses those digits up, so remove them from every other cell in the region.</dd>
-    <dt>Hidden pair<span class="tno">T5</span></dt>
-    <dd>Two digits can only appear in the same two cells of a region. Those cells must hold that pair, so strip all their other candidates.</dd>
-    <dt>Naked triple<span class="tno">T6</span> &amp; Hidden triple<span class="tno">T7</span></dt>
-    <dd>The pair ideas extended to three cells and three digits. In a naked triple the cells needn't each hold all three digits — their options together just can't exceed the three.</dd>
-    <dt>Naked quad<span class="tno">T8</span> &amp; Hidden quad<span class="tno">T9</span></dt>
-    <dd>The same with four cells and four digits. Rare, but purely mechanical to verify once spotted.</dd>
-    <dt>X-Wing<span class="tno">T10</span></dt>
-    <dd>Across two rows, a digit fits only in the same two columns, forming a rectangle. One diagonal pair of corners must hold it, so remove the digit from the rest of those two columns (also works with rows and columns swapped).</dd>
-    <dt>Skyscraper / kite<span class="tno">T11</span></dt>
-    <dd>Two regions each have exactly two spots for a digit ("strong links"). If one end of each link sees the other, then one of the two remaining ends must hold the digit — remove it from any cell that sees both of those ends.</dd>
-    <dt>XY-Wing<span class="tno">T12</span></dt>
-    <dd>A pivot cell with candidates XY sees one cell with XZ and one with YZ. Whichever digit the pivot takes, one pincer becomes Z — remove Z from cells that see both pincers.</dd>
-    <dt>XYZ-Wing<span class="tno">T13</span></dt>
-    <dd>Like XY-Wing, but the pivot holds XYZ itself. Z is guaranteed among the three cells, so it's removed only from cells that see the pivot and both pincers.</dd>
-    <dt>Swordfish<span class="tno">T14</span> &amp; Jellyfish<span class="tno">T15</span></dt>
-    <dd>X-Wing extended to three (Swordfish) or four (Jellyfish) rows and columns. Each base line may hold the digit in two or more spots, as long as together they stay inside the matching columns (or rows).</dd>
-  </dl>
-</details>
 
 <script>
 /*__WASM_JS__*/
@@ -303,13 +237,12 @@ function peersMask(vals, idx) {
 }
 
 /* ---------- WASM engine ---------- */
-let engine = null;
+let engine = null;                    // { generate(targetClues, seed) -> obj }
 const enginePromise = createSudokuModule().then(M => {
+  const gen = M.cwrap("generate", "string", ["number", "number"]);
+  const prof = M.cwrap("profile_board", "string", ["number"]); // string arg handled by ccall below
   engine = {
-    generateLevel: (level, seed) =>
-      JSON.parse(M.ccall("generate_level", "string", ["number", "number"], [level, seed])),
-    hint: (givens, values, elims) =>
-      JSON.parse(M.ccall("hint", "string", ["string", "string", "string"], [givens, values, elims])),
+    generate: (target, seed) => JSON.parse(gen(target, seed)),
     profileBoard: b => JSON.parse(M.ccall("profile_board", "string", ["string"], [b])),
   };
 });
@@ -322,24 +255,11 @@ let undoStack = [];
 let savepoints = [];
 let pinnedIdx = -1;
 let hoverIdx  = -1;
-let puzzleInfo = null;
-const marks = { wrong: new Set(), badnote: new Set(), pattern: new Set(),
-                targets: new Set(), place: -1 };
+let puzzleInfo = null;                // parsed JSON from the engine
 
 const snapshot = () => ({ values: [...values], elim: [...elim] });
 const restore  = s  => { values = [...s.values]; elim = [...s.elim]; };
 const pushUndo = () => { undoStack.push(snapshot()); };
-
-/* ---------- assist bar & highlight marks ---------- */
-const assistEl = document.getElementById("assist");
-function clearAssist() {
-  marks.wrong.clear(); marks.badnote.clear();
-  marks.pattern.clear(); marks.targets.clear(); marks.place = -1;
-  assistEl.textContent = "";
-}
-function setAssist(kind, html) {
-  assistEl.innerHTML = `<span class="msg ${kind}">${html}</span>`;
-}
 
 /* ---------- rendering ---------- */
 const boardEl  = document.getElementById("board");
@@ -355,10 +275,12 @@ function render() {
     cell.dataset.idx = i;
     if (givens[i]) {
       cell.classList.add("given");
-      cell.textContent = givens[i];
+      cell.textContent = SYM[givens[i] - 1];
+      cell.dataset.v = givens[i];
     } else if (values[i]) {
       cell.classList.add("user");
-      cell.textContent = values[i];
+      cell.textContent = SYM[values[i] - 1];
+      cell.dataset.v = values[i];
       cell.title = "Click to clear";
     } else {
       cell.classList.add("empty");
@@ -371,7 +293,7 @@ function render() {
         s.className = "cand";
         if (open & (1 << d)) {
           s.dataset.d = d;
-          s.textContent = d;
+          s.textContent = SYM[d - 1];
           if (elim[i] & (1 << d)) { s.classList.add("x"); s.title = "Ctrl/⌘-click to restore"; }
           else                    { s.classList.add("ok"); }
         }
@@ -379,11 +301,6 @@ function render() {
       }
       cell.appendChild(cands);
     }
-    if (marks.wrong.has(i))   cell.classList.add("wrong");
-    if (marks.badnote.has(i)) cell.classList.add("badnote");
-    if (marks.pattern.has(i)) cell.classList.add("hintpat", "reveal");
-    if (marks.targets.has(i)) cell.classList.add("hinttarget", "reveal");
-    if (marks.place === i)    cell.classList.add("hintplace", "reveal");
     frag.appendChild(cell);
   }
   boardEl.appendChild(frag);
@@ -413,9 +330,7 @@ function renderSavepoints() {
     b.className = "sp";
     b.textContent = "⤺ " + sp.label;
     b.title = "Revert board to this save point";
-    b.addEventListener("click", () => {
-      pushUndo(); clearAssist(); restore(sp.snap); pinnedIdx = -1; render();
-    });
+    b.addEventListener("click", () => { pushUndo(); restore(sp.snap); pinnedIdx = -1; render(); });
     row.appendChild(b);
   });
 }
@@ -431,11 +346,6 @@ function renderProfile(info) {
   const names = info.techNames;
   const mk = (cls, html) => { const d = document.createElement("span"); d.className = cls; d.innerHTML = html; return d; };
 
-  if (info.level) {
-    const lv = mk("metric", `Level: <b>${info.level}</b>`);
-    lv.title = `Matched the target profile window on generation attempt ${info.attempts}`;
-    head.appendChild(lv);
-  }
   if (info.hardest > 0)
     head.appendChild(mk("metric hardest",
       `Hardest technique: <b>${names[info.hardest]}</b> (T${info.hardest})`));
@@ -461,9 +371,9 @@ function renderProfile(info) {
 }
 
 /* ---------- actions ---------- */
-function setVal(idx, d)    { pushUndo(); clearAssist(); values[idx] = d; pinnedIdx = -1; render(); }
-function clearVal(idx)     { pushUndo(); clearAssist(); values[idx] = 0; render(); }
-function toggleElim(idx, d){ pushUndo(); clearAssist(); elim[idx] ^= (1 << d); render(); }
+function setVal(idx, d)    { pushUndo(); values[idx] = d; pinnedIdx = -1; render(); }
+function clearVal(idx)     { pushUndo(); values[idx] = 0; render(); }
+function toggleElim(idx, d){ pushUndo(); elim[idx] ^= (1 << d); render(); }
 
 boardEl.addEventListener("click", e => {
   const candEl = e.target.closest(".cand");
@@ -484,17 +394,29 @@ boardEl.addEventListener("click", e => {
   }
 });
 
+function clearSame() {
+  boardEl.querySelectorAll(".samesym").forEach(el => el.classList.remove("samesym"));
+}
 boardEl.addEventListener("mouseover", e => {
   const cellEl = e.target.closest(".cell");
   hoverIdx = cellEl ? +cellEl.dataset.idx : -1;
+  clearSame();
+  if (cellEl && cellEl.dataset.v) {
+    const v = cellEl.dataset.v;
+    boardEl.querySelectorAll(`.cell[data-v="${v}"]`).forEach(el => {
+      if (el !== cellEl) el.classList.add("samesym");
+    });
+  }
 });
-boardEl.addEventListener("mouseleave", () => { hoverIdx = -1; });
+boardEl.addEventListener("mouseleave", () => { hoverIdx = -1; clearSame(); });
 
 document.addEventListener("keydown", e => {
   const idx = pinnedIdx !== -1 ? pinnedIdx : hoverIdx;
   if (idx === -1 || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key >= "1" && e.key <= "9") {
-    const d = +e.key;
+  let d = 0;
+  if (e.key >= "1" && e.key <= "9") d = +e.key;
+  else { const k = SYM.indexOf(e.key); if (k >= 0) d = k + 1; }
+  if (d) {
     if (!givens[idx] && values[idx] === 0) {
       const open = ALL & ~peersMask(values, idx);
       if ((open & (1 << d)) && !(elim[idx] & (1 << d))) setVal(idx, d);
@@ -506,7 +428,7 @@ document.addEventListener("keydown", e => {
 
 document.getElementById("undoBtn").addEventListener("click", () => {
   const s = undoStack.pop();
-  if (s) { clearAssist(); restore(s); pinnedIdx = -1; render(); }
+  if (s) { restore(s); pinnedIdx = -1; render(); }
 });
 
 document.getElementById("saveBtn").addEventListener("click", () => {
@@ -514,76 +436,34 @@ document.getElementById("saveBtn").addEventListener("click", () => {
   renderSavepoints();
 });
 
-/* ---------- Check ---------- */
-document.getElementById("checkBtn").addEventListener("click", () => {
-  if (!puzzleInfo) return;
-  clearAssist();
-  const sol = puzzleInfo.solution;
-  let wrong = 0, badnotes = 0;
-  for (let i = 0; i < 81; i++) {
-    if (!givens[i] && values[i] && values[i] !== +sol[i]) { marks.wrong.add(i); wrong++; }
-    if (!values[i] && (elim[i] & (1 << +sol[i])))         { marks.badnote.add(i); badnotes++; }
-  }
-  render();
-  if (!wrong && !badnotes) {
-    setAssist("good", isSolved() ? "Solved — every cell is correct."
-                                 : "Everything checks out so far.");
-  } else {
-    const parts = [];
-    if (wrong)    parts.push(`${wrong} incorrect ${wrong > 1 ? "entries" : "entry"}`);
-    if (badnotes) parts.push(`${badnotes} pencil strike${badnotes > 1 ? "s" : ""} that removed a correct digit`);
-    setAssist("bad", "Found " + parts.join(" and ") + " — highlighted on the board.");
-  }
-});
-
-/* ---------- Help ---------- */
-document.getElementById("helpBtn").addEventListener("click", async () => {
-  if (!puzzleInfo) return;
-  await enginePromise;
-  clearAssist();
-  const h = engine.hint(puzzleInfo.givens, values.join(""), elim.join(","));
-  if (h.error) {
-    if (h.error === "solved") {
-      setAssist("good", "The puzzle is already solved!");
-    } else if (h.error === "mistakes") {
-      h.cells.forEach(c => marks.wrong.add(c));
-      setAssist("bad", "There are incorrect entries — fix the highlighted cells before hinting.");
-    } else if (h.error === "badnotes") {
-      h.cells.forEach(c => marks.badnote.add(c));
-      setAssist("bad", "Some pencil strikes removed a correct digit — restore them in the highlighted cells first.");
-    } else {
-      setAssist("bad", "No technique on the ladder applies here — this position needs trial and error (use a save point!).");
-    }
-  } else {
-    h.pattern.forEach(c => marks.pattern.add(c));
-    (h.targets || []).forEach(c => marks.targets.add(c));
-    if (h.place !== undefined) marks.place = h.place;
-    setAssist("info", `<b>${h.name}</b> (T${h.tier}) — ${h.desc}`);
-  }
-  render();
-});
-
-/* ---------- New ---------- */
 document.getElementById("newBtn").addEventListener("click", newGame);
 
 async function newGame() {
   await enginePromise;
-  clearAssist();
   renderProfile(null);
-  const level = +document.getElementById("difficulty").value;
+  const target = +document.getElementById("difficulty").value;
   const seed = (Math.random() * 0x7fffffff) | 0;
-  setTimeout(() => {                       // let "Generating…" paint first
-    puzzleInfo = engine.generateLevel(level, seed);
-    givens = [...puzzleInfo.givens].map(ch => +ch);
-    values = [...givens];
-    elim = new Array(81).fill(0);
-    undoStack = [];
-    savepoints = [];
-    pinnedIdx = -1;
-    render();
-    renderProfile(puzzleInfo);
-  }, 10);
+  puzzleInfo = engine.generate(target, seed);
+  givens = [...puzzleInfo.givens].map(ch => +ch);
+  values = [...givens];
+  elim = new Array(81).fill(0);
+  undoStack = [];
+  savepoints = [];
+  pinnedIdx = -1;
+  render();
+  renderProfile(puzzleInfo);
 }
+
+document.getElementById("symbols").addEventListener("change", async e => {
+  const raw = Array.from(e.target.value).filter(ch => ch.trim() !== "");
+  const uniq = [...new Set(raw)];
+  if (e.target.value.trim() === "") SYM = ["1","2","3","4","5","6","7","8","9"];
+  else if (uniq.length === 9) SYM = uniq;
+  else { setAssist("bad", "Symbols must be exactly nine distinct characters — reverting to 1-9."); SYM = ["1","2","3","4","5","6","7","8","9"]; e.target.value = ""; }
+  await enginePromise;
+  engine.setSymbols(SYM.join(","));
+  render();
+});
 
 newGame();
 </script>

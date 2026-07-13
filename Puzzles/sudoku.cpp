@@ -37,6 +37,51 @@
 #define EXPORT
 #endif
 
+// std::expected where available (C++23); otherwise an API-compatible subset
+// so the public evaluation API keeps one signature everywhere (the Ubuntu
+// emscripten 3.1.6 toolchain ships a libc++ without <expected>).
+#if __has_include(<expected>)
+#include <expected>
+template <class T, class E> using Expected = std::expected<T, E>;
+template <class E> using Unexpected = std::unexpected<E>;
+#else
+template <class E> struct Unexpected { E error; explicit Unexpected(E e) : error(e) {} };
+template <class T, class E>
+class Expected {
+  bool ok_;
+  T val_{};
+  E err_{};
+ public:
+  Expected(T v) : ok_(true), val_(std::move(v)) {}
+  Expected(Unexpected<E> u) : ok_(false), err_(u.error) {}
+  bool has_value() const { return ok_; }
+  explicit operator bool() const { return ok_; }
+  T& value() { return val_; }
+  const T& value() const { return val_; }
+  E& error() { return err_; }
+  const E& error() const { return err_; }
+  T* operator->() { return &val_; }
+  const T* operator->() const { return &val_; }
+  T& operator*() { return val_; }
+  const T& operator*() const { return val_; }
+};
+#endif
+
+// Public profiling types (returned by the evaluation API below).
+struct Step { int tech, count; };
+struct Profile {
+  std::vector<Step> steps;          // (tier, applications) in solving order
+  bool solved_logically = false;    // did the ladder finish the puzzle?
+  int  hardest = 0, total = 0;      // hardest tier used; total applications
+};
+
+/// Failure modes of evaluate_puzzle.
+enum class EvalError {
+  NoSolution,            // the clues admit no completion
+  MultipleSolutions,     // more than one completion exists
+  SearchLimitExceeded,   // solver hit its node budget before deciding
+};
+
 namespace {
 
 // ----------------------------------------------------------------- basics --
@@ -105,12 +150,6 @@ std::string region_name(int g) {
   if (g < 18) return "column " + std::to_string(g - 8);
   return "box " + std::to_string(g - 17);
 }
-std::string digit_set(Mask m) {
-  std::string s = "{";
-  for (int d = 1; d <= 9; ++d)
-    if (m & (1 << d)) { if (s.size() > 1) s += ","; s += std::to_string(d); }
-  return s + "}";
-}
 std::string cells_list(const std::vector<int>& cs) {
   std::string s;
   for (size_t k = 0; k < cs.size(); ++k) { if (k) s += ", "; s += cell_name(cs[k]); }
@@ -146,7 +185,12 @@ struct State {
 };
 
 // ---------------------------------------------- uniqueness solver (MRV) ----
+long long g_solver_nodes = 0;
+long long g_solver_cap = 1LL << 60;
+bool g_solver_capped = false;
+
 int count_solutions(std::array<int, 81>& v, int limit) {
+  if (++g_solver_nodes > g_solver_cap) { g_solver_capped = true; return limit; }
   int best = -1, best_n = 10;
   Mask best_m = 0;
   for (int i = 0; i < 81; ++i)
@@ -192,6 +236,18 @@ bool fill_solved(std::array<int, 81>& v, std::mt19937& rng) {
   }
   v[best] = 0;
   return false;
+}
+
+// -------------------------------------------------------------- symbols ----
+// Display symbols for digits 1..9 (used only in human-facing descriptions;
+// the engine always works with 1..9 internally).
+std::array<std::string, 10> g_sym = {"", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
+const std::string& sym(int d) { return g_sym[d]; }
+std::string sym_set(Mask m) {
+  std::string s = "{";
+  for (int d = 1; d <= 9; ++d)
+    if (m & (1 << d)) { if (s.size() > 1) s += ","; s += sym(d); }
+  return s + "}";
 }
 
 // ------------------------------------------------------------- techniques --
@@ -258,7 +314,7 @@ void scan_naked_single(const State& s, std::vector<Found>& out) {
       f.pattern = {i};
       if (g_desc)
         f.desc = cell_name(i) + " has only one possible digit: " +
-                 std::to_string(f.place_digit) + ".";
+                 sym(f.place_digit) + ".";
       out.push_back(std::move(f));
     }
 }
@@ -276,7 +332,7 @@ void scan_hidden_single(const State& s, std::vector<Found>& out) {
       f.place_digit = d;
       f.pattern = {pos};
       if (g_desc)
-        f.desc = "Within " + region_name(g) + ", " + std::to_string(d) +
+        f.desc = "Within " + region_name(g) + ", " + sym(d) +
                  " fits only in " + cell_name(pos) + ".";
       out.push_back(std::move(f));
     }
@@ -298,9 +354,9 @@ void scan_locked(const State& s, std::vector<Found>& out) {
           pat.for_each([&](int c) { f.pattern.push_back(c); });
           targets.for_each([&](int c) { f.elims.push_back({c, Mask(1 << d)}); });
           if (g_desc)
-            f.desc = "In " + region_name(inside) + ", " + std::to_string(d) +
+            f.desc = "In " + region_name(inside) + ", " + sym(d) +
                      " is confined to " + region_name(outside) + " — remove " +
-                     std::to_string(d) + " from the rest of " + region_name(outside) + ".";
+                     sym(d) + " from the rest of " + region_name(outside) + ".";
           out.push_back(std::move(f));
         };
         if (!in_box.empty() && in_box.subset_of(inter))            // pointing
@@ -335,7 +391,7 @@ void scan_naked_set(const State& s, int K, std::vector<Found>& out) {
         if (f.elims.empty()) return;
         if (g_desc)
           f.desc = "In " + region_name(g) + ", cells " + cells_list(f.pattern) +
-                   " together hold only " + digit_set(uni) + " — remove those digits from the region's other cells.";
+                   " together hold only " + sym_set(uni) + " — remove those digits from the region's other cells.";
         out.push_back(std::move(f));
         return;
       }
@@ -370,7 +426,7 @@ void scan_hidden_set(const State& s, int K, std::vector<Found>& out) {
         }
         if (f.elims.empty()) return;
         if (g_desc)
-          f.desc = "Within " + region_name(g) + ", digits " + digit_set(keep) +
+          f.desc = "Within " + region_name(g) + ", digits " + sym_set(keep) +
                    " fit only in " + cells_list(f.pattern) + " — those cells can hold nothing else.";
         out.push_back(std::move(f));
         return;
@@ -430,10 +486,10 @@ void scan_line_fish(const State& s, int N, std::vector<Found>& out) {
             };
             int covers[4], nc = 0;
             for (unsigned p = uni; p; p &= p - 1) covers[nc++] = lowest_bit(p);
-            f.desc = std::string(fish_name) + " on " + std::to_string(d) + ": " +
-                     line_list(base.data(), N, orient) + " hold " + std::to_string(d) +
+            f.desc = std::string(fish_name) + " on " + sym(d) + ": " +
+                     line_list(base.data(), N, orient) + " hold " + sym(d) +
                      " only within " + line_list(covers, N, !orient) + " — remove " +
-                     std::to_string(d) + " from the rest of those lines.";
+                     sym(d) + " from the rest of those lines.";
           }
           out.push_back(std::move(f));
           return;
@@ -480,11 +536,11 @@ void scan_turbot(const State& s, std::vector<Found>& out) {
             f.pattern = {A, B, C, D};
             targets.for_each([&](int c) { f.elims.push_back({c, Mask(1 << d)}); });
             if (g_desc)
-              f.desc = "Skyscraper/kite on " + std::to_string(d) + ": strong links " +
+              f.desc = "Skyscraper/kite on " + sym(d) + ": strong links " +
                        cell_name(A) + "=" + cell_name(B) + " and " + cell_name(C) + "=" +
                        cell_name(D) + " connect through " + cell_name(B) + "–" + cell_name(C) +
                        ", so " + cell_name(A) + " or " + cell_name(D) + " must be " +
-                       std::to_string(d) + " — remove " + std::to_string(d) +
+                       sym(d) + " — remove " + sym(d) +
                        " from cells that see both.";
             out.push_back(std::move(f));
           }
@@ -517,10 +573,10 @@ void scan_xy_wing(const State& s, std::vector<Found>& out) {
         f.pattern = {p, q, r};
         targets.for_each([&](int c) { f.elims.push_back({c, z}); });
         if (g_desc)
-          f.desc = "XY-Wing: pivot " + cell_name(p) + " " + digit_set(pm) +
-                   " with pincers " + cell_name(q) + " " + digit_set(qm) + " and " +
-                   cell_name(r) + " " + digit_set(rm) + " — one pincer must be " +
-                   std::to_string(lowest_bit(z)) + "; remove it from cells seeing both pincers.";
+          f.desc = "XY-Wing: pivot " + cell_name(p) + " " + sym_set(pm) +
+                   " with pincers " + cell_name(q) + " " + sym_set(qm) + " and " +
+                   cell_name(r) + " " + sym_set(rm) + " — one pincer must be " +
+                   sym(lowest_bit(z)) + "; remove it from cells seeing both pincers.";
         out.push_back(std::move(f));
       }
   }
@@ -551,10 +607,10 @@ void scan_xyz_wing(const State& s, std::vector<Found>& out) {
         f.pattern = {p, q, r};
         targets.for_each([&](int c) { f.elims.push_back({c, z}); });
         if (g_desc)
-          f.desc = "XYZ-Wing: pivot " + cell_name(p) + " " + digit_set(s.cand[p]) +
-                   " with pincers " + cell_name(q) + " " + digit_set(qm) + " and " +
-                   cell_name(r) + " " + digit_set(rm) + " — every case places " +
-                   std::to_string(lowest_bit(z)) + " among them; remove it from cells seeing all three.";
+          f.desc = "XYZ-Wing: pivot " + cell_name(p) + " " + sym_set(s.cand[p]) +
+                   " with pincers " + cell_name(q) + " " + sym_set(qm) + " and " +
+                   cell_name(r) + " " + sym_set(rm) + " — every case places " +
+                   sym(lowest_bit(z)) + " among them; remove it from cells seeing all three.";
         out.push_back(std::move(f));
       }
   }
@@ -600,13 +656,6 @@ int run_tech(int t, State& s) {
 }
 
 // -------------------------------------------------------------- profiling --
-struct Step { int tech, count; };
-struct Profile {
-  std::vector<Step> steps;
-  bool solved_logically = false;
-  int  hardest = 0, total = 0;
-};
-
 Profile profile_puzzle(const std::array<int, 81>& givens) {
   State s;
   s.init(givens);
@@ -753,10 +802,86 @@ std::array<int, 81> parse_board(const char* b) {
 
 }  // namespace
 
+// ========================== public evaluation API ===========================
+/// Evaluate an arbitrary Sudoku instance and produce its difficulty profile.
+///
+/// This is the intended entry point for external puzzle-generation research:
+/// hand it a candidate instance and it either returns the full solving
+/// profile (see Profile) or tells you why the instance is unusable.
+///
+/// @param givens 81 values in row-major order; 0 = empty, 1..9 = clue.
+/// @param search_cap node budget for the uniqueness search. The default is
+///        ample for any 9x9 instance; lower it if you are screening millions
+///        of candidates and prefer fast "unknown" over slow certainty.
+/// @return the Profile computed by repeatedly applying the easiest applicable
+///         technique tier (see TECHS for the ladder and its order), or:
+///         - EvalError::NoSolution          the clues admit no completion
+///         - EvalError::MultipleSolutions   at least two completions exist
+///         - EvalError::SearchLimitExceeded search_cap hit before deciding
+///
+/// A returned Profile with solved_logically == false means the instance is
+/// valid (unique) but requires search beyond the technique ladder; hardest
+/// and steps still describe how far logic alone gets.
+Expected<Profile, EvalError> evaluate_puzzle(const std::array<int, 81>& givens,
+                                             long long search_cap = 5000000) {
+  // The MRV counter constrains only empty cells, so contradictions *between
+  // givens* must be checked explicitly.
+  for (int i = 0; i < 81; ++i) {
+    if (!givens[i]) continue;
+    for (int p : T.peers[i])
+      if (givens[p] == givens[i]) return Unexpected<EvalError>(EvalError::NoSolution);
+  }
+  auto probe = givens;
+  g_solver_nodes = 0;
+  g_solver_cap = search_cap;
+  g_solver_capped = false;
+  int n = count_solutions(probe, 2);
+  if (g_solver_capped) return Unexpected<EvalError>(EvalError::SearchLimitExceeded);
+  if (n == 0) return Unexpected<EvalError>(EvalError::NoSolution);
+  if (n >= 2) return Unexpected<EvalError>(EvalError::MultipleSolutions);
+  return profile_puzzle(givens);
+}
+
 // ---------------------------------------------------------------- exports --
 extern "C" {
 
+// JSON wrapper around evaluate_puzzle for the WASM/JS side.
+// Returns {"status":"ok",...profile...} or {"status":"no_solution"} /
+// {"status":"multiple_solutions"} / {"status":"search_limit_exceeded"}.
+EXPORT const char* evaluate(const char* board81) {
+  auto res = evaluate_puzzle(parse_board(board81));
+  if (!res) {
+    const char* what = res.error() == EvalError::NoSolution ? "no_solution"
+                     : res.error() == EvalError::MultipleSolutions ? "multiple_solutions"
+                     : "search_limit_exceeded";
+    g_result = std::string("{\"status\":\"") + what + "\"}";
+    return g_result.c_str();
+  }
+  g_result = "{\"status\":\"ok\",";
+  append_profile_json(g_result, *res);
+  g_result += '}';
+  return g_result.c_str();
+}
+
+// Set display symbols for digits 1..9 as a comma-separated list (e.g.
+// "A,B,C,D,E,F,G,H,I"). Affects hint descriptions only. Empty resets to 1-9.
+EXPORT void set_symbols(const char* csv) {
+  for (int d = 1; d <= 9; ++d) g_sym[d] = std::to_string(d);
+  if (!csv || !*csv) return;
+  int d = 1;
+  std::string cur;
+  for (const char* p = csv; d <= 9; ++p) {
+    if (*p == ',' || *p == 0) {
+      if (!cur.empty()) g_sym[d] = cur;
+      ++d;
+      cur.clear();
+      if (*p == 0) break;
+    } else cur += *p;
+  }
+}
+
 EXPORT const char* generate(int target_clues, unsigned seed) {
+  g_solver_nodes = 0; g_solver_cap = 1LL << 60; g_solver_capped = false;
   std::mt19937 rng(seed);
   auto puzzle = generate_puzzle(target_clues, rng);
   auto solved = puzzle;
@@ -771,6 +896,7 @@ EXPORT const char* generate(int target_clues, unsigned seed) {
 }
 
 EXPORT const char* generate_level(int level, unsigned seed) {
+  g_solver_nodes = 0; g_solver_cap = 1LL << 60; g_solver_capped = false;
   level = std::max(0, std::min(4, level));
   std::mt19937 rng(seed);
   Generated G = generate_level_impl(level, rng);

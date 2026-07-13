@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slitherlink — Loop the Loop</title>
+<style>
+  :root{
+    --page:#F4F7FB; --graph-line:rgba(59,111,212,.10); --paper:#FCFCFA;
+    --grid-light:#C7D3E3; --ink:#1C2740; --cand:#7A8699;
+    --strike:#B3402F; --accent:#2B5FC7; --win:#2F7D4F; --chip:#E7EEF9;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100vh;
+    background:
+      repeating-linear-gradient(0deg, var(--graph-line) 0 1px, transparent 1px 24px),
+      repeating-linear-gradient(90deg, var(--graph-line) 0 1px, transparent 1px 24px),
+      var(--page);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink);
+    display:flex; flex-direction:column; align-items:center; padding:24px 16px 48px;
+  }
+  .gamenav{flex-basis:100%; font-size:.8rem; color:var(--cand); letter-spacing:.03em; margin-top:-4px;}
+  .gamenav a{color:var(--accent); text-decoration:none;}
+  .gamenav a:hover{text-decoration:underline;}
+  .gamenav b{color:var(--ink);}
+  header{width:min(92vw,600px); display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;}
+  h1{font-family:Georgia,"Times New Roman",serif; font-size:1.9rem; font-weight:700; margin:0;}
+  h1 .sub{font-size:.8rem; font-weight:400; color:var(--cand); letter-spacing:.08em; margin-left:.5em; font-family:system-ui,sans-serif;}
+  .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  button,select{font:inherit; font-size:.85rem; padding:6px 14px; border-radius:6px; border:1.5px solid var(--ink); background:var(--paper); color:var(--ink); cursor:pointer;}
+  button:hover:not(:disabled){background:var(--ink); color:var(--paper);}
+  button:disabled{opacity:.35; cursor:default;}
+  button:focus-visible,select:focus-visible,summary:focus-visible{outline:2.5px solid var(--accent); outline-offset:2px;}
+
+  #profileCard{width:min(92vw,600px); background:var(--paper); border:1.5px solid var(--ink); border-radius:6px; padding:10px 14px 12px; margin-bottom:12px; box-shadow:0 1px 6px rgba(28,39,64,.08);}
+  #profileCard .cardlabel{font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--cand); margin-bottom:6px;}
+  .profhead{display:flex; gap:16px; flex-wrap:wrap; align-items:baseline; margin-bottom:8px;}
+  .profhead .metric b{font-family:Georgia,serif; font-size:1.05rem;}
+  .profhead .metric{font-size:.85rem;}
+  .profhead .hardest b{color:var(--accent);}
+  .profhead .search-needed b{color:var(--strike);}
+  .techchips{display:flex; gap:6px; flex-wrap:wrap;}
+  .tchip{font-size:.78rem; padding:3px 10px; border-radius:12px; background:var(--chip); border:1px solid var(--grid-light);}
+  .tchip.max{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .tchip .n{font-weight:700;}
+  details.sequence{margin-top:8px; font-size:.78rem; color:var(--cand);}
+  details.sequence summary{cursor:pointer; user-select:none; color:var(--ink);}
+  details.sequence .seq{margin-top:6px; line-height:1.9;}
+  .seqstep{display:inline-block; background:var(--chip); border-radius:4px; padding:1px 6px; margin-right:4px; color:var(--ink); white-space:nowrap;}
+  .seqstep.hard{background:var(--accent); color:#fff;}
+
+  #assist{width:min(92vw,600px); min-height:26px; margin-bottom:10px; font-size:.85rem; line-height:1.45;}
+  #assist .msg{padding:6px 12px; border-radius:6px; border:1.5px solid; display:inline-block;}
+  #assist .good{color:var(--win); border-color:var(--win); background:#EAF4EC;}
+  #assist .bad{color:var(--strike); border-color:var(--strike); background:#F9ECE9;}
+  #assist .info{color:var(--ink); border-color:var(--accent); background:var(--chip);}
+
+  .saverow{width:min(92vw,600px); display:flex; gap:8px; align-items:center; flex-wrap:wrap; min-height:34px; margin-bottom:12px;}
+  .saverow .label{font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:var(--cand);}
+  .sp{border:1.5px dashed var(--accent); background:var(--chip); color:var(--accent); border-radius:6px; padding:4px 12px; font-size:.82rem;}
+  .sp:hover{background:var(--accent); color:#fff; border-style:solid;}
+
+  .boardwrap{position:relative;}
+  #board{
+    width:min(92vw,560px); aspect-ratio:1;
+    display:grid;
+    background:var(--paper); border:3px solid var(--ink); border-radius:4px;
+    box-shadow:0 2px 14px rgba(28,39,64,.12); user-select:none; padding:8px;
+  }
+  .dot{position:relative;}
+  .dot::after{content:''; position:absolute; inset:0; margin:auto; width:7px; height:7px; border-radius:50%; background:var(--ink);}
+  .sqcell{display:flex; align-items:center; justify-content:center;
+    font-family:Georgia,"Times New Roman",serif; font-weight:700;
+    font-size:clamp(1rem,4vmin,1.7rem); color:var(--ink);}
+  .sqcell.done{color:#A9B4C6;}
+  .edge{position:relative; cursor:pointer;}
+  .edge::after{content:''; position:absolute; border-radius:3px;}
+  .hedge::after{left:-5px; right:-5px; top:50%; height:6px; transform:translateY(-50%);}
+  .vedge::after{top:-5px; bottom:-5px; left:50%; width:6px; transform:translateX(-50%);}
+  .edge:hover::after,.edge.near::after{background:rgba(43,95,199,.25);}
+  .edge.line::after{background:var(--ink);}
+  .edge.line:hover::after{background:#41506F;}
+  .edge.x::before{content:'×'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--strike); opacity:.6; font-size:clamp(.7rem,2.4vmin,1rem); font-weight:700;}
+  .edge.x:hover::before{opacity:1;}
+
+  .edge.wrong::after{background:var(--strike) !important;}
+  .edge.wrong::before{color:var(--strike); opacity:1; text-shadow:0 0 4px #F3B7AC;}
+  .edge.hintpat::after{background:rgba(43,95,199,.45);}
+  .edge.actline::after{background:rgba(47,125,79,.5); box-shadow:0 0 0 2px var(--win);}
+  .edge.actcross::before{content:'×'; color:var(--strike); opacity:1;}
+  .edge.actcross{outline:2px dashed var(--strike); outline-offset:-2px;}
+  .sqcell.hintcell{background:#EDF2FC; box-shadow:inset 0 0 0 2.5px var(--accent); border-radius:4px;}
+
+  #banner{position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(252,252,250,.88); border-radius:4px;}
+  #banner.show{display:flex;}
+  #banner .msg{font-family:Georgia,serif; font-size:2.2rem; font-weight:700; color:var(--win);
+    border:3px solid var(--win); border-radius:8px; padding:14px 34px; background:var(--paper);
+    transform:rotate(-3deg); animation:stamp .35s ease-out;}
+  @keyframes stamp{from{transform:rotate(-3deg) scale(1.6); opacity:0;} to{transform:rotate(-3deg) scale(1); opacity:1;}}
+  @media (prefers-reduced-motion:reduce){#banner .msg{animation:none;}}
+
+  footer{width:min(92vw,600px); margin-top:14px; font-size:.78rem; color:var(--cand); line-height:1.5;}
+  footer b{color:var(--ink); font-weight:600;}
+  #glossary{width:min(92vw,600px); margin-top:12px; background:var(--paper); border:1.5px solid var(--grid-light); border-radius:6px; padding:8px 14px; font-size:.8rem; line-height:1.5;}
+  #glossary summary{cursor:pointer; user-select:none; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:var(--cand);}
+  #glossary dt{font-weight:700; margin-top:8px;}
+  #glossary dt .tno{color:var(--cand); font-weight:400; font-size:.72rem; margin-left:.4em;}
+  #glossary dd{margin:1px 0 0 0; color:#3D4657;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Slitherlink<span class="sub">loop the loop</span></h1>
+  <div class="controls">
+    <select id="boardsize" aria-label="Board size" title="Expert on the largest board can take a while to generate">
+      <option value="7" selected>7×7</option>
+      <option value="10">10×10</option>
+      <option value="12">12×12</option>
+    </select>
+    <select id="difficulty" aria-label="Difficulty">
+      <option value="0">Easy</option>
+      <option value="1" selected>Medium</option>
+      <option value="2">Hard</option>
+      <option value="3">Expert</option>
+    </select>
+    <button id="newBtn">New</button>
+    <button id="undoBtn" disabled>Undo</button>
+    <button id="saveBtn">Save point</button>
+    <button id="checkBtn">Check</button>
+    <button id="helpBtn">Help</button>
+  </div>
+  <div class="gamenav"><a href="sudoku.html">Sudoku</a> · <a href="kakuro.html">Kakuro</a> · <b>Slitherlink</b></div>
+</header>
+
+<div id="profileCard">
+  <div class="cardlabel">Difficulty profile</div>
+  <div class="profhead" id="profHead"></div>
+  <div class="techchips" id="techChips"></div>
+  <details class="sequence"><summary>Step-by-step solving sequence</summary><div class="seq" id="seqBody"></div></details>
+</div>
+
+<div id="assist"></div>
+
+<div class="saverow" id="saverow">
+  <span class="label">Save points</span>
+  <span class="label" id="spEmpty">— none yet</span>
+</div>
+
+<div class="boardwrap">
+  <div id="board" aria-label="Slitherlink board"></div>
+  <div id="banner"><div class="msg">Solved!</div></div>
+</div>
+
+<footer>
+  Draw one closed loop along the dots; each number counts the loop edges around that cell.
+  <b>Click</b> an edge to draw a line (click again to erase) · <b>Ctrl/⌘-click</b> to mark an edge
+  as ruled out with × (again to unmark). Numbers fade once satisfied.
+  <b>Check</b> flags lines and ×s that contradict the solution; <b>Help</b> shows the easiest applicable
+  technique — <span style="color:var(--accent)">blue</span> pattern,
+  <span style="color:var(--win)">green</span> edges to draw, <span style="color:var(--strike)">dashed red</span> edges to rule out.
+</footer>
+
+<details id="glossary">
+  <summary>What the techniques mean</summary>
+  <dl>
+    <dt>Clue counting<span class="tno">T1</span></dt>
+    <dd>A cell already has its number of lines (rule out the rest), or needs every undecided edge to reach it (draw them all).</dd>
+    <dt>Dot rules<span class="tno">T2</span></dt>
+    <dd>The loop passes through each dot 0 or 2 times. A dot with two lines rules out its other edges; a dot with one line and one open edge must continue; a lone open edge at an empty dot is ruled out.</dd>
+    <dt>Corner reasoning<span class="tno">T3</span></dt>
+    <dd>Short case analysis at a cell's corner. A 3 whose corner is sealed from outside must use both corner edges; a 1 must use neither. A line entering a corner of a 1 exhausts it; entering a 3 forces the two far edges; entering a 2 must exit through the opposite corner, and a sealed corner of a 2 pushes the loop out through its neighbors.</dd>
+    <dt>3-3 patterns<span class="tno">T4</span></dt>
+    <dd>Two 3s side by side force the shared and outer parallel edges (and stop the shared edge from extending); two 3s on a diagonal force both outer corners.</dd>
+    <dt>No early loop<span class="tno">T5</span></dt>
+    <dd>An edge that would join the two ends of an existing path may not be drawn if closing the loop there would leave the rest of the puzzle unfinishable.</dd>
+    <dt>One-edge trial<span class="tno">T6</span></dt>
+    <dd>Suppose a single edge is a line (or a ×) and follow the counting rules; if that quickly contradicts, the edge must be the opposite. The workhorse of hard slitherlinks.</dd>
+  </dl>
+</details>
+
+<script>
+/*__WASM_JS__*/
+</script>
+
+<script>
+"use strict";
+let R = 7, C = 7, NC = 49, NHE = 56, E = 112;
+function setDims(rows, cols){
+  R = rows; C = cols; NC = R * C;
+  NHE = (R + 1) * C; E = NHE + R * (C + 1);
+}
+const he = (r, c) => r * C + c;
+const ve = (r, c) => NHE + r * (C + 1) + c;
+const cellEdges = i => {
+  const r = (i / C) | 0, c = i % C;
+  return [he(r, c), he(r + 1, c), ve(r, c), ve(r, c + 1)];
+};
+
+let engine = null;
+const enginePromise = createSlitherModule().then(M => {
+  engine = {
+    generate: (level, rows, cols, seed) =>
+      JSON.parse(M.ccall("generate_slither", "string",
+                         ["number", "number", "number", "number"], [level, rows, cols, seed])),
+    hint: state => JSON.parse(M.ccall("slither_hint", "string", ["string"], [state])),
+  };
+});
+
+/* ---------- game state ---------- */
+let puzzleInfo = null;
+let clues = new Array(NC).fill(-1);
+let st = new Array(E).fill(0);
+let edgeRects = null;               // cached geometry for nearest-edge picking              // 0 unknown, 1 line, 2 cross
+let undoStack = [], savepoints = [];
+const marks = { wrong:new Set(), pattern:new Set(), actline:new Set(), actcross:new Set(), cells:new Set() };
+
+const snapshot = () => [...st];
+const restore  = s  => { st = [...s]; };
+const pushUndo = () => undoStack.push(snapshot());
+
+const assistEl = document.getElementById("assist");
+function clearAssist(){ marks.wrong.clear(); marks.pattern.clear(); marks.actline.clear(); marks.actcross.clear(); marks.cells.clear(); assistEl.textContent=""; }
+function setAssist(kind, html){ assistEl.innerHTML = `<span class="msg ${kind}">${html}</span>`; }
+
+/* ---------- rendering ---------- */
+const boardEl = document.getElementById("board");
+const bannerEl = document.getElementById("banner");
+const undoBtn = document.getElementById("undoBtn");
+
+function buildBoard(){
+  boardEl.textContent = "";
+  boardEl.style.gridTemplateColumns = `12px repeat(${C}, 1fr 12px)`;
+  boardEl.style.gridTemplateRows = `12px repeat(${R}, 1fr 12px)`;
+  const frag = document.createDocumentFragment();
+  for (let gr = 0; gr <= 2 * R; gr++)
+    for (let gc = 0; gc <= 2 * C; gc++){
+      let el;
+      if (gr % 2 === 0 && gc % 2 === 0){
+        el = document.createElement("div");
+        el.className = "dot";
+      } else if (gr % 2 === 0){
+        el = document.createElement("div");
+        el.className = "edge hedge";
+        el.dataset.e = he(gr / 2, (gc - 1) / 2);
+      } else if (gc % 2 === 0){
+        el = document.createElement("div");
+        el.className = "edge vedge";
+        el.dataset.e = ve((gr - 1) / 2, gc / 2);
+      } else {
+        el = document.createElement("div");
+        el.className = "sqcell";
+        el.dataset.cell = ((gr - 1) / 2) * C + (gc - 1) / 2;
+      }
+      frag.appendChild(el);
+    }
+  boardEl.appendChild(frag);
+  edgeRects = null;
+}
+
+function render(){
+  for (const el of boardEl.querySelectorAll(".edge")){
+    const e = +el.dataset.e;
+    el.classList.toggle("line", st[e] === 1);
+    el.classList.toggle("x", st[e] === 2);
+    el.classList.toggle("wrong", marks.wrong.has(e));
+    el.classList.toggle("hintpat", marks.pattern.has(e));
+    el.classList.toggle("actline", marks.actline.has(e));
+    el.classList.toggle("actcross", marks.actcross.has(e));
+  }
+  for (const el of boardEl.querySelectorAll(".sqcell")){
+    const i = +el.dataset.cell;
+    el.textContent = clues[i] >= 0 ? clues[i] : "";
+    let lines = 0;
+    for (const e of cellEdges(i)) if (st[e] === 1) lines++;
+    el.classList.toggle("done", clues[i] >= 0 && lines === clues[i]);
+    el.classList.toggle("hintcell", marks.cells.has(i));
+  }
+  undoBtn.disabled = undoStack.length === 0;
+  bannerEl.classList.toggle("show", isSolved());
+  renderSavepoints();
+}
+
+function isSolved(){
+  if (!puzzleInfo) return false;
+  for (let e = 0; e < E; e++){
+    const solLine = puzzleInfo.solution[e] === "1";
+    if (solLine !== (st[e] === 1)) return false;
+  }
+  return true;
+}
+
+function renderSavepoints(){
+  const row = document.getElementById("saverow");
+  row.querySelectorAll(".sp").forEach(el => el.remove());
+  document.getElementById("spEmpty").style.display = savepoints.length ? "none" : "";
+  savepoints.forEach(sp => {
+    const b = document.createElement("button");
+    b.className = "sp";
+    b.textContent = "⤺ " + sp.label;
+    b.title = "Revert board to this save point";
+    b.addEventListener("click", () => { pushUndo(); clearAssist(); restore(sp.snap); render(); });
+    row.appendChild(b);
+  });
+}
+
+function renderProfile(info){
+  const head = document.getElementById("profHead");
+  const chips = document.getElementById("techChips");
+  const seq = document.getElementById("seqBody");
+  head.textContent = ""; chips.textContent = ""; seq.textContent = "";
+  if (!info){ head.textContent = "Generating…"; return; }
+  const names = info.techNames;
+  const mk = (cls, html) => { const d = document.createElement("span"); d.className = cls; d.innerHTML = html; return d; };
+  if (info.level){
+    const lv = mk("metric", `Level: <b>${info.level}</b>`);
+    lv.title = `Matched the target profile window on generation attempt ${info.attempts}`;
+    head.appendChild(lv);
+  }
+  if (info.hardest > 0)
+    head.appendChild(mk("metric hardest", `Hardest technique: <b>${names[info.hardest]}</b> (T${info.hardest})`));
+  head.appendChild(mk("metric", `Logical steps: <b>${info.totalSteps}</b>`));
+  if (!info.solvedLogically)
+    head.appendChild(mk("metric search-needed", `<b>Search required</b> beyond these techniques`));
+  for (const [t, n] of Object.entries(info.summary)){
+    const c = mk("tchip", `${names[+t]} <span class="n">×${n}</span>`);
+    if (+t === info.hardest && info.hardest > 1) c.classList.add("max");
+    chips.appendChild(c);
+  }
+  for (const [t, n] of info.profile){
+    const s = mk("seqstep", `${n}×T${t}`);
+    s.title = names[t];
+    if (t === info.hardest && info.hardest > 1) s.classList.add("hard");
+    seq.appendChild(s);
+  }
+  if (!info.solvedLogically) seq.appendChild(mk("seqstep hard", "…stuck → brute force"));
+}
+
+/* ---------- nearest-edge picking ----------
+   Clicks and hovers anywhere on the board act on the closest edge, so a
+   click slightly inside a cell still lands on the intended line. */
+function cacheEdgeRects(){
+  edgeRects = [];
+  for (const el of boardEl.querySelectorAll(".edge")){
+    const r = el.getBoundingClientRect();
+    edgeRects.push({
+      e: +el.dataset.e, el,
+      horiz: el.classList.contains("hedge"),
+      x1: r.left, x2: r.right, y1: r.top, y2: r.bottom,
+      cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2,
+    });
+  }
+}
+window.addEventListener("resize", () => { edgeRects = null; });
+
+function nearestEdge(px, py){
+  if (!edgeRects) cacheEdgeRects();
+  const cell = boardEl.querySelector(".sqcell");
+  const pitch = cell ? cell.getBoundingClientRect().width : 40;
+  let best = null, bestD = Infinity;
+  for (const r of edgeRects){
+    let dx, dy;
+    if (r.horiz){ dx = px < r.x1 ? r.x1 - px : px > r.x2 ? px - r.x2 : 0; dy = py - r.cy; }
+    else        { dy = py < r.y1 ? r.y1 - py : py > r.y2 ? py - r.y2 : 0; dx = px - r.cx; }
+    const d = Math.hypot(dx, dy);
+    if (d < bestD){ bestD = d; best = r; }
+  }
+  return best && bestD <= pitch * 0.48 ? best : null;
+}
+
+/* ---------- actions ---------- */
+boardEl.addEventListener("click", e => {
+  const near = nearestEdge(e.clientX, e.clientY);
+  if (!near) return;
+  const idx = near.e;
+  pushUndo();
+  clearAssist();
+  if (e.ctrlKey || e.metaKey) st[idx] = (st[idx] === 2) ? 0 : 2;   // toggle ×
+  else                        st[idx] = (st[idx] === 1) ? 0 : 1;   // toggle line
+  render();
+});
+
+let hoverRaf = 0;
+boardEl.addEventListener("mousemove", e => {
+  if (hoverRaf) return;
+  hoverRaf = requestAnimationFrame(() => {
+    hoverRaf = 0;
+    const near = nearestEdge(e.clientX, e.clientY);
+    boardEl.querySelectorAll(".edge.near").forEach(el => el.classList.remove("near"));
+    if (near) near.el.classList.add("near");
+  });
+});
+boardEl.addEventListener("mouseleave", () => {
+  boardEl.querySelectorAll(".edge.near").forEach(el => el.classList.remove("near"));
+});
+
+document.getElementById("undoBtn").addEventListener("click", () => {
+  const s = undoStack.pop();
+  if (s){ clearAssist(); restore(s); render(); }
+});
+document.getElementById("saveBtn").addEventListener("click", () => {
+  savepoints.push({ label: "SP" + (savepoints.length+1), snap: snapshot() });
+  renderSavepoints();
+});
+
+document.getElementById("checkBtn").addEventListener("click", () => {
+  if (!puzzleInfo) return;
+  clearAssist();
+  let wrong = 0;
+  for (let e = 0; e < E; e++){
+    const solLine = puzzleInfo.solution[e] === "1";
+    if ((st[e] === 1 && !solLine) || (st[e] === 2 && solLine)){ marks.wrong.add(e); wrong++; }
+  }
+  render();
+  if (!wrong) setAssist("good", isSolved() ? "Solved — the loop is complete." : "Everything checks out so far.");
+  else setAssist("bad", `Found ${wrong} mark${wrong>1?"s":""} that contradict the solution — highlighted in red.`);
+});
+
+document.getElementById("helpBtn").addEventListener("click", async () => {
+  if (!puzzleInfo) return;
+  await enginePromise;
+  clearAssist();
+  const h = engine.hint(st.join(""));
+  if (h.error){
+    if (h.error === "solved") setAssist("good", "The puzzle is already solved!");
+    else if (h.error === "mistakes"){ h.edges.forEach(e => marks.wrong.add(e)); setAssist("bad", "Some of your marks contradict the solution — fix the highlighted edges before hinting."); }
+    else setAssist("bad", "No technique on the ladder applies — this position needs deeper case analysis (use a save point!).");
+  } else {
+    (h.patternEdges || []).forEach(e => marks.pattern.add(e));
+    (h.patternCells || []).forEach(c => marks.cells.add(c));
+    (h.actEdges || []).forEach((e, k) => (h.actStates[k] === 1 ? marks.actline : marks.actcross).add(e));
+    setAssist("info", `<b>${h.name}</b> (T${h.tier}) — ${h.desc}`);
+  }
+  render();
+});
+
+document.getElementById("newBtn").addEventListener("click", newGame);
+
+async function newGame(){
+  await enginePromise;
+  clearAssist();
+  renderProfile(null);
+  const level = +document.getElementById("difficulty").value;
+  const size = +document.getElementById("boardsize").value;
+  const seed = (Math.random() * 0x7fffffff) | 0;
+  setTimeout(() => {
+    puzzleInfo = engine.generate(level, size, size, seed);
+    setDims(puzzleInfo.rows, puzzleInfo.cols);
+    clues = puzzleInfo.clues.slice(0, NC);
+    st = new Array(E).fill(0);
+    undoStack = []; savepoints = [];
+    buildBoard();
+    render();
+    renderProfile(puzzleInfo);
+  }, 10);
+}
+
+newGame();
+</script>
+</body>
+</html>

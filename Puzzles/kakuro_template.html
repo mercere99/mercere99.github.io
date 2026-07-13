@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kakuro — Pencil Marks</title>
+<style>
+  :root{
+    --page:#F4F7FB; --graph-line:rgba(59,111,212,.10); --paper:#FCFCFA;
+    --grid-light:#C7D3E3; --ink:#1C2740; --user:#2B5FC7; --cand:#7A8699;
+    --strike:#B3402F; --accent:#2B5FC7; --win:#2F7D4F; --warn:#B07A1E; --chip:#E7EEF9;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100vh;
+    background:
+      repeating-linear-gradient(0deg, var(--graph-line) 0 1px, transparent 1px 24px),
+      repeating-linear-gradient(90deg, var(--graph-line) 0 1px, transparent 1px 24px),
+      var(--page);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink);
+    display:flex; flex-direction:column; align-items:center; padding:24px 16px 48px;
+  }
+  .gamenav{flex-basis:100%; font-size:.8rem; color:var(--cand); letter-spacing:.03em; margin-top:-4px;}
+  .gamenav a{color:var(--accent); text-decoration:none;}
+  .gamenav a:hover{text-decoration:underline;}
+  .gamenav b{color:var(--ink);}
+  header{width:min(92vw,620px); display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;}
+  h1{font-family:Georgia,"Times New Roman",serif; font-size:1.9rem; font-weight:700; margin:0;}
+  h1 .sub{font-size:.8rem; font-weight:400; color:var(--cand); letter-spacing:.08em; margin-left:.5em; font-family:system-ui,sans-serif;}
+  .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  button,select{font:inherit; font-size:.85rem; padding:6px 14px; border-radius:6px; border:1.5px solid var(--ink); background:var(--paper); color:var(--ink); cursor:pointer;}
+  button:hover:not(:disabled){background:var(--ink); color:var(--paper);}
+  button:disabled{opacity:.35; cursor:default;}
+  button:focus-visible,select:focus-visible,summary:focus-visible{outline:2.5px solid var(--accent); outline-offset:2px;}
+
+  #profileCard{width:min(92vw,620px); background:var(--paper); border:1.5px solid var(--ink); border-radius:6px; padding:10px 14px 12px; margin-bottom:12px; box-shadow:0 1px 6px rgba(28,39,64,.08);}
+  #profileCard .cardlabel{font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--cand); margin-bottom:6px;}
+  .profhead{display:flex; gap:16px; flex-wrap:wrap; align-items:baseline; margin-bottom:8px;}
+  .profhead .metric b{font-family:Georgia,serif; font-size:1.05rem;}
+  .profhead .metric{font-size:.85rem;}
+  .profhead .hardest b{color:var(--accent);}
+  .profhead .search-needed b{color:var(--strike);}
+  .techchips{display:flex; gap:6px; flex-wrap:wrap;}
+  .tchip{font-size:.78rem; padding:3px 10px; border-radius:12px; background:var(--chip); border:1px solid var(--grid-light);}
+  .tchip.max{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .tchip .n{font-weight:700;}
+  details.sequence{margin-top:8px; font-size:.78rem; color:var(--cand);}
+  details.sequence summary{cursor:pointer; user-select:none; color:var(--ink);}
+  details.sequence .seq{margin-top:6px; line-height:1.9;}
+  .seqstep{display:inline-block; background:var(--chip); border-radius:4px; padding:1px 6px; margin-right:4px; color:var(--ink); white-space:nowrap;}
+  .seqstep.hard{background:var(--accent); color:#fff;}
+
+  #assist{width:min(92vw,620px); min-height:26px; margin-bottom:10px; font-size:.85rem; line-height:1.45;}
+  #assist .msg{padding:6px 12px; border-radius:6px; border:1.5px solid; display:inline-block;}
+  #assist .good{color:var(--win); border-color:var(--win); background:#EAF4EC;}
+  #assist .bad{color:var(--strike); border-color:var(--strike); background:#F9ECE9;}
+  #assist .info{color:var(--ink); border-color:var(--accent); background:var(--chip);}
+
+  .saverow{width:min(92vw,620px); display:flex; gap:8px; align-items:center; flex-wrap:wrap; min-height:34px; margin-bottom:12px;}
+  .saverow .label{font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:var(--cand);}
+  .sp{border:1.5px dashed var(--accent); background:var(--chip); color:var(--accent); border-radius:6px; padding:4px 12px; font-size:.82rem;}
+  .sp:hover{background:var(--accent); color:#fff; border-style:solid;}
+
+  .boardwrap{position:relative;}
+  #board{
+    width:min(92vw,620px); aspect-ratio:1;
+    display:grid; grid-template-columns:repeat(10,1fr); grid-template-rows:repeat(10,1fr);
+    background:var(--paper); border:3px solid var(--ink); border-radius:4px;
+    box-shadow:0 2px 14px rgba(28,39,64,.12); user-select:none;
+  }
+  .cell{position:relative; border-right:1px solid var(--grid-light); border-bottom:1px solid var(--grid-light);
+    display:flex; align-items:center; justify-content:center;
+    font-family:Georgia,"Times New Roman",serif; font-size:clamp(1rem,3.6vmin,1.6rem);}
+  .cell.blk{background:var(--ink);}
+  .cell.cluecell{
+    background:
+      linear-gradient(to top right, transparent calc(50% - 1px), var(--paper) calc(50% - 1px), var(--paper) calc(50% + 1px), transparent calc(50% + 1px)),
+      var(--ink);
+  }
+  .cell.cluecell .ch{position:absolute; top:6%; right:9%; color:var(--paper); font-family:system-ui,sans-serif; font-size:clamp(.5rem,1.9vmin,.85rem); font-weight:600;}
+  .cell.cluecell .cv{position:absolute; bottom:6%; left:9%; color:var(--paper); font-family:system-ui,sans-serif; font-size:clamp(.5rem,1.9vmin,.85rem); font-weight:600;}
+  .cell.user{color:var(--user); cursor:pointer;}
+  .cell.user:hover{background:#EDF2FC;}
+  .cell.empty{cursor:default;}
+  .cands{position:absolute; inset:1px; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr);
+    opacity:0; pointer-events:none; background:#F3F7FE;}
+  .cell.empty:hover .cands,.cell.pinned .cands,.cell.reveal .cands{opacity:1; pointer-events:auto;}
+  .cell.reveal .cands{background:transparent;}
+  .cand{display:flex; align-items:center; justify-content:center; font-family:system-ui,sans-serif;
+    font-size:clamp(.5rem,1.4vmin,.72rem); color:var(--cand); border-radius:3px;}
+  .cand.ok{cursor:pointer;}
+  .cand.ok:hover{background:var(--accent); color:#fff; font-weight:600;}
+  .cand.x{color:var(--strike); text-decoration:line-through; opacity:.55; cursor:pointer;}
+  .cand.x:hover{opacity:1; background:#F7E4E0;}
+
+  .cell.wrong{background:#F7DAD4;}
+  .cell.wrong.user{color:var(--strike);}
+  .cell.badnote{box-shadow:inset 0 0 0 2.5px var(--warn);}
+  .cell.hintpat{box-shadow:inset 0 0 0 2.5px var(--accent); background:#EDF2FC;}
+  .cell.hinttarget{background:#F7E4E0;}
+  .cell.hintplace{background:#DEF0E3; box-shadow:inset 0 0 0 2.5px var(--win);}
+
+  #banner{position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(252,252,250,.88); border-radius:4px;}
+  #banner.show{display:flex;}
+  #banner .msg{font-family:Georgia,serif; font-size:2.2rem; font-weight:700; color:var(--win);
+    border:3px solid var(--win); border-radius:8px; padding:14px 34px; background:var(--paper);
+    transform:rotate(-3deg); animation:stamp .35s ease-out;}
+  @keyframes stamp{from{transform:rotate(-3deg) scale(1.6); opacity:0;} to{transform:rotate(-3deg) scale(1); opacity:1;}}
+  @media (prefers-reduced-motion:reduce){#banner .msg{animation:none;}}
+
+  footer{width:min(92vw,620px); margin-top:14px; font-size:.78rem; color:var(--cand); line-height:1.5;}
+  footer b{color:var(--ink); font-weight:600;}
+  #glossary{width:min(92vw,620px); margin-top:12px; background:var(--paper); border:1.5px solid var(--grid-light); border-radius:6px; padding:8px 14px; font-size:.8rem; line-height:1.5;}
+  #glossary summary{cursor:pointer; user-select:none; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:var(--cand);}
+  #glossary dt{font-weight:700; margin-top:8px;}
+  #glossary dt .tno{color:var(--cand); font-weight:400; font-size:.72rem; margin-left:.4em;}
+  #glossary dd{margin:1px 0 0 0; color:#3D4657;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Kakuro<span class="sub">pencil-mark edition</span></h1>
+  <div class="controls">
+    <select id="difficulty" aria-label="Difficulty">
+      <option value="0">Easy</option>
+      <option value="1" selected>Medium</option>
+      <option value="2">Hard</option>
+      <option value="3">Expert</option>
+    </select>
+    <button id="newBtn">New</button>
+    <button id="undoBtn" disabled>Undo</button>
+    <button id="saveBtn">Save point</button>
+    <button id="checkBtn">Check</button>
+    <button id="helpBtn">Help</button>
+  </div>
+  <div class="gamenav"><a href="sudoku.html">Sudoku</a> · <b>Kakuro</b> · <a href="slitherlink.html">Slitherlink</a></div>
+</header>
+
+<div id="profileCard">
+  <div class="cardlabel">Difficulty profile</div>
+  <div class="profhead" id="profHead"></div>
+  <div class="techchips" id="techChips"></div>
+  <details class="sequence"><summary>Step-by-step solving sequence</summary><div class="seq" id="seqBody"></div></details>
+</div>
+
+<div id="assist"></div>
+
+<div class="saverow" id="saverow">
+  <span class="label">Save points</span>
+  <span class="label" id="spEmpty">— none yet</span>
+</div>
+
+<div class="boardwrap">
+  <div id="board" aria-label="Kakuro board"></div>
+  <div id="banner"><div class="msg">Solved!</div></div>
+</div>
+
+<footer>
+  Fill every white cell with 1–9 so each run adds to its clue with no repeats.
+  <b>Hover</b> a cell to see the digits that fit both of its runs · <b>click</b> to place ·
+  <b>Ctrl/⌘-click</b> to strike an option (again to restore) · <b>click a placed digit</b> to clear ·
+  type <b>1–9</b> or <b>Backspace</b> over a hovered cell.
+  <b>Check</b> flags wrong entries and strikes that removed a correct digit; <b>Help</b> shows the easiest
+  applicable technique — <span style="color:var(--accent)">blue</span> pattern,
+  <span style="color:var(--strike)">red</span> eliminations, <span style="color:var(--win)">green</span> placement.
+</footer>
+
+<details id="glossary">
+  <summary>What the techniques mean</summary>
+  <dl>
+    <dt>Last cell<span class="tno">T1</span></dt>
+    <dd>Only one cell of a run is empty — it must be whatever remains of the sum.</dd>
+    <dt>Forced single<span class="tno">T2</span></dt>
+    <dd>Only one candidate digit is left for a cell; place it.</dd>
+    <dt>Sum bounds<span class="tno">T3</span></dt>
+    <dd>Quick arithmetic: a digit is impossible when the rest of the run couldn't be small or large enough to finish the sum with distinct digits.</dd>
+    <dt>Unique combination<span class="tno">T4</span></dt>
+    <dd>Some sums decompose only one way (the "magic blocks" — e.g. two cells summing 3 must be {1,2}; four cells summing 30 must be {6,7,8,9}). Every other digit is struck from the run.</dd>
+    <dt>Combination filter<span class="tno">T5</span></dt>
+    <dd>List every digit-set that could still complete the run; digits in none of them are struck.</dd>
+    <dt>Required digit<span class="tno">T6</span></dt>
+    <dd>A digit appears in <i>every</i> remaining combination for a run, and only one cell can host it — place it there.</dd>
+    <dt>Naked pair<span class="tno">T7</span> &amp; Naked triple<span class="tno">T8</span></dt>
+    <dd>Two (or three) cells of a run share the same two (three) candidates; those digits are used up and are struck from the run's other cells.</dd>
+    <dt>Run analysis<span class="tno">T9</span></dt>
+    <dd>Work through every arrangement of a run that respects the current pencil marks; digits appearing in no arrangement are struck. The heavy machinery of hard kakuro.</dd>
+  </dl>
+</details>
+
+<script>
+/*__WASM_JS__*/
+</script>
+
+<script>
+"use strict";
+const W = 10, N = 100;
+
+let engine = null;
+const enginePromise = createKakuroModule().then(M => {
+  engine = {
+    generate: (level, seed) =>
+      JSON.parse(M.ccall("generate_kakuro", "string", ["number", "number", "number"], [level, 9, seed])),
+    hint: (values, elims) =>
+      JSON.parse(M.ccall("kakuro_hint", "string", ["string", "string"], [values, elims])),
+  };
+});
+
+/* ---------- puzzle + game state ---------- */
+let puzzleInfo = null;
+let runs = [];                 // {sum, horiz, cells[]}
+let hrunOf = new Array(N).fill(-1), vrunOf = new Array(N).fill(-1);
+let isWhite = new Array(N).fill(false);
+let values = new Array(N).fill(0);
+let elim   = new Array(N).fill(0);
+let undoStack = [], savepoints = [];
+let pinnedIdx = -1, hoverIdx = -1;
+const marks = { wrong:new Set(), badnote:new Set(), pattern:new Set(), targets:new Set(), place:-1 };
+
+const snapshot = () => ({ values:[...values], elim:[...elim] });
+const restore  = s  => { values=[...s.values]; elim=[...s.elim]; };
+const pushUndo = () => undoStack.push(snapshot());
+
+const assistEl = document.getElementById("assist");
+function clearAssist(){ marks.wrong.clear(); marks.badnote.clear(); marks.pattern.clear(); marks.targets.clear(); marks.place=-1; assistEl.textContent=""; }
+function setAssist(kind, html){ assistEl.innerHTML = `<span class="msg ${kind}">${html}</span>`; }
+
+/* digits with no immediate conflict for cell i */
+function candMask(i){
+  let mask = 0;
+  outer: for (let d = 1; d <= 9; d++){
+    for (const j of [hrunOf[i], vrunOf[i]]){
+      const run = runs[j];
+      let used = 0, placed = 0, empt = 0;
+      for (const c of run.cells){ if (values[c]){ used |= 1<<values[c]; placed += values[c]; } else empt++; }
+      if (used & (1<<d)) continue outer;
+      const S = run.sum - placed;
+      if (empt === 1){ if (d !== S) continue outer; continue; }
+      const pool = [];
+      for (let x = 1; x <= 9; x++) if (!(used & (1<<x)) && x !== d) pool.push(x);
+      if (pool.length < empt-1) continue outer;
+      let lo = 0, hi = 0;
+      for (let k = 0; k < empt-1; k++){ lo += pool[k]; hi += pool[pool.length-1-k]; }
+      if (S - d < lo || S - d > hi) continue outer;
+    }
+    mask |= 1<<d;
+  }
+  return mask;
+}
+
+/* ---------- rendering ---------- */
+const boardEl = document.getElementById("board");
+const bannerEl = document.getElementById("banner");
+const undoBtn = document.getElementById("undoBtn");
+
+function render(){
+  boardEl.textContent = "";
+  const frag = document.createDocumentFragment();
+  const clueH = new Array(N).fill(0), clueV = new Array(N).fill(0);
+  for (const r of runs){
+    if (r.horiz) clueH[r.cells[0]-1] = r.sum;
+    else clueV[r.cells[0]-W] = r.sum;
+  }
+  for (let i = 0; i < N; i++){
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.dataset.idx = i;
+    if (!isWhite[i]){
+      if (clueH[i] || clueV[i]){
+        cell.classList.add("cluecell");
+        if (clueH[i]){ const s = document.createElement("span"); s.className="ch"; s.textContent=clueH[i]; cell.appendChild(s); }
+        if (clueV[i]){ const s = document.createElement("span"); s.className="cv"; s.textContent=clueV[i]; cell.appendChild(s); }
+      } else cell.classList.add("blk");
+    } else if (values[i]){
+      cell.classList.add("user");
+      cell.textContent = values[i];
+      cell.title = "Click to clear";
+    } else {
+      cell.classList.add("empty");
+      if (i === pinnedIdx) cell.classList.add("pinned");
+      const open = candMask(i);
+      const cands = document.createElement("div");
+      cands.className = "cands";
+      for (let d = 1; d <= 9; d++){
+        const s = document.createElement("span");
+        s.className = "cand";
+        if (open & (1<<d)){
+          s.dataset.d = d;
+          s.textContent = d;
+          if (elim[i] & (1<<d)){ s.classList.add("x"); s.title="Ctrl/⌘-click to restore"; }
+          else s.classList.add("ok");
+        }
+        cands.appendChild(s);
+      }
+      cell.appendChild(cands);
+    }
+    if (marks.wrong.has(i)) cell.classList.add("wrong");
+    if (marks.badnote.has(i)) cell.classList.add("badnote");
+    if (marks.pattern.has(i)) cell.classList.add("hintpat","reveal");
+    if (marks.targets.has(i)) cell.classList.add("hinttarget","reveal");
+    if (marks.place === i) cell.classList.add("hintplace","reveal");
+    frag.appendChild(cell);
+  }
+  boardEl.appendChild(frag);
+  undoBtn.disabled = undoStack.length === 0;
+  bannerEl.classList.toggle("show", isSolved());
+  renderSavepoints();
+}
+
+function isSolved(){
+  if (!puzzleInfo) return false;
+  for (let i = 0; i < N; i++)
+    if (isWhite[i] && values[i] !== +puzzleInfo.solution[i]) return false;
+  return true;
+}
+
+function renderSavepoints(){
+  const row = document.getElementById("saverow");
+  row.querySelectorAll(".sp").forEach(el => el.remove());
+  document.getElementById("spEmpty").style.display = savepoints.length ? "none" : "";
+  savepoints.forEach(sp => {
+    const b = document.createElement("button");
+    b.className = "sp";
+    b.textContent = "⤺ " + sp.label;
+    b.title = "Revert board to this save point";
+    b.addEventListener("click", () => { pushUndo(); clearAssist(); restore(sp.snap); pinnedIdx=-1; render(); });
+    row.appendChild(b);
+  });
+}
+
+function renderProfile(info){
+  const head = document.getElementById("profHead");
+  const chips = document.getElementById("techChips");
+  const seq = document.getElementById("seqBody");
+  head.textContent = ""; chips.textContent = ""; seq.textContent = "";
+  if (!info){ head.textContent = "Generating…"; return; }
+  const names = info.techNames;
+  const mk = (cls, html) => { const d = document.createElement("span"); d.className = cls; d.innerHTML = html; return d; };
+  if (info.level){
+    const lv = mk("metric", `Level: <b>${info.level}</b>`);
+    lv.title = `Matched the target profile window on generation attempt ${info.attempts}`;
+    head.appendChild(lv);
+  }
+  if (info.hardest > 0)
+    head.appendChild(mk("metric hardest", `Hardest technique: <b>${names[info.hardest]}</b> (T${info.hardest})`));
+  head.appendChild(mk("metric", `Logical steps: <b>${info.totalSteps}</b>`));
+  if (!info.solvedLogically)
+    head.appendChild(mk("metric search-needed", `<b>Search required</b> beyond these techniques`));
+  for (const [t, n] of Object.entries(info.summary)){
+    const c = mk("tchip", `${names[+t]} <span class="n">×${n}</span>`);
+    if (+t === info.hardest && info.hardest > 1) c.classList.add("max");
+    chips.appendChild(c);
+  }
+  for (const [t, n] of info.profile){
+    const s = mk("seqstep", `${n}×T${t}`);
+    s.title = names[t];
+    if (t === info.hardest && info.hardest > 1) s.classList.add("hard");
+    seq.appendChild(s);
+  }
+  if (!info.solvedLogically) seq.appendChild(mk("seqstep hard", "…stuck → brute force"));
+}
+
+/* ---------- actions ---------- */
+function setVal(i, d){ pushUndo(); clearAssist(); values[i]=d; pinnedIdx=-1; render(); }
+function clearVal(i){ pushUndo(); clearAssist(); values[i]=0; render(); }
+function toggleElim(i, d){ pushUndo(); clearAssist(); elim[i]^=(1<<d); render(); }
+
+boardEl.addEventListener("click", e => {
+  const candEl = e.target.closest(".cand");
+  const cellEl = e.target.closest(".cell");
+  if (!cellEl) return;
+  const idx = +cellEl.dataset.idx;
+  if (candEl && candEl.dataset.d){
+    const d = +candEl.dataset.d;
+    if (e.ctrlKey || e.metaKey) toggleElim(idx, d);
+    else if (!(elim[idx] & (1<<d))) setVal(idx, d);
+    return;
+  }
+  if (cellEl.classList.contains("user")){ clearVal(idx); return; }
+  if (cellEl.classList.contains("empty")){ pinnedIdx = (pinnedIdx===idx)?-1:idx; render(); }
+});
+boardEl.addEventListener("mouseover", e => {
+  const cellEl = e.target.closest(".cell");
+  hoverIdx = cellEl ? +cellEl.dataset.idx : -1;
+});
+boardEl.addEventListener("mouseleave", () => { hoverIdx = -1; });
+
+document.addEventListener("keydown", e => {
+  const idx = pinnedIdx !== -1 ? pinnedIdx : hoverIdx;
+  if (idx === -1 || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key >= "1" && e.key <= "9"){
+    const d = +e.key;
+    if (isWhite[idx] && values[idx] === 0 && (candMask(idx) & (1<<d)) && !(elim[idx] & (1<<d))) setVal(idx, d);
+  } else if (e.key === "Backspace" || e.key === "Delete" || e.key === "0"){
+    if (isWhite[idx] && values[idx] !== 0) clearVal(idx);
+  }
+});
+
+document.getElementById("undoBtn").addEventListener("click", () => {
+  const s = undoStack.pop();
+  if (s){ clearAssist(); restore(s); pinnedIdx=-1; render(); }
+});
+document.getElementById("saveBtn").addEventListener("click", () => {
+  savepoints.push({ label: "SP" + (savepoints.length+1), snap: snapshot() });
+  renderSavepoints();
+});
+
+document.getElementById("checkBtn").addEventListener("click", () => {
+  if (!puzzleInfo) return;
+  clearAssist();
+  const sol = puzzleInfo.solution;
+  let wrong = 0, badnotes = 0;
+  for (let i = 0; i < N; i++){
+    if (!isWhite[i]) continue;
+    if (values[i] && values[i] !== +sol[i]){ marks.wrong.add(i); wrong++; }
+    if (!values[i] && (elim[i] & (1 << +sol[i]))){ marks.badnote.add(i); badnotes++; }
+  }
+  render();
+  if (!wrong && !badnotes){
+    setAssist("good", isSolved() ? "Solved — every cell is correct." : "Everything checks out so far.");
+  } else {
+    const parts = [];
+    if (wrong) parts.push(`${wrong} incorrect ${wrong>1?"entries":"entry"}`);
+    if (badnotes) parts.push(`${badnotes} pencil strike${badnotes>1?"s":""} that removed a correct digit`);
+    setAssist("bad", "Found " + parts.join(" and ") + " — highlighted on the board.");
+  }
+});
+
+document.getElementById("helpBtn").addEventListener("click", async () => {
+  if (!puzzleInfo) return;
+  await enginePromise;
+  clearAssist();
+  const h = engine.hint(values.join(""), elim.join(","));
+  if (h.error){
+    if (h.error === "solved") setAssist("good", "The puzzle is already solved!");
+    else if (h.error === "mistakes"){ h.cells.forEach(c => marks.wrong.add(c)); setAssist("bad", "There are incorrect entries — fix the highlighted cells before hinting."); }
+    else if (h.error === "badnotes"){ h.cells.forEach(c => marks.badnote.add(c)); setAssist("bad", "Some pencil strikes removed a correct digit — restore them in the highlighted cells first."); }
+    else setAssist("bad", "No technique on the ladder applies — this position needs trial and error (use a save point!).");
+  } else {
+    h.pattern.forEach(c => marks.pattern.add(c));
+    (h.targets || []).forEach(c => marks.targets.add(c));
+    if (h.place !== undefined) marks.place = h.place;
+    setAssist("info", `<b>${h.name}</b> (T${h.tier}) — ${h.desc}`);
+  }
+  render();
+});
+
+document.getElementById("newBtn").addEventListener("click", newGame);
+
+async function newGame(){
+  await enginePromise;
+  clearAssist();
+  renderProfile(null);
+  boardEl.textContent = "";
+  const level = +document.getElementById("difficulty").value;
+  const seed = (Math.random() * 0x7fffffff) | 0;
+  setTimeout(() => {
+    puzzleInfo = engine.generate(level, seed);
+    runs = puzzleInfo.runs.map(r => ({ sum:r[0], horiz:!!r[1], cells:r.slice(2) }));
+    hrunOf = new Array(N).fill(-1);
+    vrunOf = new Array(N).fill(-1);
+    isWhite = new Array(N).fill(false);
+    runs.forEach((r, j) => r.cells.forEach(c => { isWhite[c] = true; (r.horiz ? hrunOf : vrunOf)[c] = j; }));
+    values = new Array(N).fill(0);
+    elim = new Array(N).fill(0);
+    undoStack = []; savepoints = []; pinnedIdx = -1;
+    render();
+    renderProfile(puzzleInfo);
+  }, 10);
+}
+
+newGame();
+</script>
+</body>
+</html>
