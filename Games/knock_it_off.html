@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knock It Off! — a cat physics puzzle</title>
+<style>
+  :root {
+    --bg: #322639;
+    --bg2: #271d2e;
+    --panel: #3e3049;
+    --ink: #f6ecf2;
+    --ink-dim: #bfa9c9;
+    --pink: #f79ec4;
+    --pink-deep: #d4699f;
+    --mint: #8fe3cf;
+    --amber: #ffd98e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #4a3757 0%, var(--bg) 55%, var(--bg2) 100%);
+    color: var(--ink);
+    font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  header { text-align: center; margin: 18px 12px 4px; }
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 44px);
+    letter-spacing: 1px;
+    color: var(--pink);
+    text-shadow: 0 3px 0 rgba(0,0,0,0.35);
+  }
+  h1 .paw { display: inline-block; transform: rotate(-12deg); }
+  .subtitle { color: var(--ink-dim); font-size: 14px; margin-top: 2px; }
+
+  .hud {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center;
+    margin: 10px 8px;
+  }
+  .hud .stat {
+    background: var(--panel); border-radius: 12px; padding: 6px 12px; font-size: 14px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07);
+  }
+  .hud .stat b { color: var(--amber); }
+  button, select {
+    font: inherit; font-size: 14px;
+    background: var(--panel); color: var(--ink);
+    border: 0; border-radius: 12px; padding: 7px 12px; cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), 0 2px 0 rgba(0,0,0,0.3);
+  }
+  button:hover, select:hover { background: #4b3a59; }
+  button:active { transform: translateY(1px); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+  button.primary { background: var(--pink-deep); }
+  button.primary:hover { background: #e07bb0; }
+
+  #stage-wrap { position: relative; margin: 4px 8px; max-width: 96vw; }
+  canvas {
+    display: block;
+    max-width: 96vw;
+    height: auto;
+    image-rendering: auto;
+    border-radius: 16px;
+  }
+  #overlay {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    background: rgba(30, 20, 38, 0.72); border-radius: 16px; text-align: center;
+    backdrop-filter: blur(2px);
+  }
+  #overlay.show { display: flex; }
+  #overlay .big { font-size: clamp(26px, 5vw, 40px); color: var(--amber); }
+  #overlay .small { color: var(--ink-dim); }
+
+  .dpad {
+    display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 54px);
+    gap: 6px; margin: 8px 0 4px; justify-content: center;
+  }
+  .dpad button { font-size: 20px; padding: 0; }
+  .dpad .up   { grid-column: 2; grid-row: 1; }
+  .dpad .left { grid-column: 1; grid-row: 2; }
+  .dpad .down { grid-column: 2; grid-row: 2; }
+  .dpad .right{ grid-column: 3; grid-row: 2; }
+  @media (min-width: 900px) { .dpad { display: none; } }
+
+  footer { color: var(--ink-dim); font-size: 13px; margin: 6px 12px 20px; text-align: center; max-width: 720px; }
+  kbd {
+    background: var(--panel); border-radius: 6px; padding: 1px 6px;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.35); font-family: inherit;
+  }
+  details {
+    margin: 8px auto 24px; max-width: 720px; width: 94vw;
+    background: var(--panel); border-radius: 14px; padding: 10px 16px;
+  }
+  summary { cursor: pointer; color: var(--amber); font-weight: 600; }
+  details pre {
+    background: var(--bg2); border-radius: 10px; padding: 10px; overflow-x: auto;
+    font-size: 12.5px; line-height: 1.45;
+  }
+  details code { color: var(--mint); }
+  details p, details li { color: var(--ink); font-size: 14px; line-height: 1.5; }
+  /* Achievement toasts + panel */
+  #toasts { position: fixed; top: 14px; right: 14px; display: flex; flex-direction: column; gap: 8px; z-index: 50; pointer-events: none; }
+  .toast {
+    background: var(--panel); border-left: 4px solid var(--amber); border-radius: 10px;
+    padding: 10px 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    animation: toast-in 0.35s ease-out; max-width: 280px;
+  }
+  .toast b { color: var(--amber); }
+  .toast .desc { color: var(--ink-dim); font-size: 12.5px; }
+  @keyframes toast-in { from { transform: translateX(120%); opacity: 0; } to { transform: none; opacity: 1; } }
+  .toast.bye { transition: opacity 0.4s, transform 0.4s; opacity: 0; transform: translateY(-8px); }
+  #ach-modal {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(20,12,26,0.7); z-index: 40;
+  }
+  #ach-modal.show { display: flex; }
+  #ach-panel {
+    background: var(--panel); border-radius: 16px; width: min(560px, 94vw);
+    max-height: 80vh; overflow: auto; padding: 16px 18px;
+  }
+  #ach-panel h2 { margin: 0 0 10px; color: var(--amber); font-size: 20px; }
+  .ach { display: flex; gap: 10px; align-items: baseline; padding: 7px 8px; border-radius: 10px; }
+  .ach:nth-child(odd) { background: rgba(255,255,255,0.04); }
+  .ach .icon { width: 26px; text-align: center; flex: none; }
+  .ach.locked { color: var(--ink-dim); opacity: 0.75; }
+  .ach b { color: var(--mint); }
+  .ach .desc { color: var(--ink-dim); font-size: 12.5px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="paw">🐾</span> Knock It Off!</h1>
+  <div class="subtitle">You are a small pink agent of chaos. Shove things onto the paw prints.</div>
+</header>
+
+<div class="hud">
+  <span class="stat">Level <b id="hud-level">1</b>: <span id="hud-name"></span></span>
+  <span class="stat">Moves <b id="hud-moves">0</b></span>
+  <span class="stat">Pushes <b id="hud-pushes">0</b></span>
+  <select id="level-select" aria-label="Choose level"></select>
+  <button id="btn-undo" title="Undo (U or Z)">↩ Undo</button>
+  <button id="btn-restart" title="Restart (R)">⟳ Restart</button>
+  <button id="btn-sfx" title="Toggle sound effects">🔊 SFX</button>
+  <button id="btn-music" title="Toggle music">🎵 Music</button>
+  <button id="btn-ach" title="Achievements">🏆 <span id="ach-count">0/0</span></button>
+</div>
+
+<div id="stage-wrap">
+  <canvas id="game"></canvas>
+  <div id="overlay">
+    <div class="big" id="overlay-title">Level clear!</div>
+    <div class="small" id="overlay-sub"></div>
+    <button class="primary" id="btn-next">Next level ▸</button>
+  </div>
+</div>
+
+<div class="dpad">
+  <button class="up" data-dir="up" aria-label="Move up">▲</button>
+  <button class="left" data-dir="left" aria-label="Move left">◀</button>
+  <button class="down" data-dir="down" aria-label="Move down">▼</button>
+  <button class="right" data-dir="right" aria-label="Move right">▶</button>
+</div>
+
+<footer>
+  Move: <kbd>←↑→↓</kbd> / <kbd>WASD</kbd> &nbsp; Undo: <kbd>U</kbd>/<kbd>Z</kbd> &nbsp; Restart: <kbd>R</kbd> &nbsp; Levels: <kbd>[</kbd> <kbd>]</kbd><br>
+  You can push an item only when you stand at <b>its height</b>, and only onto a tile of <b>equal or lower</b> height.
+  You, however, can jump up to anything. You're a cat.
+</footer>
+
+<details>
+  <summary>How to add your own levels, music, and sounds</summary>
+  <p><b>Levels</b> live in the <code>LEVELS</code> array near the top of the script in this file.
+     Each level is two aligned ASCII grids: <code>heights</code> (digits <code>0–9</code> = tile height,
+     <code>#</code> = solid wall, space = no tile) and <code>objects</code> (<code>@</code> cat,
+     <code>$</code> item, <code>x</code> target, <code>*</code> item already on a target,
+     <code>+</code> cat on a target, <code>.</code> empty). A <code>#</code> in either grid makes a wall.</p>
+  <p><b>Music</b>: set <code>MUSIC_SRC</code> to a file path or URL (e.g. <code>"music/lofi_cat.mp3"</code>)
+     and it will loop; toggle with the 🎵 button.</p>
+  <p><b>Sound effects</b>: every effect is synthesized, so the game needs no assets — but any entry in
+     <code>CUSTOM_SOUNDS</code> that you point at an audio file replaces the corresponding synth.</p>
+  <p><b>Achievements</b> are defined in the <code>ACHIEVEMENTS</code> array; add an entry and call
+     <code>award("yourId")</code> from wherever its condition is detected.</p>
+  <p>Full details are in the comment block at the top of the script.</p>
+</details>
+
+<div id="toasts" aria-live="polite"></div>
+<div id="ach-modal">
+  <div id="ach-panel">
+    <h2>🏆 Achievements <span id="ach-count2"></span></h2>
+    <div id="ach-list"></div>
+    <p style="color:var(--ink-dim);font-size:12.5px;margin-top:10px">
+      Locked achievements stay secret until you stumble into them.</p>
+    <button id="btn-ach-close">Close</button>
+  </div>
+</div>
+
+<audio id="bgm" loop preload="auto"></audio>
+
+<script>
+"use strict";
+
+/* ============================================================================
+ *  KNOCK IT OFF! — customization guide
+ * ============================================================================
+ *
+ *  1. ADDING LEVELS
+ *  ----------------
+ *  Append an object to the LEVELS array below. A level is two ASCII grids of
+ *  identical dimensions (rows may be padded with trailing spaces/dots):
+ *
+ *    heights:  one character per tile
+ *        '0'..'9'  -> tile of that height (0 = floor, higher = tables/shelves)
+ *        '#'       -> solid wall; nothing may enter, not even the cat
+ *        ' '       -> void; nothing can go there
+ *
+ *    objects:  what sits on each tile
+ *        '.'  empty        '@'  the cat         '$'  a pushable item
+ *        'x'  target       '*'  item on target  '+'  cat on target
+ *        '#'  also accepted here as a wall (classic Sokoban style)
+ *
+ *  Optional per-level fields:
+ *        par:      optimal move count (drives the "Minimalist" and
+ *                  "Scenic Route" achievements; omit to disable them there)
+ *        expected: for multi-item levels, the target each item "naturally"
+ *                  belongs on, as ["x,y", ...] in item order (items are read
+ *                  row-major from the objects grid). Solving the level with
+ *                  EVERY item on a different target than expected unlocks
+ *                  the secret "Switcheroo!" achievement.
+ *
+ *  Rules encoded by the engine:
+ *    - The cat may step onto ANY adjacent tile, regardless of height (jump).
+ *    - The cat can push an item only while standing at the SAME height as the
+ *      item's tile. (Change PUSH_REQUIRES_SAME_HEIGHT below to relax this.)
+ *    - An item may only be pushed onto an empty tile of EQUAL OR LOWER height.
+ *      Pushing it to a lower tile knocks it off the edge — the fun part.
+ *    - Items cannot be pushed off the board or into the void.
+ *    - Win when every 'x' target has an item on it.
+ *
+ *  Sanity: give the level exactly one '@' (or '+'), and at least as many
+ *  '$'/'*' items as 'x'/'*' targets. parseLevel() will warn in the console
+ *  if a level is malformed.
+ *
+ *  2. ADDING MUSIC
+ *  ---------------
+ *  Set MUSIC_SRC to a path/URL of any audio file the browser can play
+ *  (mp3/ogg/m4a/wav), e.g.:
+ *      const MUSIC_SRC = "music/lofi_cat.mp3";
+ *  It loops and is toggled with the 🎵 button. Browsers block autoplay, so
+ *  music starts on the first click of the button (or first key press after
+ *  enabling it).
+ *
+ *  3. REPLACING SOUND EFFECTS
+ *  --------------------------
+ *  All effects are synthesized with WebAudio (zero assets). To use your own
+ *  samples instead, point entries of CUSTOM_SOUNDS at audio files:
+ *      const CUSTOM_SOUNDS = { crash: "sfx/glass.mp3", win: "sfx/meow.wav" };
+ *  Recognized keys: step, jump, land, push, crash, ding, blocked, win, chirp.
+ *  Missing/failed files silently fall back to the synth versions.
+ *
+ *  4. REPLACING THE CAT
+ *  --------------------
+ *  The cat is drawn procedurally in drawCat(). To use your own sprite, set
+ *  CAT_SPRITE_SRC to an image (PNG with transparency, roughly square); it is
+ *  drawn centered on the cat's tile, flipped to face left/right.
+ *
+ *  5. ACHIEVEMENTS
+ *  ---------------
+ *  Defined in the ACHIEVEMENTS array (id, icon, name, desc). They render as
+ *  "???" until earned. To add your own: add an entry, then call award("id")
+ *  wherever you detect the condition — tryMove(), checkWin(), and the stats
+ *  object (session totals) and lvStats object (per-level tracking) give you
+ *  most of the hooks you'll want. Achievements are session-only here; to
+ *  persist them when you host this yourself, save/load the `earned` set in
+ *  award() and at startup (localStorage works fine outside sandboxed
+ *  environments).
+ * ========================================================================= */
+
+const MUSIC_SRC = null;          // e.g. "music/lofi_cat.mp3"
+const CUSTOM_SOUNDS = {};        // e.g. { crash: "sfx/glass.mp3" }
+const CAT_SPRITE_SRC = null;     // e.g. "img/my_cat.png"
+const PUSH_REQUIRES_SAME_HEIGHT = true;
+
+const LEVELS = [
+  {
+    name: "First Steps", par: 1,
+    heights: [
+      "11111",
+      "11111",
+      "11111",
+    ],
+    objects: [
+      ".....",
+      ".@$x.",
+      ".....",
+    ],
+  },
+  {
+    name: "Off the Table", par: 3,
+    heights: [
+      "00000",
+      "02220",
+      "00000",
+    ],
+    objects: [
+      ".....",
+      "@.$.x",
+      ".....",
+    ],
+  },
+  {
+    name: "Edge of Glory", par: 4,
+    heights: [
+      "000000",
+      "022220",
+      "022220",
+      "000000",
+    ],
+    objects: [
+      "..x...",
+      "@.$...",
+      "......",
+      "......",
+    ],
+  },
+  {
+    name: "Around the Bump", par: 10,
+    heights: [
+      "11111",
+      "11211",
+      "11111",
+      "11111",
+    ],
+    objects: [
+      ".....",
+      "@$.x.",
+      ".....",
+      ".....",
+    ],
+  },
+  {
+    name: "Step by Step", par: 8,
+    heights: [
+      "33222",
+      "33222",
+      "33222",
+      "11111",
+      "11111",
+    ],
+    objects: [
+      ".....",
+      ".@$..",
+      ".....",
+      "....x",
+      ".....",
+    ],
+  },
+  {
+    name: "Cat Flap", par: 8,
+    heights: [
+      "########",
+      "#111111#",
+      "#111111#",
+      "#11##11#",
+      "#111111#",
+      "########",
+    ],
+    objects: [
+      "........",
+      ".@......",
+      "..$.....",
+      "........",
+      ".....x..",
+      "........",
+    ],
+  },
+  {
+    name: "Bookshelf", par: 10,
+    heights: [
+      "########",
+      "#111111#",
+      "#221#11#",
+      "#221#11#",
+      "#111111#",
+      "########",
+    ],
+    objects: [
+      "........",
+      "........",
+      "..$.....",
+      ".@......",
+      ".....x..",
+      "........",
+    ],
+  },
+  {
+    name: "Double Trouble", par: 11,
+    expected: ["5,1", "5,3"],
+    heights: [
+      "1111111",
+      "1111111",
+      "1122211",
+      "1111111",
+      "1111111",
+    ],
+    objects: [
+      ".......",
+      ".@$..x.",
+      ".......",
+      "..$..x.",
+      ".......",
+    ],
+  },
+  {
+    name: "Two Cushions", par: 15,
+    expected: ["6,2", "6,4"],
+    heights: [
+      "#########",
+      "#1111111#",
+      "#1111111#",
+      "#11#1#11#",
+      "#1111111#",
+      "#1111111#",
+      "#########",
+    ],
+    objects: [
+      ".........",
+      ".........",
+      "..$...x..",
+      ".@.......",
+      "..$...x..",
+      ".........",
+      ".........",
+    ],
+  },
+  {
+    name: "Grand Buffet", par: 24,
+    expected: ["4,5", "8,3"],
+    heights: [
+      "##########",
+      "#22211111#",
+      "#22211#11#",
+      "#11111#11#",
+      "#1#111111#",
+      "#11111111#",
+      "##########",
+    ],
+    objects: [
+      "..........",
+      ".@........",
+      "..$....$..",
+      "........x.",
+      "..........",
+      "....x.....",
+      "..........",
+    ],
+  },
+];
+
+/* ========================= rendering constants ========================= */
+
+const TILE = 64;          // tile footprint in logical pixels
+const LIFT = 15;          // vertical pixels per height level
+const PAD  = 26;          // margin around the board
+const BASE_EDGE = 8;      // thickness under height-0 tiles
+
+const TOP_COLORS  = ["#8a6a4f", "#a5825e", "#c09a6c", "#dcb37d", "#eec98f", "#ffe0a3",
+                     "#ffe9b8", "#fff1cc", "#fff7de", "#fffbee"];
+const SIDE_COLORS = ["#5d4535", "#6f533d", "#815f44", "#93704e", "#a57f58", "#b78e63",
+                     "#c99d6e", "#dbac79", "#edbb84", "#ffca8f"];
+const ITEM_TYPES = ["vase", "mug", "plant", "fish"];
+
+/* ============================== helpers =============================== */
+
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* =============================== audio ================================ */
+
+let audioCtx = null;
+let sfxOn = true;
+const soundBuffers = {};   // name -> AudioBuffer (custom samples)
+
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    loadCustomSounds();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function loadCustomSounds() {
+  for (const [name, url] of Object.entries(CUSTOM_SOUNDS)) {
+    if (!url) continue;
+    fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => audioCtx.decodeAudioData(b))
+      .then((buf) => { soundBuffers[name] = buf; })
+      .catch(() => console.warn(`Custom sound "${name}" failed to load; using synth.`));
+  }
+}
+
+function playBuffer(buf, gain = 0.8) {
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const g = audioCtx.createGain();
+  g.gain.value = gain;
+  src.connect(g).connect(audioCtx.destination);
+  src.start();
+}
+
+// One enveloped oscillator note.
+function tone({ freq = 440, end = null, dur = 0.15, type = "sine", gain = 0.25, when = 0 }) {
+  const t0 = audioCtx.currentTime + when;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (end) osc.frequency.exponentialRampToValueAtTime(end, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.05);
+}
+
+// Short filtered noise burst (scrapes, thumps, crashes).
+function noise({ dur = 0.15, gain = 0.3, freq = 1200, q = 1, type = "bandpass", when = 0 }) {
+  const t0 = audioCtx.currentTime + when;
+  const n = Math.floor(audioCtx.sampleRate * dur);
+  const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const filt = audioCtx.createBiquadFilter();
+  filt.type = type;
+  filt.frequency.value = freq;
+  filt.Q.value = q;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(gain, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(filt).connect(g).connect(audioCtx.destination);
+  src.start(t0);
+}
+
+const SYNTH = {
+  step()    { noise({ dur: 0.05, gain: 0.10, freq: 900, type: "lowpass" }); },
+  jump()    { tone({ freq: 320, end: 620, dur: 0.13, type: "triangle", gain: 0.18 }); },
+  land()    { noise({ dur: 0.08, gain: 0.18, freq: 240, type: "lowpass" });
+              tone({ freq: 130, end: 70, dur: 0.09, type: "sine", gain: 0.18 }); },
+  push()    { noise({ dur: 0.14, gain: 0.14, freq: 1400, q: 0.7 }); },
+  crash()   { noise({ dur: 0.30, gain: 0.34, freq: 2800, q: 0.5 });
+              tone({ freq: 1900, end: 500, dur: 0.22, type: "square", gain: 0.10 });
+              tone({ freq: 2600, end: 900, dur: 0.16, type: "triangle", gain: 0.10, when: 0.03 }); },
+  ding()    { tone({ freq: 880, dur: 0.16, type: "sine", gain: 0.20 });
+              tone({ freq: 1320, dur: 0.24, type: "sine", gain: 0.14, when: 0.05 }); },
+  blocked() { tone({ freq: 110, end: 90, dur: 0.07, type: "square", gain: 0.10 }); },
+  chirp()   { tone({ freq: 520, end: 900, dur: 0.10, type: "sine", gain: 0.16 });
+              tone({ freq: 900, end: 430, dur: 0.14, type: "sine", gain: 0.16, when: 0.10 }); },
+  win()     { [523, 659, 784, 1047].forEach((f, i) =>
+                tone({ freq: f, dur: 0.18, type: "triangle", gain: 0.16, when: i * 0.09 }));
+              SYNTH.chirp(); },
+};
+
+function playSfx(name) {
+  if (!sfxOn) return;
+  ensureAudio();
+  if (soundBuffers[name]) playBuffer(soundBuffers[name]);
+  else if (SYNTH[name]) SYNTH[name]();
+}
+
+/* ============================ achievements ============================ */
+
+const ACHIEVEMENTS = [
+  { id: "pawsOn",       icon: "🐾", name: "Paws On",             desc: "Made your very first move." },
+  { id: "goodKitty",    icon: "😺", name: "Good Kitty",          desc: "Cleared a level." },
+  { id: "knockover",    icon: "💥", name: "Knockover Artist",    desc: "Knocked an item off an edge." },
+  { id: "nineLives",    icon: "↩️", name: "Nine Lives",          desc: "Used undo. No regrets. Well, one regret." },
+  { id: "cleanSlate",   icon: "🧹", name: "Clean Slate",         desc: "Restarted a level mid-mess." },
+  { id: "graduate",     icon: "🎓", name: "Graduate of Chaos",   desc: "Cleared every level." },
+  { id: "floorInspector", icon: "🔎", name: "Floor Inspector",   desc: "Stepped on every single tile of a level." },
+  { id: "catNap",       icon: "😴", name: "Cat Nap",             desc: "Did absolutely nothing for a full minute." },
+  { id: "zoomies",      icon: "⚡", name: "The Zoomies",         desc: "Made 30 moves in 15 seconds." },
+  { id: "headBonk",     icon: "🤕", name: "Head Bonk",           desc: "Bumped into things 10 times." },
+  { id: "highDive",     icon: "🏊", name: "High Dive",           desc: "Knocked an item down 3+ heights in one push." },
+  { id: "gravity",      icon: "🌍", name: "Gravity Enthusiast",  desc: "Accumulated 15 heights of total dropping." },
+  { id: "marathon",     icon: "🏃", name: "Marathon Paws",       desc: "Made 300 moves in one sitting." },
+  { id: "butterfingers", icon: "🫢", name: "Oops.",              desc: "Knocked something off somewhere it didn't belong." },
+  { id: "minimalist",   icon: "✨", name: "Minimalist",          desc: "Cleared a level in the fewest possible moves." },
+  { id: "noTakebacks",  icon: "🔒", name: "No Take-Backs",       desc: "Cleared a later level without a single undo." },
+  { id: "scenic",       icon: "🗺️", name: "Scenic Route",        desc: "Cleared a level in 3× the necessary moves." },
+  { id: "verticalLeap", icon: "🦘", name: "Vertical Leap",       desc: "Jumped up 2+ heights in a single bound." },
+  { id: "serialShover", icon: "🛒", name: "Serial Shover",       desc: "Pushed the same item 12 times in one level." },
+  { id: "proMover",     icon: "📦", name: "Professional Mover",  desc: "Racked up 50 total pushes." },
+  { id: "stealthMode",  icon: "🤫", name: "Stealth Mode",        desc: "Turned the sound off. Sneaky." },
+  { id: "switcheroo",   icon: "🔀", name: "Switcheroo!",         desc: "Swapped item locations! Nothing ended up where it belonged." },
+];
+
+const earned = new Set();
+// Session-wide stats.
+const stats = {
+  totalMoves: 0, totalPushes: 0, totalDrops: 0, dropHeight: 0,
+  blocked: 0, cleared: new Set(), moveTimes: [],
+};
+// Per-level stats; reset in loadLevel().
+let lvStats = null;
+
+function award(id) {
+  if (earned.has(id)) return;
+  const a = ACHIEVEMENTS.find((x) => x.id === id);
+  if (!a) return;
+  earned.add(id);
+  // To persist across visits when self-hosting, save `[...earned]` here.
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = `<div>${a.icon} <b>Achievement: ${a.name}</b></div><div class="desc">${a.desc}</div>`;
+  $("toasts").appendChild(t);
+  setTimeout(() => t.classList.add("bye"), 3400);
+  setTimeout(() => t.remove(), 3900);
+  playSfx("ding");
+  updateAchCount();
+}
+
+function updateAchCount() {
+  const txt = `${earned.size}/${ACHIEVEMENTS.length}`;
+  $("ach-count").textContent = txt;
+  $("ach-count2").textContent = `(${txt})`;
+}
+
+function renderAchList() {
+  const list = $("ach-list");
+  list.innerHTML = "";
+  for (const a of ACHIEVEMENTS) {
+    const row = document.createElement("div");
+    if (earned.has(a.id)) {
+      row.className = "ach";
+      row.innerHTML = `<span class="icon">${a.icon}</span><span><b>${a.name}</b> — <span class="desc">${a.desc}</span></span>`;
+    } else {
+      row.className = "ach locked";
+      row.innerHTML = `<span class="icon">❓</span><span><b>???</b> — <span class="desc">still a secret</span></span>`;
+    }
+    list.appendChild(row);
+  }
+}
+
+// "Cat Nap": a full minute of ignoring the game mid-level.
+let idleTimer = null;
+function pokeIdle() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { if (!won) award("catNap"); }, 60000);
+}
+
+/* ============================ level state ============================= */
+
+let levelIndex = 0;
+let grid = [];       // grid[y][x] = height number, or null for void
+let cols = 0, rows = 0, maxH = 0;
+let targets = [];    // [{x, y}]
+let items = [];      // [{x, y, type, vx, vy, vh}]
+let cat = null;      // {x, y, facing, vx, vy, vh}
+let moves = 0, pushes = 0;
+let history = [];
+let won = false;
+let particles = [];
+
+function parseLevel(def) {
+  const h = def.heights, o = def.objects;
+  const r = h.length;
+  const c = Math.max(...h.map((s) => s.length), ...o.map((s) => s.length));
+  const g = [];
+  const its = [], tgs = [];
+  let start = null;
+  for (let y = 0; y < r; y++) {
+    g.push([]);
+    for (let x = 0; x < c; x++) {
+      const hc = (h[y] || "")[x] ?? " ";
+      const oc = (o[y] || "")[x] ?? ".";
+      if (hc === "#" || oc === "#") g[y][x] = "#";
+      else g[y][x] = (hc >= "0" && hc <= "9") ? +hc : null;
+      if (oc === "@" || oc === "+") start = { x, y };
+      if (oc === "$" || oc === "*") its.push({ x, y });
+      if (oc === "x" || oc === "*" || oc === "+") tgs.push({ x, y });
+      if (oc !== "." && oc !== " " && oc !== "#" && typeof g[y][x] !== "number")
+        console.warn(`Level "${def.name}": object '${oc}' at (${x},${y}) sits on void or wall.`);
+    }
+  }
+  if (!start) console.warn(`Level "${def.name}": no cat ('@') found.`);
+  if (its.length < tgs.length)
+    console.warn(`Level "${def.name}": fewer items than targets — unwinnable.`);
+  return { g, r, c, its, tgs, start: start || { x: 0, y: 0 } };
+}
+
+function loadLevel(i) {
+  levelIndex = clamp(i, 0, LEVELS.length - 1);
+  const p = parseLevel(LEVELS[levelIndex]);
+  grid = p.g; rows = p.r; cols = p.c;
+  const hs = grid.flat().filter((v) => typeof v === "number");
+  maxH = hs.length ? Math.max(...hs) : 0;
+  targets = p.tgs.map((t) => ({ ...t }));
+  items = p.its.map((t, k) => ({
+    x: t.x, y: t.y, type: ITEM_TYPES[k % ITEM_TYPES.length],
+    vx: t.x, vy: t.y, vh: heightAt(t.x, t.y),
+  }));
+  cat = { x: p.start.x, y: p.start.y, facing: 1,
+          vx: p.start.x, vy: p.start.y, vh: heightAt(p.start.x, p.start.y) };
+  moves = 0; pushes = 0; history = []; won = false; particles = [];
+  lvStats = {
+    undos: 0,
+    itemPushes: items.map(() => 0),
+    visited: new Set([`${cat.x},${cat.y}`]),
+    walkable: hs.length,
+  };
+  pokeIdle();
+  $("overlay").classList.remove("show");
+  $("level-select").value = String(levelIndex);
+  resizeCanvas();
+  updateHud();
+}
+
+function restartLevel() {
+  if (moves > 0) award("cleanSlate");
+  loadLevel(levelIndex);
+}
+
+function heightAt(x, y) {
+  if (y < 0 || y >= rows || x < 0 || x >= cols) return null;
+  const v = grid[y][x];
+  return (typeof v === "number") ? v : null;
+}
+const isTile = (x, y) => heightAt(x, y) !== null;
+const itemAt = (x, y) => items.findIndex((it) => it.x === x && it.y === y);
+const targetAt = (x, y) => targets.some((t) => t.x === x && t.y === y);
+
+function snapshot() {
+  history.push({
+    cat: { x: cat.x, y: cat.y, facing: cat.facing },
+    items: items.map((it) => ({ x: it.x, y: it.y })),
+    moves, pushes,
+  });
+  if (history.length > 500) history.shift();
+}
+
+function undo() {
+  const s = history.pop();
+  if (!s || won) return;
+  cat.x = s.cat.x; cat.y = s.cat.y; cat.facing = s.cat.facing;
+  items.forEach((it, k) => { it.x = s.items[k].x; it.y = s.items[k].y; });
+  moves = s.moves; pushes = s.pushes;
+  lvStats.undos++;
+  award("nineLives");
+  playSfx("step");
+  updateHud();
+}
+
+function bonk() {
+  stats.blocked++;
+  if (stats.blocked >= 10) award("headBonk");
+  playSfx("blocked");
+}
+
+function trackMove() {
+  stats.totalMoves++;
+  award("pawsOn");
+  if (stats.totalMoves >= 300) award("marathon");
+  lvStats.visited.add(`${cat.x},${cat.y}`);
+  if (lvStats.visited.size === lvStats.walkable) award("floorInspector");
+  const now = performance.now();
+  stats.moveTimes.push(now);
+  stats.moveTimes = stats.moveTimes.filter((t) => now - t <= 15000);
+  if (stats.moveTimes.length >= 30) award("zoomies");
+}
+
+function tryMove(dx, dy) {
+  if (won) return;
+  ensureAudio();
+  pokeIdle();
+  if (dx !== 0) cat.facing = dx;
+
+  const nx = cat.x + dx, ny = cat.y + dy;
+  if (!isTile(nx, ny)) { bonk(); return; }
+
+  const hHere = heightAt(cat.x, cat.y);
+  const hNext = heightAt(nx, ny);
+  const idx = itemAt(nx, ny);
+
+  if (idx >= 0) {
+    // Attempt a push.
+    if (PUSH_REQUIRES_SAME_HEIGHT && hHere !== hNext) { bonk(); return; }
+    const bx = nx + dx, by = ny + dy;
+    if (!isTile(bx, by) || itemAt(bx, by) >= 0) { bonk(); return; }
+    const hBeyond = heightAt(bx, by);
+    if (hBeyond > hNext) { bonk(); return; }
+
+    snapshot();
+    const it = items[idx];
+    it.x = bx; it.y = by;
+    cat.x = nx; cat.y = ny;
+    moves++; pushes++;
+    stats.totalPushes++;
+    if (stats.totalPushes >= 50) award("proMover");
+    lvStats.itemPushes[idx]++;
+    if (lvStats.itemPushes[idx] >= 12) award("serialShover");
+    playSfx("push");
+    if (hBeyond < hNext) {
+      const dh = hNext - hBeyond;
+      stats.totalDrops++;
+      stats.dropHeight += dh;
+      award("knockover");
+      if (dh >= 3) award("highDive");
+      if (stats.dropHeight >= 15) award("gravity");
+      if (!targetAt(bx, by)) award("butterfingers");
+      playSfx("crash");
+      spawnCrash(bx, by, hBeyond);
+    }
+    if (targetAt(bx, by)) playSfx("ding");
+    trackMove();
+  } else {
+    snapshot();
+    cat.x = nx; cat.y = ny;
+    moves++;
+    if (hNext - hHere >= 2) award("verticalLeap");
+    if (hNext > hHere) playSfx("jump");
+    else if (hNext < hHere) playSfx("land");
+    else playSfx("step");
+    trackMove();
+  }
+  updateHud();
+  checkWin();
+}
+
+function checkWin() {
+  if (targets.every((t) => itemAt(t.x, t.y) >= 0)) {
+    won = true;
+    clearTimeout(idleTimer);
+    playSfx("win");
+    spawnConfetti();
+
+    // Achievements at level clear.
+    award("goodKitty");
+    stats.cleared.add(levelIndex);
+    if (stats.cleared.size === LEVELS.length) award("graduate");
+    const par = LEVELS[levelIndex].par;
+    if (par && moves === par) award("minimalist");
+    if (par && par > 1 && moves >= par * 3) award("scenic");
+    if (levelIndex > 0 && lvStats.undos === 0) award("noTakebacks");
+    const exp = LEVELS[levelIndex].expected;
+    if (exp && items.length === exp.length &&
+        items.every((it, i) => `${it.x},${it.y}` !== exp[i]))
+      award("switcheroo");
+
+    const last = levelIndex === LEVELS.length - 1;
+    $("overlay-title").textContent = last ? "All levels clear! 🐈" : "Level clear!";
+    $("overlay-sub").textContent =
+      `${moves} moves, ${pushes} pushes of pure feline mischief.`;
+    $("btn-next").style.display = last ? "none" : "";
+    setTimeout(() => $("overlay").classList.add("show"), 450);
+  }
+}
+
+function updateHud() {
+  $("hud-level").textContent = String(levelIndex + 1);
+  $("hud-name").textContent = LEVELS[levelIndex].name;
+  $("hud-moves").textContent = String(moves);
+  $("hud-pushes").textContent = String(pushes);
+}
+
+/* ============================= particles ============================== */
+
+function tileCenter(x, y, h) {
+  return {
+    x: PAD + x * TILE + TILE / 2,
+    y: PAD + maxH * LIFT + y * TILE + TILE / 2 - h * LIFT,
+  };
+}
+
+function spawnCrash(x, y, h) {
+  const c = tileCenter(x, y, h);
+  for (let i = 0; i < 16; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 1 + Math.random() * 2.5;
+    particles.push({
+      x: c.x, y: c.y - 8, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2,
+      life: 30 + Math.random() * 20, size: 2 + Math.random() * 3,
+      color: Math.random() < 0.5 ? "#ffe0a3" : "#f6ecf2", grav: 0.15,
+    });
+  }
+}
+
+function spawnConfetti() {
+  const colors = ["#f79ec4", "#8fe3cf", "#ffd98e", "#b8a6ff"];
+  for (let i = 0; i < 60; i++) {
+    particles.push({
+      x: Math.random() * canvas.width / DPR, y: -10 - Math.random() * 60,
+      vx: (Math.random() - 0.5) * 1.5, vy: 1 + Math.random() * 2,
+      life: 90 + Math.random() * 60, size: 3 + Math.random() * 3,
+      color: colors[i % colors.length], grav: 0.02,
+    });
+  }
+}
+
+/* ============================== drawing =============================== */
+
+const canvas = $("game");
+const ctx = canvas.getContext("2d");
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+let catSprite = null;
+if (CAT_SPRITE_SRC) {
+  catSprite = new Image();
+  catSprite.src = CAT_SPRITE_SRC;
+}
+
+function resizeCanvas() {
+  const w = cols * TILE + PAD * 2;
+  const hgt = rows * TILE + maxH * LIFT + BASE_EDGE + PAD * 2;
+  canvas.width = w * DPR;
+  canvas.height = hgt * DPR;
+  canvas.style.width = w + "px";
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawTile(x, y, h) {
+  const sx = PAD + x * TILE;
+  const topY = PAD + maxH * LIFT + y * TILE - h * LIFT;
+  // Side face (drops down to cover elevation + a base edge).
+  ctx.fillStyle = SIDE_COLORS[clamp(h, 0, 9)];
+  ctx.fillRect(sx, topY + TILE - 4, TILE, h * LIFT + BASE_EDGE + 4);
+  // Top face.
+  ctx.fillStyle = TOP_COLORS[clamp(h, 0, 9)];
+  roundRect(sx + 1, topY + 1, TILE - 2, TILE - 2, 7);
+  ctx.fill();
+  // Soft inner edge for a "plank" feel.
+  ctx.strokeStyle = "rgba(0,0,0,0.10)";
+  ctx.lineWidth = 1;
+  roundRect(sx + 3.5, topY + 3.5, TILE - 7, TILE - 7, 5);
+  ctx.stroke();
+}
+
+function drawWall(x, y) {
+  const sx = PAD + x * TILE;
+  const hw = maxH + 1.3;                     // walls loom over the tallest tile
+  const topY = PAD + maxH * LIFT + y * TILE - hw * LIFT;
+  // Side face.
+  ctx.fillStyle = "#463949";
+  ctx.fillRect(sx, topY + TILE - 4, TILE, hw * LIFT + BASE_EDGE + 4);
+  // Paneling lines on the side face.
+  ctx.strokeStyle = "rgba(0,0,0,0.22)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i <= 2; i++) {
+    const yy = topY + TILE + (i * hw * LIFT) / 3;
+    ctx.moveTo(sx + 3, yy); ctx.lineTo(sx + TILE - 3, yy);
+  }
+  ctx.stroke();
+  // Top face.
+  ctx.fillStyle = "#5f4f63";
+  roundRect(sx + 1, topY + 1, TILE - 2, TILE - 2, 6);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  roundRect(sx + 3.5, topY + 3.5, TILE - 7, TILE - 7, 4);
+  ctx.stroke();
+}
+
+function drawTargetMark(x, y, h, filled) {
+  const c = tileCenter(x, y, h);
+  ctx.save();
+  ctx.translate(c.x, c.y + 2);
+  ctx.fillStyle = filled ? "rgba(143,227,207,0.95)" : "rgba(143,227,207,0.55)";
+  // Paw pad.
+  ctx.beginPath();
+  ctx.ellipse(0, 5, 9, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Toes.
+  for (const [tx, ty] of [[-9, -4], [0, -7], [9, -4]]) {
+    ctx.beginPath();
+    ctx.arc(tx, ty, 3.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawItem(it) {
+  const c = tileCenter(it.vx, it.vy, it.vh);
+  const onT = targetAt(it.x, it.y);
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  if (onT) {
+    ctx.shadowColor = "rgba(143,227,207,0.9)";
+    ctx.shadowBlur = 14;
+  }
+  // Shadow.
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 15, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  switch (it.type) {
+    case "vase":
+      ctx.fillStyle = "#7fb2e8";
+      ctx.beginPath();
+      ctx.moveTo(-6, -26); ctx.lineTo(6, -26);
+      ctx.bezierCurveTo(4, -18, 14, -12, 12, 2);
+      ctx.bezierCurveTo(11, 9, -11, 9, -12, 2);
+      ctx.bezierCurveTo(-14, -12, -4, -18, -6, -26);
+      ctx.fill();
+      ctx.fillStyle = "#5d8fc4";
+      ctx.fillRect(-7, -28, 14, 4);
+      break;
+    case "mug":
+      ctx.fillStyle = "#e87b7b";
+      roundRect(-11, -18, 22, 26, 5); ctx.fill();
+      ctx.strokeStyle = "#e87b7b"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(13, -5, 6, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+      ctx.fillStyle = "#8a4b3a";
+      ctx.beginPath(); ctx.ellipse(0, -18, 10, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+      break;
+    case "plant":
+      ctx.fillStyle = "#c98a54";
+      ctx.beginPath();
+      ctx.moveTo(-12, -8); ctx.lineTo(12, -8); ctx.lineTo(8, 8); ctx.lineTo(-8, 8);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#6fbf73";
+      for (const [lx, ly, r] of [[-7, -16, 7], [7, -16, 7], [0, -24, 8]]) {
+        ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.fill();
+      }
+      break;
+    case "fish":
+      ctx.fillStyle = "rgba(160,215,240,0.85)";
+      ctx.beginPath(); ctx.arc(0, -8, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(80,150,200,0.5)";
+      ctx.beginPath(); ctx.arc(0, -8, 14, 0.15 * Math.PI, 0.85 * Math.PI); ctx.fill();
+      ctx.fillStyle = "#f0a640";
+      ctx.beginPath();
+      ctx.ellipse(2, -9, 5, 3.2, 0, 0, Math.PI * 2);
+      ctx.moveTo(-3, -9); ctx.lineTo(-9, -12); ctx.lineTo(-9, -6);
+      ctx.closePath(); ctx.fill();
+      break;
+  }
+  ctx.restore();
+}
+
+function drawCat() {
+  const c = tileCenter(cat.vx, cat.vy, cat.vh);
+  const t = performance.now() / 1000;
+  const bob = Math.sin(t * 3) * 1.4;
+  ctx.save();
+  ctx.translate(c.x, c.y - 4 + bob);
+  if (cat.facing < 0) ctx.scale(-1, 1);
+
+  // Shadow (doesn't bob).
+  ctx.save();
+  ctx.translate(0, 12 - bob);
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath(); ctx.ellipse(0, 0, 17, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  if (catSprite && catSprite.complete && catSprite.naturalWidth > 0) {
+    ctx.drawImage(catSprite, -TILE * 0.45, -TILE * 0.62, TILE * 0.9, TILE * 0.9);
+    ctx.restore();
+    return;
+  }
+
+  const PINK = "#f79ec4", DEEP = "#d4699f";
+  // Tail.
+  ctx.strokeStyle = PINK; ctx.lineWidth = 6; ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-13, 2);
+  ctx.bezierCurveTo(-24, 0, -24, -14 + Math.sin(t * 2.2) * 3, -17, -18 + Math.sin(t * 2.2) * 3);
+  ctx.stroke();
+  // Body.
+  ctx.fillStyle = PINK;
+  ctx.beginPath(); ctx.ellipse(0, 0, 15, 12, 0, 0, Math.PI * 2); ctx.fill();
+  // Head.
+  ctx.beginPath(); ctx.arc(7, -13, 11, 0, Math.PI * 2); ctx.fill();
+  // Ears.
+  ctx.beginPath();
+  ctx.moveTo(-1, -20); ctx.lineTo(1, -30); ctx.lineTo(7, -22); ctx.closePath();
+  ctx.moveTo(9, -23); ctx.lineTo(14, -31); ctx.lineTo(16, -20); ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = DEEP;
+  ctx.beginPath();
+  ctx.moveTo(1.5, -22); ctx.lineTo(2.5, -27); ctx.lineTo(5.8, -22.6); ctx.closePath();
+  ctx.moveTo(10.5, -23.5); ctx.lineTo(13.2, -28); ctx.lineTo(14.2, -22.4); ctx.closePath();
+  ctx.fill();
+  // Stripes.
+  ctx.strokeStyle = DEEP; ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(-8, -8); ctx.quadraticCurveTo(-5, -5, -8, -1);
+  ctx.moveTo(-3, -10); ctx.quadraticCurveTo(0, -7, -3, -2);
+  ctx.stroke();
+  // Face.
+  ctx.fillStyle = "#3a2430";
+  ctx.beginPath();
+  ctx.arc(4.5, -14, 1.8, 0, Math.PI * 2);
+  ctx.arc(11.5, -14, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#3a2430"; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(6, -9.5); ctx.quadraticCurveTo(8, -7.5, 10, -9.5);
+  ctx.stroke();
+  // Blush + nose.
+  ctx.fillStyle = "rgba(255,120,170,0.55)";
+  ctx.beginPath();
+  ctx.ellipse(2, -10.5, 2.4, 1.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(14, -10.5, 2.4, 1.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = DEEP;
+  ctx.beginPath(); ctx.arc(8, -11, 1.4, 0, Math.PI * 2); ctx.fill();
+  // Front paws.
+  ctx.fillStyle = PINK;
+  ctx.beginPath();
+  ctx.ellipse(7, 9, 4.5, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(14, 9, 4.5, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function render() {
+  // Smooth visual positions toward logical positions.
+  const K = 0.28;
+  for (const e of [cat, ...items]) {
+    e.vx = lerp(e.vx, e.x, K);
+    e.vy = lerp(e.vy, e.y, K);
+    e.vh = lerp(e.vh, heightAt(e.x, e.y) ?? e.vh, K * 0.8);
+    if (Math.abs(e.vx - e.x) < 0.004) e.vx = e.x;
+    if (Math.abs(e.vy - e.y) < 0.004) e.vy = e.y;
+  }
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Rows back-to-front so nearer (higher-y) tiles occlude correctly.
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const v = grid[y][x];
+      if (v === null) continue;
+      if (v === "#") { drawWall(x, y); continue; }
+      drawTile(x, y, v);
+      if (targetAt(x, y)) drawTargetMark(x, y, v, itemAt(x, y) >= 0);
+    }
+    // Entities whose visual row rounds to this row.
+    for (const it of items) if (Math.round(it.vy) === y) drawItem(it);
+    if (Math.round(cat.vy) === y) drawCat();
+  }
+
+  // Particles.
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += p.grav; p.life--;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.globalAlpha = clamp(p.life / 30, 0, 1);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    ctx.globalAlpha = 1;
+  }
+
+  requestAnimationFrame(render);
+}
+
+/* =============================== input ================================ */
+
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+document.addEventListener("keydown", (e) => {
+  const k = e.key.toLowerCase();
+  const map = {
+    arrowup: "up", w: "up", arrowdown: "down", s: "down",
+    arrowleft: "left", a: "left", arrowright: "right", d: "right",
+  };
+  if (map[k]) {
+    e.preventDefault();
+    tryMove(...DIRS[map[k]]);
+  } else if (k === "u" || k === "z") undo();
+  else if (k === "r") restartLevel();
+  else if (k === "[") loadLevel(levelIndex - 1);
+  else if (k === "]") loadLevel(levelIndex + 1);
+  else if (k === "enter" && won) loadLevel(levelIndex + 1);
+});
+
+document.querySelectorAll(".dpad button").forEach((b) =>
+  b.addEventListener("click", () => tryMove(...DIRS[b.dataset.dir])));
+
+// Swipe on the canvas.
+let touchStart = null;
+canvas.addEventListener("touchstart", (e) => {
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: true });
+canvas.addEventListener("touchend", (e) => {
+  if (!touchStart) return;
+  const dx = e.changedTouches[0].clientX - touchStart.x;
+  const dy = e.changedTouches[0].clientY - touchStart.y;
+  touchStart = null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+  if (Math.abs(dx) > Math.abs(dy)) tryMove(Math.sign(dx), 0);
+  else tryMove(0, Math.sign(dy));
+}, { passive: true });
+
+/* ================================ UI ================================== */
+
+$("btn-undo").addEventListener("click", undo);
+$("btn-restart").addEventListener("click", restartLevel);
+$("btn-next").addEventListener("click", () => loadLevel(levelIndex + 1));
+
+$("btn-ach").addEventListener("click", () => {
+  renderAchList();
+  $("ach-modal").classList.add("show");
+});
+$("btn-ach-close").addEventListener("click", () => $("ach-modal").classList.remove("show"));
+$("ach-modal").addEventListener("click", (e) => {
+  if (e.target === $("ach-modal")) $("ach-modal").classList.remove("show");
+});
+updateAchCount();
+
+$("btn-sfx").addEventListener("click", () => {
+  sfxOn = !sfxOn;
+  $("btn-sfx").textContent = sfxOn ? "🔊 SFX" : "🔇 SFX";
+  if (sfxOn) playSfx("chirp");
+  else award("stealthMode");
+});
+
+const bgm = $("bgm");
+let musicOn = false;
+if (MUSIC_SRC) bgm.src = MUSIC_SRC;
+$("btn-music").addEventListener("click", () => {
+  if (!MUSIC_SRC) {
+    $("btn-music").textContent = "🎵 (no file set)";
+    setTimeout(() => { $("btn-music").textContent = "🎵 Music"; }, 1600);
+    return;
+  }
+  musicOn = !musicOn;
+  if (musicOn) { bgm.volume = 0.55; bgm.play().catch(() => {}); }
+  else bgm.pause();
+  $("btn-music").textContent = musicOn ? "🎵 Music ✓" : "🎵 Music";
+});
+
+const sel = $("level-select");
+LEVELS.forEach((lv, i) => {
+  const opt = document.createElement("option");
+  opt.value = String(i);
+  opt.textContent = `${i + 1}. ${lv.name}`;
+  sel.appendChild(opt);
+});
+sel.addEventListener("change", () => loadLevel(+sel.value));
+
+/* =============================== start ================================ */
+
+loadLevel(0);
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
