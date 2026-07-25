@@ -7,7 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
@@ -93,6 +95,25 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .editor-pane textarea::selection{background:#3b4a61}
 .warnbar{max-height:90px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:11.5px;color:#d9a05a;padding:6px 12px;display:none}
 .warnbar.on{display:block}
+
+/* ---------- notice banner: draft-restore prompt, autosave warnings ---------- */
+.notice{display:none;align-items:center;gap:14px;padding:9px 16px;background:#2c2410;border-bottom:1px solid var(--amber-dim);color:var(--chrome-text);font-size:13px}
+.notice.on{display:flex}
+.notice #noticeText{flex:1}
+.notice-actions{display:flex;gap:8px;flex:0 0 auto}
+.notice .btn{padding:5px 11px;font-size:12.5px}
+.notice-x{flex:0 0 auto;background:transparent;border:0;color:var(--chrome-dim);font-size:14px;cursor:pointer;padding:4px 6px;line-height:1}
+.notice-x:hover{color:var(--chrome-text)}
+
+/* ---------- version history panel ---------- */
+.histList{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto;margin:-4px 0}
+.histRow{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
+.histMeta{flex:1;min-width:0}
+.histLabel{font-size:13px;color:var(--chrome-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.histTime{font-size:11.5px;color:var(--chrome-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.histActions{display:flex;gap:6px;flex:0 0 auto}
+.histActions .btn{padding:5px 10px;font-size:12px}
+.histDelete{color:#c97070}
 .preview-pane{flex:1;display:flex;min-width:0}
 .thumb-rail{width:168px;overflow-y:auto;padding:12px 10px;border-right:1px solid var(--line);background:var(--panel)}
 .thumb{position:relative;margin:0 0 12px;cursor:pointer;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:#000}
@@ -119,6 +140,18 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .slide .s-embed iframe{width:100%;height:100%;border:0;display:block;background:#fff}
 .slide .s-embed.embed-ph{display:flex;align-items:center;justify-content:center;border:1px dashed #9aa;background:#eef1f3}
 .slide .s-embed.embed-ph span{font-family:var(--mono);font-size:16px;color:#556}
+/* native video/audio (thumbnails/print reuse the embed placeholder look) */
+.slide .s-media{position:relative}
+.slide .s-media.s-video{border-radius:8px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.28);background:#000}
+.slide .s-media video{width:100%;height:100%;display:block;object-fit:contain;background:#000}
+.slide .s-media audio{width:100%;display:block}
+.slide .s-media.embed-ph{display:flex;align-items:center;justify-content:center;border:1px dashed #9aa;background:#eef1f3;min-height:46px}
+.slide .s-media.embed-ph span{font-family:var(--mono);font-size:16px;color:#556}
+.slide .s-media.embed-ph img{width:100%;height:100%;object-fit:cover;display:block}
+/* math: unrenderable/unloaded LaTeX falls back to visible source */
+.slide .math-err{font-family:var(--mono);font-size:.85em;color:#b03030;border-bottom:1px dotted #b03030;cursor:help}
+.slide .math-raw{font-family:var(--mono);font-size:.9em}
+.slide .katex-display{margin:.3em 0}
 .slide .box-text{width:100%;height:100%;display:flex;font-size:26px;line-height:1.3;color:#233;box-sizing:border-box;overflow:hidden}
 .slide .box-text .box-inner{display:block;width:100%}
 .s-h1{font-family:var(--slide-display,var(--display));font-weight:700;font-size:72px;line-height:1.12;letter-spacing:-.01em}
@@ -194,6 +227,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <button class="mitem" id="miNew">New Script</button>
     <button class="mitem" id="miOpen">Open Script…</button>
     <button class="mitem" id="miSave">Save Script</button>
+    <div class="msep"></div>
+    <button class="mitem" id="miCheckpoint">Save Checkpoint…</button>
+    <button class="mitem" id="miHistory">Version History…</button>
+    <div class="msep"></div>
     <button class="mitem" id="miSample">Load Sample Deck</button>
     <div class="msep"></div>
     <button class="mitem" id="miPptx">Import PowerPoint…</button>
@@ -203,8 +240,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
   <div class="menu" id="mInsert"><button class="mbtn">Insert</button><div class="mlist">
     <button class="mitem" data-ins="image">Image…</button>
+    <button class="mitem" data-ins="video">Video…</button>
+    <button class="mitem" data-ins="audio">Audio…</button>
     <button class="mitem" data-ins="link">Link…</button>
     <button class="mitem" data-ins="table">Table…</button>
+    <button class="mitem" data-ins="chart">Chart…</button>
     <div class="msep"></div>
     <button class="mitem" data-ins="line">Line…</button>
     <button class="mitem" data-ins="arrow">Arrow…</button>
@@ -240,6 +280,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   <input type="file" id="fileIn" accept=".psl,.txt,.md,.slides" style="display:none">
   <input type="file" id="pptxIn" accept=".pptx" style="display:none">
 </div>
+
+<div class="notice" id="notice"><span id="noticeText"></span><span class="notice-actions" id="noticeActions"></span><button class="notice-x" id="noticeClose" title="Dismiss">✕</button></div>
 
 <div class="split" id="split">
   <div class="editor-pane">
@@ -290,6 +332,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td># Title / ## Subtitle</td><td>Big centered title and subtitle (title slides).</td></tr>
       <tr><td>### Slide title</td><td>Heading at the top of a regular slide.</td></tr>
       <tr><td>- item / &nbsp;&nbsp;- sub-item</td><td>Bullets; indent 2 spaces per level. <code>**bold**</code>, <code>*italic*</code>, <code>`code`</code> work in any text.</td></tr>
+      <tr><td>$e^{i\pi} + 1 = 0$ &nbsp;·&nbsp; $$\frac{dN}{dt} = rN$$</td><td>LaTeX math (KaTeX) in any text — headings, bullets, table cells, shape text. <code>$…$</code> is inline, <code>$$…$$</code> is display (centered, on its own line). Currency is left alone (<code>$5 and $10</code> stays text); write <code>\$</code> for a literal dollar sign next to math. <code>\${…}</code> variables substitute first, so computed values work inside formulas. Invalid LaTeX shows its source in red with the error as a tooltip.</td></tr>
       <tr><td>% a comment</td><td>Ignored.</td></tr>
       <tr><td>...</td><td>Pause point — wait for spacebar before revealing what follows.</td></tr>
       <tr><td>&gt;&gt;&gt;</td><td>Chain — run what follows automatically when the previous animations finish.</td></tr>
@@ -315,7 +358,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <table>
       <tr><td>@(0.55, 0.1) text or element</td><td>Absolute position: top-left anchor at 55% across, 10% down. Add <code>{anchor=center}</code> to center on the point.</td></tr>
       <tr><td>[mylabel] element</td><td>Name an element so animations can target it.</td></tr>
-      <tr><td>{size=44px, color=crimson} text</td><td>Style overrides. Keys: <code>size</code> <code>color</code> <code>font</code> <code>fill</code> <code>w</code> <code>h</code> <code>thick</code> <code>align</code> <code>valign</code> <code>anchor</code> <code>opacity</code> · shapes/boxes also: <code>textcolor</code> <code>pad</code> <code>round</code> <code>tint</code> <code>dim</code>.</td></tr>
+      <tr><td>{size=44px, color=crimson} text</td><td>Style overrides. Keys: <code>size</code> <code>color</code> <code>font</code> <code>fill</code> <code>w</code> <code>h</code> <code>thick</code> <code>align</code> <code>valign</code> <code>anchor</code> <code>opacity</code> <code>rotate</code> · shapes/boxes also: <code>textcolor</code> <code>pad</code> <code>round</code> <code>tint</code> <code>dim</code>.</td></tr>
+      <tr><td>{rotate=25} !rect (…)(…)</td><td>Give an element a starting rotation, in degrees, about its own center.</td></tr>
     </table>
 
     <h3>Images, backgrounds &amp; embeds</h3>
@@ -324,6 +368,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!bg(url)  ·  !bg(#123456)</td><td>Slide background image (covers slide) or color.</td></tr>
       <tr><td>{dim=0.5, tint=#000} !bg(url)  ·  !dim 0.5</td><td>Darken (or tint) the background so text on top stays readable. <code>dim</code> is 0–1.</td></tr>
       <tr><td>!embed(https://your.app)</td><td>Embed a live web app as an iframe. Position with <code>@()</code>, size with <code>{w=, h=}</code>. Thumbnails show a placeholder.</td></tr>
+      <tr><td>!video(clip.mp4)<br>!audio(voice.mp3)</td><td>Native video / audio. Position with <code>@()</code>, size video with <code>{w=, h=}</code> (defaults to 16:9). Style flags: <code>autoplay</code> (starts when the element is revealed — browsers require <code>muted</code> for videos to autoplay reliably), <code>loop</code>, <code>muted</code>, <code>controls=0</code>, and <code>poster=url</code> for a video cover frame. Playback pauses automatically when the element is hidden or you leave the slide. Thumbnails and print show the poster or a placeholder.</td></tr>
+      <tr><td>!chart bar (0.2, 0.3) (0.6, 0.5) Q1:14, Q2:22, Q3:19<br>!chart line (x, y) (w, h) 2023:4, 2024:9<br>!chart pie (0.5, 0.5) 0.25 A:40, B:35, C:25</td><td>Native charts from <code>label:value</code> pairs. Bar and line take a top-left corner and size; pie takes a center and radius. Styling: <code>colors=(#1f6f6b, #d97b4a, …)</code> sets the series palette (or <code>fill=</code> for one color), <code>color=</code> the axis/label ink, <code>size=</code> the label text size, <code>thick=</code> the line-chart stroke, and <code>values=0</code> hides the numeric labels. Values can be computed with <code>\${…}</code>. Charts are shapes, so <code>!anim</code> enter/exit, scale, rotate, hide and show all work on them.</td></tr>
+      <tr><td>!set transition fade 0.4<br>!transition slide</td><td>Slide-to-slide transitions during presentation: <code>fade</code>, <code>slide</code> (direction follows travel), <code>slideleft</code>, <code>slideright</code>, or <code>none</code>, with an optional duration in seconds. <code>!set transition …</code> applies from that slide onward; a <code>!transition …</code> line overrides it for its own slide only (it applies when <i>entering</i> that slide). Editor preview, thumbnails, and print always cut; the transition is skipped for users with reduced-motion enabled.</td></tr>
     </table>
 
     <h3>Shapes &amp; text boxes</h3>
@@ -348,6 +395,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!anim arrow1 point 2 (0.8, 0.5) 1s</td><td>Move just point 1 or 2 of a line/arrow.</td></tr>
       <tr><td>!anim pic size 0.45 1s</td><td>Animate an image to a new width.</td></tr>
       <tr><td>!anim pic scale 1.6 0.5s</td><td>Scale any element about its center.</td></tr>
+      <tr><td>!anim pic rotate 180 1s</td><td>Rotate an element to an absolute angle (degrees), pivoting on its own center.</td></tr>
+      <tr><td>!anim hand rotate 90 around (0.5, 0.5) 1s</td><td>Rotate around any point in the slide, not just the element's own center — e.g. a clock hand around the clock face, or one shape orbiting another.</td></tr>
       <tr><td>!anim word color #cc2244 0.5s</td><td>Animate text color / shape stroke.</td></tr>
       <tr><td>!anim word textsize 54px 0.7s</td><td>Animate font size.</td></tr>
     </table>
@@ -393,17 +442,46 @@ const px = (v, span) => (Math.abs(v) <= 1 ? v*span : v);   // fraction or pixels
 const cx = v => px(v, SW), cy = v => px(v, SH);
 
 function escapeHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+/* LaTeX -> HTML via KaTeX. Never throws: if KaTeX is unavailable (offline)
+   the raw source is shown in mono; a KaTeX parse error shows the source
+   flagged in red with the message as a tooltip. */
+function renderMath(tex, display){
+  const src=display?"$$"+tex+"$$":"$"+tex+"$";
+  if(!window.katex) return '<span class="math-raw">'+escapeHtml(src)+"</span>";
+  try{ return katex.renderToString(tex,{displayMode:display,throwOnError:true}); }
+  catch(e){
+    const msg=String(e&&e.message||e).replace(/"/g,"&quot;");
+    return '<span class="math-err" title="'+escapeHtml(msg)+'">'+escapeHtml(src)+"</span>";
+  }
+}
+
+/* Inline markdown. Code spans and math are pulled out first (so their
+   contents are never touched by entity/link/emphasis rules), the rest is
+   escaped and processed, then the protected pieces are spliced back in.
+   Math: $...$ inline, $$...$$ display, \$ for a literal dollar sign.
+   To leave currency alone, $...$ only counts as math when the opening $
+   is not followed by whitespace, the closing $ is not preceded by
+   whitespace, and the closing $ is not immediately followed by a digit
+   (so "$5 and $10" or "from $3 to $8" never turn into math). */
 function inlineMd(s){
-  let h = escapeHtml(s);
+  const stash=[];
+  const keep=html=>{ stash.push(html); return "\u0000"+(stash.length-1)+"\u0000"; };
+  let raw=s;
+  raw=raw.replace(/`([^`]+)`/g,(_,c)=>keep("<code>"+escapeHtml(c)+"</code>"));
+  raw=raw.replace(/\\\$/g,()=>keep("$"));
+  raw=raw.replace(/\$\$([^$]+)\$\$/g,(_,tex)=>keep(renderMath(tex,true)));
+  raw=raw.replace(/\$([^\s$][^$]*?)\$(?!\d)/g,(all,tex)=>/\s$/.test(tex)?all:keep(renderMath(tex,false)));
+  let h = escapeHtml(raw);
   // entities stay usable: &nbsp; &mdash; &rarr; &#8594; &#x1F600; ... (never tags)
   h = h.replace(/&amp;(#\d{1,7}|#x[0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,30});/g,"&$1;");
-  h = h.replace(/`([^`]+)`/g,"<code>$1</code>");
   h = h.replace(/(^|[^!])\[([^\]]+)\]\(([^)\s]+)\)/g,(all,pre,txt,url)=>{
     if(/^javascript:/i.test(url)) return all;
     return pre+'<a href="'+url.replace(/"/g,"%22")+'" target="_blank" rel="noopener">'+txt+"</a>";
   });
   h = h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
   h = h.replace(/\*([^*]+)\*/g,"<i>$1</i>");
+  h = h.replace(/\u0000(\d+)\u0000/g,(_,i)=>stash[+i]);
   return h;
 }
 let _colorProbe=null;
@@ -675,6 +753,8 @@ function memberOf(def, m, vars){
       const x=def.pos?def.pos.x:undefined, y=def.pos?def.pos.y:undefined;
       let w=styleLen(st.w,SW,vars), h=styleLen(st.h,SH,vars);
       if(def.kind==="embed"){ if(w==null) w=Math.round(SW*0.6); if(h==null) h=Math.round(SH*0.62); }
+      if(def.kind==="video"){ if(w==null) w=Math.round(SW*0.5); if(h==null) h=Math.round(w*9/16); }
+      if(def.kind==="audio"&&w==null) w=Math.round(SW*0.35);
       const o={x,y,w:w==null?undefined:w,h:h==null?undefined:h};
       if(o.x!==undefined&&o.w!==undefined) o.cx=o.x+o.w/2;
       if(o.y!==undefined&&o.h!==undefined) o.cy=o.y+o.h/2;
@@ -705,12 +785,18 @@ const RE_DUR   = /(?:^|\s)([\d.]+)\s*s\s*$/;
 
 function parseStyle(s){
   const st={}; let lastKey=null;
+  // A bare word continues the previous value only where that's meaningful:
+  // inside unbalanced parens (fill=rgba(1,2,3,.5)) or font stacks
+  // (font=Georgia, serif). Anywhere else it's a boolean flag, so
+  // {w=0.4, autoplay, muted} works as expected.
+  const unbalanced=v=>{ const t=String(v); let d=0; for(const ch of t){ if(ch==="(")d++; else if(ch===")")d--; } return d>0; };
   for(const part of s.split(/[,;]/)){
-    const eq=part.indexOf("=");
-    if(eq>=0){ lastKey=part.slice(0,eq).trim().toLowerCase(); st[lastKey]=part.slice(eq+1).trim(); }
-    else if(part.trim()){
-      if(lastKey) st[lastKey]+=", "+part.trim();      // e.g. {font=Georgia, serif}
-      else st[part.trim().toLowerCase()]=true;
+    const eq=part.indexOf("="), t=part.trim();
+    if(eq>=0 && !(lastKey && unbalanced(st[lastKey]))){
+      lastKey=part.slice(0,eq).trim().toLowerCase(); st[lastKey]=part.slice(eq+1).trim();
+    }else if(t){
+      if(lastKey && (unbalanced(st[lastKey]) || lastKey.includes("font"))) st[lastKey]+=", "+t;
+      else st[t.toLowerCase()]=true;
     }
   }
   return st;
@@ -759,6 +845,11 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
 
   const srcLines=body.split("\n").map((text,i)=>({text, n:i+1}));
   processLines(srcLines);
+  // Effective transition for ENTERING this slide: a per-slide !transition line
+  // wins; otherwise whatever `!set transition` is in force at this point in
+  // the deck (so a mid-deck !set changes it from that slide onward).
+  if(slide.transition===undefined && vars.transition!=null)
+    slide.transition=String(vars.transition).toLowerCase();
   return slide;
 
   function processLines(L){
@@ -889,6 +980,56 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       addItem({id:nextId++, kind:"embed", src:m[1].trim(), label, style, pos});
       continue;
     }
+    // --- native video / audio ---
+    if((m=line.match(/^!(video|audio)\((.+)\)\s*$/i))){
+      addItem({id:nextId++, kind:m[1].toLowerCase(), src:m[2].trim(), label, style, pos});
+      continue;
+    }
+    // --- charts: !chart bar|line (x,y) (w,h) A:1, B:2   ·   !chart pie (cx,cy) r A:1, B:2 ---
+    if((m=line.match(/^!chart\s+(bar|line|pie)\b(.*)$/i))){
+      const ctype=m[1].toLowerCase(), rest2=m[2];
+      RE_PAIR.lastIndex=0;
+      const pm=[...rest2.matchAll(RE_PAIR)];
+      const endOf2=mm=>mm.index+mm[0].length;
+      const item={id:nextId++, kind:"chart", ctype, label, style, pos:null};
+      let ok=true, geomEnd=0;
+      if(ctype==="pie"){
+        if(pm.length<1) ok=false;
+        else{
+          const after=rest2.slice(endOf2(pm[0])), rm=after.match(/^\s*(-?[\d.]+)/);
+          if(!rm) ok=false;
+          else{ item.cx=cvx(+pm[0][1],vars); item.cy=cvy(+pm[0][2],vars);
+                item.r=cvlen(parseFloat(rm[1]),vars,SH); geomEnd=endOf2(pm[0])+rm[0].length; }
+        }
+      }else{
+        if(pm.length<2) ok=false;
+        else{ item.x=cvx(+pm[0][1],vars); item.y=cvy(+pm[0][2],vars);
+              item.w=cvx(+pm[1][1],vars); item.h=cvy(+pm[1][2],vars); geomEnd=endOf2(pm[1]); }
+      }
+      if(!ok){ warnings.push(`${where(lnNo)}: !chart ${ctype} needs ${ctype==="pie"?"(cx, cy) radius":"(x, y) (w, h)"} then label:value pairs`); continue; }
+      const data=[];
+      for(const seg of rest2.slice(geomEnd).split(",")){
+        const t=seg.trim(); if(!t) continue;
+        const ci=t.lastIndexOf(":");
+        if(ci<0){ warnings.push(`${where(lnNo)}: chart data “${t}” isn't label:value`); continue; }
+        const lab=t.slice(0,ci).trim(), v=parseFloat(t.slice(ci+1));
+        if(isNaN(v)){ warnings.push(`${where(lnNo)}: chart value for “${lab}” isn't a number`); continue; }
+        if(ctype==="pie" && v<=0){ warnings.push(`${where(lnNo)}: pie slice “${lab}” dropped — pie values must be positive`); continue; }
+        data.push({label:lab, value:v});
+      }
+      if(!data.length){ warnings.push(`${where(lnNo)}: !chart has no usable data points`); continue; }
+      item.data=data;
+      addItem(item);
+      continue;
+    }
+    // --- per-slide transition override (deck-wide default: !set transition …) ---
+    if((m=line.match(/^!transition\s+(\S+)(?:\s+([\d.]+))?\s*$/i))){
+      const ty=m[1].toLowerCase();
+      if(!["none","fade","slide","slideleft","slideright"].includes(ty))
+        warnings.push(`${where(lnNo)}: unknown transition “${ty}” — use none, fade, slide, slideleft, or slideright`);
+      else slide.transition=ty+(m[2]?" "+m[2]:"");
+      continue;
+    }
     // --- shapes ---
     if((m=line.match(/^!(line|arrow|circle|ellipse|rect|textbox|box|polygon|polyline|triangle|diamond|star|curve)\b(.*)$/i))){
       let kind=m[1].toLowerCase(); if(kind==="box") kind="textbox";
@@ -1006,6 +1147,13 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
       return {target,verb,dur,w:cvlen(v,vars,SW)}; }
     case "scale":{ const v=parseFloat(args); if(isNaN(v)) return bad("scale needs a factor");
       return {target,verb,dur,f:v}; }
+    case "rotate":{
+      const rm=args.match(/^(-?[\d.]+)\s*(?:around\s*\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\))?\s*$/i);
+      if(!rm) return bad("rotate needs a degree value, optionally “around (x,y)”");
+      const deg=parseFloat(rm[1]);
+      return rm[2]!=null
+        ? {target,verb,dur,deg,hasOrigin:true,x:cvx(parseFloat(rm[2]),vars),y:cvy(parseFloat(rm[3]),vars)}
+        : {target,verb,dur,deg,hasOrigin:false}; }
     case "color": return args ? {target,verb,dur,color:args} : bad("color needs a value");
     case "textsize": return args ? {target,verb,dur,size:args} : bad("textsize needs a size");
     default: return bad(`unknown animation “${verb}”`);
@@ -1075,13 +1223,16 @@ function renderSlide(slideDef, opts){
 
   for(const def of slideDef.items){
     const it={def, el:null, shape:null, coords:def.coords?def.coords.map(c=>c.slice()):null,
-              r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false, scale:1};
+              r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false, scale:1, rot:0, rotOrigin:null};
     if(["h1","h2","h3","p","li"].includes(def.kind))      buildText(it,flow,absLayer);
     else if(def.kind==="img")                             buildImg(it,flow,absLayer);
     else if(def.kind==="code")                            buildCode(it,flow,absLayer);
     else if(def.kind==="table")                           buildTable(it,flow,absLayer);
     else if(def.kind==="embed")                           buildEmbed(it,flow,absLayer,opts);
+    else if(def.kind==="video"||def.kind==="audio")       buildMedia(it,flow,absLayer,opts);
+    else if(def.kind==="chart")                           buildChart(it,svg);
     else                                                  buildShape(it,svg);
+    if(def.style.rotate!=null){ const rv=parseFloat(def.style.rotate); if(!isNaN(rv)){ it.rot=rv; applyTransform(it); } }
     setVisible(it,false);
     items.set(def.id,it);
     if(def.label) labels.set(def.label,it);
@@ -1185,6 +1336,37 @@ function buildEmbed(it,flow,absLayer,opts){
   }
   placeItem(it,flow,absLayer,box);
 }
+/* Native <video>/<audio>. Style keys: w, h, poster=url, and boolean flags
+   autoplay, loop, muted; controls default on, {controls=0} hides them.
+   Playback is tied to visibility (see setVisible): autoplay starts when the
+   element is revealed, and hiding it or leaving the slide pauses it.
+   Thumbnails and print show a poster or placeholder, never a live player. */
+function buildMedia(it,flow,absLayer,opts){
+  const d=it.def, isVid=d.kind==="video";
+  const w=d.style.w?sizeToPx(d.style.w,SW,d.abs):Math.round(SW*(isVid?0.5:0.35));
+  const h=isVid ? (d.style.h?sizeToPx(d.style.h,SH,d.abs):Math.round(w*9/16)) : null;
+  const box=document.createElement("div"); box.className="s-media"+(isVid?" s-video":" s-audio");
+  box.style.width=w+"px"; if(h) box.style.height=h+"px";
+  if(d.style.opacity) box.style.opacity=d.style.opacity;
+  if(isVid){ it.embedW=w; it.embedH=h; it.embedBox=box; }     // lets `!anim … size` resize videos
+  if(opts.thumb){                       // rail thumbnails & print pages: poster or placeholder
+    box.classList.add("embed-ph");
+    if(isVid&&d.style.poster){ const im=document.createElement("img"); im.src=d.style.poster; im.alt=""; box.appendChild(im); }
+    else{
+      let host=""; try{ host=new URL(d.src,location.href).host; }catch(e){ host=d.src; }
+      box.innerHTML=`<span>${isVid?"▶":"♪"} ${escapeHtml(host||d.kind)}</span>`;
+    }
+  }else{
+    const md=document.createElement(isVid?"video":"audio");
+    md.src=d.src; md.preload="metadata"; md.playsInline=true;
+    md.controls = !(d.style.controls==="0"||d.style.controls==="off"||d.style.controls==="false");
+    if(d.style.loop)  md.loop=true;
+    if(d.style.muted) md.muted=true;
+    if(isVid&&d.style.poster) md.poster=d.style.poster;
+    box.appendChild(md); it.media=md;
+  }
+  placeItem(it,flow,absLayer,box);
+}
 function buildShape(it,svg){
   const d=it.def, st=d.style;
   const isBox = d.kind==="textbox";
@@ -1235,6 +1417,101 @@ function buildShape(it,svg){
   svg.appendChild(g); it.el=g; it.shape=true;
   updateShape(it);
 }
+/* Native charts, hand-rolled SVG — themes with the deck, and because the
+   chart is a shape group it gets enter/exit/scale/rotate/hide/show for free.
+   Style keys: color= (axis/label ink), colors=(c1, c2, …) or fill= (series
+   palette), size= (label text size), thick= (line-chart stroke), values=0
+   (hide numeric value labels). */
+const CHART_PALETTE=["#1f6f6b","#d97b4a","#4a6fb3","#c9a227","#8a5fbf","#3f985c","#c05a76","#6b7b8c"];
+function buildChart(it,svg){
+  const d=it.def, st=d.style, data=d.data, n=data.length;
+  const g=document.createElementNS(SVGNS,"g");
+  const ink = st.color || "#232830";
+  const palette = st.colors ? String(st.colors).replace(/^\(|\)$/g,"").split(",").map(s=>s.trim()).filter(Boolean)
+                : st.fill   ? [st.fill]
+                : CHART_PALETTE;
+  const col=i=>palette[i%palette.length];
+  const fs = st.size ? sizeToPx(st.size,SH) : 20;
+  const showVals = !(st.values==="0"||st.values==="off"||st.values==="false");
+  const fmt=v=>String(+(+v).toFixed(2));
+  const T=(x,y,txt,anchor,size,fill,bold)=>{
+    const t=document.createElementNS(SVGNS,"text");
+    t.setAttribute("x",x); t.setAttribute("y",y); t.setAttribute("text-anchor",anchor||"middle");
+    t.setAttribute("font-size",size||fs); t.setAttribute("fill",fill||ink);
+    t.setAttribute("font-family","inherit"); if(bold) t.setAttribute("font-weight","600");
+    t.textContent=txt; g.appendChild(t); return t;
+  };
+  const axis=(x1,y1,x2,y2)=>{
+    const ln=document.createElementNS(SVGNS,"line");
+    ln.setAttribute("x1",x1); ln.setAttribute("y1",y1); ln.setAttribute("x2",x2); ln.setAttribute("y2",y2);
+    ln.setAttribute("stroke",ink); ln.setAttribute("stroke-width",1.5); ln.setAttribute("opacity",0.55);
+    g.appendChild(ln);
+  };
+  if(d.ctype==="pie"){
+    const {cx,cy,r}=d, total=data.reduce((s,p)=>s+p.value,0);
+    let a=-Math.PI/2;
+    data.forEach((p,i)=>{
+      const frac=p.value/total, a2=a+frac*2*Math.PI;
+      if(n===1){                                        // a single slice is just a disc
+        const c=document.createElementNS(SVGNS,"circle");
+        c.setAttribute("cx",cx); c.setAttribute("cy",cy); c.setAttribute("r",r); c.setAttribute("fill",col(i));
+        g.appendChild(c);
+      }else{
+        const x1=cx+r*Math.cos(a), y1=cy+r*Math.sin(a), x2=cx+r*Math.cos(a2), y2=cy+r*Math.sin(a2);
+        const big=frac>0.5?1:0;
+        const path=document.createElementNS(SVGNS,"path");
+        path.setAttribute("d",`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${big} 1 ${x2} ${y2} Z`);
+        path.setAttribute("fill",col(i)); path.setAttribute("stroke","#ffffff"); path.setAttribute("stroke-width",2);
+        g.appendChild(path);
+      }
+      const mid=(a+a2)/2;
+      if(showVals && frac>=0.07)
+        T(cx+r*0.62*Math.cos(mid), cy+r*0.62*Math.sin(mid)+fs*0.35, Math.round(frac*100)+"%", "middle", fs*0.9, "#ffffff", true);
+      const lx=cx+(r+fs*0.55)*Math.cos(mid), ly=cy+(r+fs*0.55)*Math.sin(mid);
+      T(lx, ly+fs*0.35, p.label, Math.cos(mid)>0.25?"start":Math.cos(mid)<-0.25?"end":"middle");
+      a=a2;
+    });
+  }else{
+    const {x,y,w,h}=d;
+    const labBand=fs*1.7, valBand=showVals?fs*1.35:fs*0.4;
+    const px=x, pw=w, py=y+valBand, ph=Math.max(10,h-valBand-labBand);
+    const vals=data.map(p=>p.value);
+    const vmax=Math.max(0,...vals), vmin=Math.min(0,...vals), span=(vmax-vmin)||1;
+    const Y=v=>py+(vmax-v)/span*ph, base=Y(0);
+    if(d.ctype==="bar"){
+      const barW=pw/(n*1.5+0.5), gap=barW/2;
+      data.forEach((p,i)=>{
+        const bx=px+gap+i*(barW+gap), by=Y(p.value);
+        const rect=document.createElementNS(SVGNS,"rect");
+        rect.setAttribute("x",bx); rect.setAttribute("y",Math.min(by,base));
+        rect.setAttribute("width",barW); rect.setAttribute("height",Math.max(1,Math.abs(by-base)));
+        rect.setAttribute("rx",Math.min(4,barW/4)); rect.setAttribute("fill",col(i));
+        g.appendChild(rect);
+        T(bx+barW/2, y+h-fs*0.35, p.label);
+        if(showVals) T(bx+barW/2, p.value>=0?by-fs*0.35:by+fs, fmt(p.value), "middle", fs*0.9);
+      });
+      axis(px,base,px+pw,base);
+    }else{                                              // line
+      const X=i=>n===1?px+pw/2:px+pw*i/(n-1);
+      axis(px,base,px+pw,base);
+      const pl=document.createElementNS(SVGNS,"polyline");
+      pl.setAttribute("points",data.map((p,i)=>`${X(i)},${Y(p.value)}`).join(" "));
+      pl.setAttribute("fill","none"); pl.setAttribute("stroke",col(0));
+      pl.setAttribute("stroke-width",st.thick!=null?parseFloat(st.thick):4);
+      pl.setAttribute("stroke-linecap","round"); pl.setAttribute("stroke-linejoin","round");
+      g.appendChild(pl);
+      data.forEach((p,i)=>{
+        const dot=document.createElementNS(SVGNS,"circle");
+        dot.setAttribute("cx",X(i)); dot.setAttribute("cy",Y(p.value)); dot.setAttribute("r",5); dot.setAttribute("fill",col(0));
+        g.appendChild(dot);
+        T(X(i), y+h-fs*0.35, p.label);
+        if(showVals) T(X(i), p.value>=0?Y(p.value)-fs*0.55:Y(p.value)+fs*1.1, fmt(p.value), "middle", fs*0.9);
+      });
+    }
+  }
+  if(st.opacity) g.setAttribute("opacity",st.opacity);
+  svg.appendChild(g); it.el=g; it.shape=true; it.stroke=ink;
+}
 function updateShape(it){
   const d=it.def;
   if(d.kind==="line"||d.kind==="arrow"){
@@ -1283,6 +1560,46 @@ function setVisible(it,on){
   it.visible=on;
   it.el.classList.toggle("hidden-item",!on);
   if(it.shape) it.el.style.visibility=on?"visible":"hidden";
+  if(it.media){
+    try{
+      if(on){ if(it.def.style.autoplay && it.media.paused){ const p=it.media.play(); if(p&&p.catch) p.catch(()=>{}); } }
+      else if(!it.media.paused) it.media.pause();
+    }catch(_){}
+  }
+}
+
+/* Composes an item's persistent scale + rotation into its transform.
+   Rotation pivots on it.rotOrigin (absolute slide coords) when set,
+   otherwise on the item's own center.
+   HTML items: it.x/it.y are the element's CSS left/top in slide px
+   (set by placeItem for positioned items, liftOutOfFlow for flow items).
+   With a pivot, rotate/scale go BEFORE the anchor translate so that
+   transform-origin (P − left/top) lands the pivot exactly at P for
+   any anchor; without one, translate-first keeps the pivot on the
+   element's visual center. Both cases are exact. */
+function applyTransform(it){
+  const rot=it.rot||0, sc=it.scale!=null?it.scale:1, el=it.el;
+  if(!el) return;
+  if(!rot && sc===1){
+    if(it.shape) el.removeAttribute("transform");
+    else{ el.style.transform=(it.def.pos&&it.def.style.anchor==="center")?"translate(-50%,-50%)":""; el.style.transformOrigin=""; }
+    return;
+  }
+  if(it.shape){
+    const bb=el.getBBox(), scx=bb.x+bb.width/2, scy=bb.y+bb.height/2;
+    const ox=it.rotOrigin?it.rotOrigin.x:scx, oy=it.rotOrigin?it.rotOrigin.y:scy;
+    el.setAttribute("transform",
+      `rotate(${rot} ${ox} ${oy}) translate(${scx} ${scy}) scale(${sc}) translate(${-scx} ${-scy})`);
+  }else{
+    const base=it.def.pos&&it.def.style.anchor==="center" ? "translate(-50%,-50%)" : "";
+    if(it.rotOrigin){
+      el.style.transformOrigin=`${it.rotOrigin.x-(it.x||0)}px ${it.rotOrigin.y-(it.y||0)}px`;
+      el.style.transform=`rotate(${rot}deg) scale(${sc})`+(base?" "+base:"");
+    }else{
+      el.style.transformOrigin="center center";
+      el.style.transform=(base?base+" ":"")+`rotate(${rot}deg) scale(${sc})`;
+    }
+  }
 }
 
 /* ============================================================
@@ -1328,8 +1645,9 @@ function makeAnim(a, render, warnings){
     case "enter": case "exit":{
       const [dx,dy,sc,rot]=FX[a.effect]||FX.fade;
       const entering=a.verb==="enter";
+      const rot0=it.rot||0, sc0=it.scale!=null?it.scale:1;
       const apply=k=>{                    // k: 1 = fully offset, 0 = in place
-        const s2=1+(sc-1)*k, r=rot*k, ox=dx*k, oy=dy*k;
+        const s2=sc0*(1+(sc-1)*k), r=rot0+rot*k, ox=dx*k, oy=dy*k;
         if(it.shape){
           const bb=el.getBBox(), cx0=bb.x+bb.width/2, cy0=bb.y+bb.height/2;
           el.setAttribute("transform",
@@ -1345,14 +1663,15 @@ function makeAnim(a, render, warnings){
       return T(a.dur,t=>{
         apply(entering ? 1-t : t);
         if(t>=1){
-          if(entering){ el.style.opacity=""; if(!it.shape) el.style.transform= (it.def.pos&&it.def.style.anchor==="center")?"translate(-50%,-50%)":""; else el.removeAttribute("transform"); }
-          else { setVisible(it,false); el.style.opacity=""; if(!it.shape) el.style.transform=(it.def.pos&&it.def.style.anchor==="center")?"translate(-50%,-50%)":""; else el.removeAttribute("transform"); }
+          if(entering){ el.style.opacity=""; applyTransform(it); }
+          else { setVisible(it,false); el.style.opacity=""; applyTransform(it); }
         }
       });
     }
     case "path":{
       const q=(p0,p1,p2,t)=>{ const u=1-t; return u*u*p0 + 2*u*t*p1 + t*t*p2; };
       if(it.shape){
+        if(!it.coords) return null;              // charts have no vertex list
         const start=it.coords.map(c=>c.slice()), p0=start[0];
         return T(a.dur,t=>{
           const bx=q(p0[0],a.cxp,a.x,t), by=q(p0[1],a.cyp,a.y,t);
@@ -1371,6 +1690,7 @@ function makeAnim(a, render, warnings){
     case "show": return T(a.dur,t=>{ if(!it.visible) setVisible(it,true); el.style.opacity=String(t); if(t>=1) el.style.opacity=""; });
     case "move":{
       if(it.shape){
+        if(!it.coords) return null;              // charts have no vertex list
         const start=it.coords.map(c=>c.slice());
         const dx=a.x-start[0][0], dy=a.y-start[0][1];
         return T(a.dur,t=>{ it.coords=start.map(c=>[c[0]+dx*t,c[1]+dy*t]); updateShape(it); });
@@ -1399,14 +1719,13 @@ function makeAnim(a, render, warnings){
     }
     case "scale":{
       const f0=it.scale;
-      const base=it.def.pos&&it.def.style.anchor==="center" ? "translate(-50%,-50%) " : "";
-      if(it.shape){
-        const bb=el.getBBox(), ox=bb.x+bb.width/2, oy=bb.y+bb.height/2;
-        return T(a.dur,t=>{ it.scale=f0+(a.f-f0)*t;
-          el.setAttribute("transform",`translate(${ox} ${oy}) scale(${it.scale}) translate(${-ox} ${-oy})`); });
-      }
-      el.style.transformOrigin="center center";
-      return T(a.dur,t=>{ it.scale=f0+(a.f-f0)*t; el.style.transform=base+`scale(${it.scale})`; });
+      return T(a.dur,t=>{ it.scale=f0+(a.f-f0)*t; applyTransform(it); });
+    }
+    case "rotate":{
+      const r0=it.rot||0;
+      if(a.hasOrigin) it.rotOrigin={x:a.x,y:a.y}; else it.rotOrigin=null;
+      if(!it.shape && a.hasOrigin) liftOutOfFlow(it,render);
+      return T(a.dur,t=>{ it.rot=r0+(a.deg-r0)*t; applyTransform(it); });
     }
     case "color":{
       const B=resolveColor(a.color);
@@ -1454,6 +1773,8 @@ class Player{
   constructor(slideDef, holder, opts){
     this.def=slideDef;
     this.render=renderSlide(slideDef, opts);
+    if(holder.querySelectorAll)                      // detached media can keep playing in some browsers
+      holder.querySelectorAll("video,audio").forEach(m=>{ try{ m.pause(); }catch(_){} });
     holder.innerHTML=""; holder.appendChild(this.render.root);
     this.step=-1;           // no step applied yet
     this.busy=false; this.ff=false; this.live=[];
@@ -1514,7 +1835,7 @@ function fitInto(holder, maxW, maxH){
 /* ---------- editor preview ---------- */
 const srcEl=$("#src"), thumbRail=$("#thumbRail"), stageHolder=$("#stageHolder"), warnbar=$("#warnbar");
 let parseTimer=null;
-srcEl.addEventListener("input",()=>{ clearTimeout(parseTimer); parseTimer=setTimeout(refresh,300); });
+srcEl.addEventListener("input",()=>{ clearTimeout(parseTimer); parseTimer=setTimeout(refresh,300); scheduleAutosave(); });
 srcEl.addEventListener("keydown",e=>{
   if(e.key==="Tab"){ e.preventDefault();
     const {selectionStart:a,selectionEnd:b,value:v}=srcEl;
@@ -1544,6 +1865,149 @@ function refresh(){
   rebuildEditorThumbs();
   showPreview();          // rebuilds only if the selected slide's source changed
 }
+
+/* ============================================================
+   AUTOSAVE, CRASH RECOVERY & VERSION HISTORY
+   Everything here is local to the browser (localStorage) — no
+   network calls, keeping SlideDown a single self-contained file.
+   ============================================================ */
+const AUTOSAVE_KEY="slidedown.autosave", HISTORY_KEY="slidedown.history";
+const AUTOSAVE_DEBOUNCE_MS=2000, AUTO_SNAPSHOT_INTERVAL_MS=5*60*1000, HISTORY_MAX=40;
+let savedBaseline=null;          // last text considered "saved" (open/save/sample/checkpoint/new)
+let autosaveTimer=null, autosaveDisabled=false, quotaWarned=false;
+let lastAutoSnapshotText=null, lastAutoSnapshotTime=0;
+
+function isDirty(){ return savedBaseline!==null && srcEl.value!==savedBaseline; }
+function markSaved(){ savedBaseline=srcEl.value; persistAutosave(); }
+
+function readAutosave(){
+  try{ const raw=localStorage.getItem(AUTOSAVE_KEY); return raw?JSON.parse(raw):null; }catch(_){ return null; }
+}
+function persistAutosave(){
+  if(autosaveDisabled) return;
+  try{ localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({text:srcEl.value, ts:Date.now(), selected, dirty:isDirty()})); }
+  catch(e){
+    autosaveDisabled=true;
+    if(!quotaWarned){ quotaWarned=true;
+      showNotice({text:"Autosave isn't available for this deck (probably too large for local storage) — remember to save your script to a file.", timeout:8000}); }
+  }
+}
+function scheduleAutosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer=setTimeout(()=>{ persistAutosave(); maybeSnapshotHistory(); }, AUTOSAVE_DEBOUNCE_MS);
+}
+window.addEventListener("beforeunload",e=>{ if(isDirty()){ e.preventDefault(); e.returnValue=""; } });
+
+function relTime(ts){
+  const s=Math.max(1, Math.round((Date.now()-ts)/1000));
+  if(s<60) return s+"s ago";
+  const m=Math.round(s/60); if(m<60) return m+" minute"+(m===1?"":"s")+" ago";
+  const h=Math.round(m/60); if(h<24) return h+" hour"+(h===1?"":"s")+" ago";
+  const d=Math.round(h/24); if(d<7) return d+" day"+(d===1?"":"s")+" ago";
+  return new Date(ts).toLocaleDateString();
+}
+
+/* ---------- dismissible notice banner (draft restore, storage warnings) ---------- */
+let noticeTimer=null;
+function showNotice({text, actions=[], timeout=null}){
+  $("#noticeText").textContent=text;
+  const act=$("#noticeActions"); act.innerHTML="";
+  for(const a of actions){
+    const b=document.createElement("button"); b.className="btn"+(a.primary?" primary":""); b.textContent=a.label;
+    b.addEventListener("click",()=>a.onClick&&a.onClick());
+    act.appendChild(b);
+  }
+  $("#notice").classList.add("on");
+  clearTimeout(noticeTimer);
+  if(timeout) noticeTimer=setTimeout(hideNotice,timeout);
+}
+function hideNotice(){ $("#notice").classList.remove("on"); }
+$("#noticeClose").addEventListener("click",hideNotice);
+
+function offerDraftRestore(rec){
+  showNotice({ text:"Found an unsaved draft from "+relTime(rec.ts)+".",
+    actions:[
+      {label:"Restore", primary:true, onClick:()=>{
+        srcEl.value=rec.text; selected=clamp(rec.selected||0,0,Infinity); refresh(); markSaved(); hideNotice(); }},
+      {label:"Discard", onClick:()=>{ markSaved(); hideNotice(); }},
+    ] });
+}
+
+/* ---------- local version history: periodic auto-snapshots + named checkpoints ---------- */
+function readHistory(){ try{ return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]"); }catch(_){ return []; } }
+function pushHistorySnapshot(text, label){
+  let hist=readHistory();
+  hist.push({id:"h"+Date.now()+Math.random().toString(36).slice(2,7), ts:Date.now(), text, label:label||null});
+  while(hist.length>HISTORY_MAX){                       // drop oldest unlabeled first; named checkpoints are protected
+    let idx=hist.findIndex(h=>!h.label); if(idx===-1) idx=0;
+    hist.splice(idx,1);
+  }
+  try{ localStorage.setItem(HISTORY_KEY, JSON.stringify(hist)); return true; }
+  catch(e){
+    if(label) alert("Couldn't save that checkpoint — local storage is full. Try deleting old versions from File ▸ Version History, or save this deck to a file.");
+    return false;
+  }
+}
+function maybeSnapshotHistory(){
+  const text=srcEl.value;
+  if(!text.trim() || text===lastAutoSnapshotText) return;
+  if(lastAutoSnapshotText!==null && Date.now()-lastAutoSnapshotTime<AUTO_SNAPSHOT_INTERVAL_MS) return;
+  if(pushHistorySnapshot(text,null)){ lastAutoSnapshotText=text; lastAutoSnapshotTime=Date.now(); }
+}
+function openVersionHistory(){
+  const hist=readHistory().slice().reverse();           // newest first
+  $("#dlgTitle").textContent="Version History";
+  const body=$("#dlgBody"); body.innerHTML="";
+  if(!hist.length){
+    body.innerHTML=`<p class="sub" style="margin:0">No saved versions yet. SlideDown quietly checkpoints your work every few minutes while you edit, or use <b>File ▸ Save Checkpoint…</b> to save one by hand.</p>`;
+  }else{
+    const list=document.createElement("div"); list.className="histList";
+    for(const h of hist){
+      const firstLine=(h.text.split("\n").find(l=>l.trim())||"").replace(/^[#>%!\-\s]+/,"").slice(0,60)||"(empty)";
+      const row=document.createElement("div"); row.className="histRow";
+      row.innerHTML=`<div class="histMeta">
+          <div class="histLabel">${escapeHtml(h.label||firstLine)}</div>
+          <div class="histTime">${relTime(h.ts)}${h.label?" · "+escapeHtml(firstLine):""}</div>
+        </div>
+        <div class="histActions">
+          <button class="btn histRestore" data-id="${h.id}">Restore</button>
+          <button class="btn histDelete" data-id="${h.id}" title="Delete this version">✕</button>
+        </div>`;
+      list.appendChild(row);
+    }
+    body.appendChild(list);
+  }
+  $("#dlgCancel").style.display="none";
+  $("#dlgOk").textContent="Close";
+  $("#dlg").classList.add("on");
+  const close=()=>{ $("#dlg").classList.remove("on"); $("#dlgCancel").style.display=""; $("#dlgOk").textContent="Insert";
+    $("#dlgOk").onclick=null; body.onclick=null; document.removeEventListener("keydown",escHandler,true); };
+  const escHandler=e=>{ if(e.key==="Escape"){ e.stopPropagation(); close(); } };
+  document.addEventListener("keydown",escHandler,true);
+  $("#dlgOk").onclick=close;
+  body.onclick=e=>{
+    const id=e.target.dataset.id; if(!id) return;
+    const rec=hist.find(h=>h.id===id); if(!rec) return;
+    if(e.target.classList.contains("histRestore")){
+      if(isDirty() && !confirm("Restore this version? Your current unsaved edits will be replaced (this won't affect any other saved checkpoints).")) return;
+      srcEl.value=rec.text; selected=0; refresh(); markSaved(); close();
+    }else if(e.target.classList.contains("histDelete")){
+      if(!confirm("Delete this saved version? This can't be undone.")) return;
+      try{ localStorage.setItem(HISTORY_KEY, JSON.stringify(readHistory().filter(x=>x.id!==id))); }catch(_){}
+      close(); openVersionHistory();
+    }
+  };
+}
+$("#miCheckpoint").addEventListener("click", async ()=>{
+  const v=await showDialog("Save checkpoint",[{key:"label",label:"Name",placeholder:"e.g. Before restructuring the demo"}],"Save");
+  if(!v) return;
+  if(pushHistorySnapshot(srcEl.value, v.label||("Checkpoint "+new Date().toLocaleString()))){
+    lastAutoSnapshotText=srcEl.value; lastAutoSnapshotTime=Date.now();
+    showNotice({text:"Checkpoint saved.", timeout:2500});
+  }
+});
+$("#miHistory").addEventListener("click", openVersionHistory);
+
 function buildThumbs(container,onPick,markSelected){
   const keepScroll=container.scrollTop;           // rebuilds happen on every parse; don't jump the rail
   container.innerHTML="";
@@ -1665,22 +2129,69 @@ function startPresent(fromIndex, o={}){
   }
   srcEl.blur();
   presentOn=true; presentEl.classList.add("on");
+  player=null;                                   // fresh entry — no transition from a stale slide
   gotoSlide(idx,{animate:true});
   if(o.fs && !document.fullscreenElement) enterFullscreen();   // valid only within a user gesture
 }
 function exitPresent(){
   presentOn=false; presentEl.classList.remove("on");
+  killLiveTransition();
   overviewEl.classList.remove("on"); blackout.classList.remove("on");
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
 }
+/* ---------- slide-to-slide transitions ----------
+   Only the live presentation path (audience view, incl. the presenter-mode
+   audience window) — editor preview, thumbnails, and print always cut.
+   The incoming slide's transition applies; `slide` picks direction from
+   travel, slideleft/slideright force one. Interruptible: a new transition
+   (or rapid advance) cancels and cleans up the previous one instantly. */
+let liveTransition=null;
+function killLiveTransition(){
+  if(!liveTransition) return;
+  for(const an of liveTransition.anims){ try{ an.cancel(); }catch(_){} }
+  if(liveTransition.oldRoot&&liveTransition.oldRoot.parentNode) liveTransition.oldRoot.remove();
+  const nr=liveTransition.newRoot;
+  if(nr){ nr.style.opacity=""; const s=nr.style.transform.match(/scale\([\d.]+\)/); if(s) nr.style.transform=s[0]; }
+  liveTransition=null;
+}
+function runSlideTransition(holder, oldRoot, newRoot, from, to){
+  killLiveTransition();
+  if(!oldRoot || from===to || oldRoot===newRoot) return;
+  const spec=String(deck.slides[to].transition||"none").split(/\s+/);
+  let type=spec[0], dur=clamp(parseFloat(spec[1])||0.4,0.05,2)*1000;
+  if(type==="none"||!["fade","slide","slideleft","slideright"].includes(type)) return;
+  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if(!oldRoot.animate) return;                       // very old browsers: just cut
+  const sM=(newRoot.style.transform||"").match(/scale\(([\d.]+)\)/);
+  const s=sM?parseFloat(sM[1]):1, D=SW*s, scale=sM?` scale(${s})`:"";
+  oldRoot.style.pointerEvents="none";
+  holder.appendChild(oldRoot);                       // over the new slide
+  const anims=[], EASE={duration:dur, easing:"cubic-bezier(.4,0,.2,1)", fill:"forwards"};
+  if(type==="fade"){
+    anims.push(oldRoot.animate([{opacity:1},{opacity:0}],EASE));
+  }else{
+    const fwd = type==="slideleft" ? true : type==="slideright" ? false : to>=from;
+    const dir = fwd?1:-1;
+    holder.insertBefore(oldRoot,newRoot);            // side-by-side: incoming on top isn't needed
+    anims.push(oldRoot.animate([{transform:`translateX(0)${scale}`},{transform:`translateX(${-dir*D}px)${scale}`}],EASE));
+    anims.push(newRoot.animate([{transform:`translateX(${dir*D}px)${scale}`},{transform:`translateX(0)${scale}`}],EASE));
+  }
+  liveTransition={oldRoot,newRoot,anims};
+  Promise.all(anims.map(a=>a.finished)).then(()=>{
+    if(liveTransition&&liveTransition.oldRoot===oldRoot) killLiveTransition();
+  }).catch(()=>{});
+}
 function gotoSlide(i,{animate=false,lastStep=false}={}){
+  const from=curSlide, oldRoot=player&&player.render&&player.render.root;
   curSlide=clamp(i,0,deck.slides.length-1);
-  player=new Player(deck.slides[curSlide],activeHolder(),{settings:deck.settings,index:curSlide,total:deck.slides.length});
+  const holder=activeHolder();
+  player=new Player(deck.slides[curSlide],holder,{settings:deck.settings,index:curSlide,total:deck.slides.length});
   layoutPresent();
   const last=player.stepCount-1;
   if(lastStep) player.jumpToStep(last);
   else if(animate) player.runStep(0,updateHud);
   else player.jumpToStep(0);
+  runSlideTransition(holder, oldRoot, player.render.root, from, curSlide);
   updateHud();
 }
 function updateHud(){
@@ -1775,7 +2286,7 @@ document.addEventListener("keydown",e=>{
 });
 presentEl.addEventListener("click",e=>{
   if(overviewEl.contains(e.target)||$("#hud").contains(e.target)) return;
-  if(e.target.closest&&e.target.closest(".s-embed")) return;   // interacting with an embedded app
+  if(e.target.closest&&e.target.closest(".s-embed,.s-media")) return;   // interacting with an embedded app or media player
   advance();
 });
 
@@ -1885,8 +2396,9 @@ if(window.screen && "isExtended" in screen){
 $("#miOpen").addEventListener("click",()=>$("#fileIn").click());
 $("#fileIn").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
+  if(isDirty() && !confirm("Opening this file will replace the current script. Unsaved changes will be lost — continue?")){ e.target.value=""; return; }
   const rd=new FileReader();
-  rd.onload=()=>{ srcEl.value=rd.result; selected=0; refresh(); };
+  rd.onload=()=>{ srcEl.value=rd.result; selected=0; refresh(); markSaved(); };
   rd.readAsText(f); e.target.value="";
 });
 $("#miSave").addEventListener("click",()=>{
@@ -1894,11 +2406,15 @@ $("#miSave").addEventListener("click",()=>{
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob); a.download="presentation.psl"; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  markSaved();
 });
-$("#miSample").addEventListener("click",()=>{ srcEl.value=SAMPLE; selected=0; refresh(); });
+$("#miSample").addEventListener("click",()=>{
+  if(isDirty() && !confirm("Load the sample deck? Unsaved changes will be lost.")) return;
+  srcEl.value=SAMPLE; selected=0; refresh(); markSaved();
+});
 $("#miNew").addEventListener("click",()=>{
-  if(srcEl.value.trim() && srcEl.value!==SAMPLE && !confirm("Replace the current script with a new one?")) return;
-  srcEl.value="# Untitled\n## \n---\n### First slide\n- \n"; selected=0; refresh();
+  if(isDirty() && !confirm("Replace the current script with a new one? Unsaved changes will be lost.")) return;
+  srcEl.value="# Untitled\n## \n---\n### First slide\n- \n"; selected=0; refresh(); markSaved();
 });
 $("#miPptx").addEventListener("click",()=>$("#pptxIn").click());
 $("#miPrint").addEventListener("click",()=>{ buildPrintLayout(); setTimeout(()=>window.print(),30); });
@@ -2004,16 +2520,25 @@ const DEMO_IMG="data:image/svg+xml;utf8,"+encodeURIComponent(
 </svg>`);
 
 const SAMPLE=`% ===== A tour of the Portable Slide Language (PSL) =====
+!set transition fade 0.35
 # SlideDown
 ## A tour of the Portable Slide Language.
 ---
 ### Basics
 Plain lines become paragraphs. Inline **bold**, *italic*, and \`code\` all work.
+So does LaTeX math: inline $e^{i\\pi} + 1 = 0$, or display style — $$\\frac{dN}{dt} = rN\\left(1 - \\frac{N}{K}\\right)$$
 Here is a simple list:
 - Bullet one
 - Bullet two
   - An indented sub-bullet (2 spaces)
 - Bullet three showing **bold** and *italic* text
+---
+### Charts
+Charts come straight from label:value pairs — no other tools needed.
+[growth] !chart bar (0.06, 0.34) (0.42, 0.5) Gen 10:4, Gen 50:11, Gen 250:19, Gen 1000:31
+[share] !chart pie (0.76, 0.58) 0.17 mutation:45, crossover:35, drift:20
+!anim growth enter grow 0.6s
+!anim share enter grow 0.6s
 ---
 ### Pauses with ...
 % Lines starting with % are comments and are ignored.
@@ -2265,14 +2790,16 @@ function insertAtCursor(text, inline){
 }
 const stylePrefix=v=>{
   const parts=[];
-  if(v.color) parts.push("color="+v.color);
-  if(v.fill)  parts.push("fill="+v.fill);
-  if(v.thick) parts.push("thick="+v.thick);
+  if(v.color)  parts.push("color="+v.color);
+  if(v.fill)   parts.push("fill="+v.fill);
+  if(v.thick)  parts.push("thick="+v.thick);
+  if(v.rotate) parts.push("rotate="+v.rotate);
   return (v.lbl?`[${v.lbl}] `:"") + (parts.length?`{${parts.join(", ")}} `:"");
 };
 const COMMON=[{key:"lbl",label:"Label (optional — lets you animate it)",placeholder:"myShape"},
               {key:"color",label:"Stroke color (optional)",placeholder:"#1f6f6b"},
-              {key:"thick",label:"Thickness (optional)",placeholder:"4"}];
+              {key:"thick",label:"Thickness (optional)",placeholder:"4"},
+              {key:"rotate",label:"Rotation in degrees (optional)",placeholder:"0"}];
 const FILLF={key:"fill",label:"Fill color (optional)",placeholder:"#1f6f6b33"};
 const PT=(k,l,d)=>({key:k,label:l+"  (x,y — fractions ≤1 or px)",value:d});
 const INSERTS={
@@ -2283,6 +2810,24 @@ const INSERTS={
       {key:"pos",label:"Position (optional)",placeholder:"0.55, 0.2"}]);
     if(!v||!v.url) return;
     insertAtCursor((v.pos?`@(${v.pos}) `:"")+(v.w?`{w=${v.w}} `:"")+`![${v.alt||"image"}](${v.url})`); },
+  video: async()=>{ const v=await showDialog("Insert video",[
+      {key:"url",label:"Video URL",placeholder:"https://….mp4"},
+      {key:"lbl",label:"Label (optional — lets you animate it)",placeholder:"clip"},
+      {key:"w",label:"Width (optional — fraction of slide or px)",placeholder:"0.5"},
+      {key:"pos",label:"Position (optional)",placeholder:"0.5, 0.5"},
+      {key:"poster",label:"Poster image URL (optional)",placeholder:"https://….png"},
+      {key:"opts",label:"Playback",type:"select",options:[["","Controls (click to play)"],["autoplay, muted","Autoplay (muted)"],["autoplay, muted, loop","Autoplay, looped (muted)"]]}]);
+    if(!v||!v.url) return;
+    const st=[v.w&&`w=${v.w}`, v.poster&&`poster=${v.poster}`, v.opts].filter(Boolean).join(", ");
+    insertAtCursor((v.pos?`@(${v.pos}) `:"")+(v.lbl?`[${v.lbl}] `:"")+(st?`{${st}} `:"")+`!video(${v.url})`); },
+  audio: async()=>{ const v=await showDialog("Insert audio",[
+      {key:"url",label:"Audio URL",placeholder:"https://….mp3"},
+      {key:"lbl",label:"Label (optional — lets you animate it)",placeholder:"sound"},
+      {key:"pos",label:"Position (optional)",placeholder:"0.5, 0.8"},
+      {key:"opts",label:"Playback",type:"select",options:[["","Controls (click to play)"],["autoplay","Autoplay when revealed"],["autoplay, loop","Autoplay, looped"]]}]);
+    if(!v||!v.url) return;
+    const st=[v.opts].filter(Boolean).join(", ");
+    insertAtCursor((v.pos?`@(${v.pos}) `:"")+(v.lbl?`[${v.lbl}] `:"")+(st?`{${st}} `:"")+`!audio(${v.url})`); },
   link: async()=>{ const sel=srcEl.value.slice(srcEl.selectionStart,srcEl.selectionEnd);
     const v=await showDialog("Insert link",[
       {key:"text",label:"Link text",value:sel||"",placeholder:"shown text"},
@@ -2297,6 +2842,16 @@ const INSERTS={
     const lines=[row((_,i)=>"Header "+(i+1)), row(()=>":---"),
                  ...Array.from({length:r},()=>row(()=>"…"))];
     insertAtCursor(lines.join("\n")); },
+  chart: async()=>{ const v=await showDialog("Insert chart",[
+      {key:"type",label:"Chart type",type:"select",options:[["bar","Bar chart"],["line","Line chart"],["pie","Pie chart"]]},
+      {key:"data",label:"Data — one label:value per line (or comma-separated)",type:"textarea",placeholder:"Q1: 14\nQ2: 22\nQ3: 19\nQ4: 31"},
+      {key:"lbl",label:"Label (optional — lets you animate it)",placeholder:"sales"},
+      {key:"pos",label:"Position — top-left for bar/line, center for pie",value:"0.2, 0.3"},
+      {key:"size",label:"Size — w, h for bar/line · radius for pie",value:"0.6, 0.5"}]);
+    if(!v||!v.data) return;
+    const data=v.data.split(/[\n,]/).map(s=>s.trim()).filter(Boolean).join(", ");
+    const geo=v.type==="pie" ? `(${v.pos}) ${String(v.size).split(",")[0].trim()}` : `(${v.pos}) (${v.size})`;
+    insertAtCursor((v.lbl?`[${v.lbl}] `:"")+`!chart ${v.type} ${geo} ${data}`); },
   line:    async()=>shapeDialog("Line","!line",[PT("p1","Start","0.2, 0.5"),PT("p2","End","0.5, 0.5")],false),
   arrow:   async()=>shapeDialog("Arrow","!arrow",[PT("p1","Start","0.2, 0.5"),PT("p2","End (arrowhead)","0.5, 0.5")],false),
   rect:    async()=>shapeDialog("Rectangle","!rect",[PT("p1","Top-left","0.3, 0.3"),PT("p2","Size (w,h)","0.25, 0.2")],true,true),
@@ -2336,14 +2891,15 @@ const ANIM_HINTS={move:"(x, y) — destination", path:"(ctrlx, ctrly) (destx, de
   enter:"fade · slideleft · slideright · slideup · slidedown · grow · drop · spin",
   exit:"fade · slideleft · slideright · slideup · slidedown · shrink · spin",
   point:"n (x, y) — vertex number, then destination", size:"new width (fraction or px)",
-  scale:"factor, e.g. 1.5", color:"any CSS color", textsize:"e.g. 44px", hide:"(no arguments)", show:"(no arguments)"};
+  scale:"factor, e.g. 1.5", rotate:"degrees, optionally “around (x, y)”",
+  color:"any CSS color", textsize:"e.g. 44px", hide:"(no arguments)", show:"(no arguments)"};
 async function animDialog(){
   const labels=[...new Set((deck.slides[selected]?.items||[]).filter(i=>i.label).map(i=>i.label))];
   const v=await showDialog("Insert animation",[
     {key:"target",label:"Target label"+(labels.length?"":" (label an element first — e.g. [pic])"),list:labels,placeholder:labels[0]||"myLabel"},
     {key:"verb",label:"Effect",type:"select",options:[["move","Move to position"],["path","Move along a curve"],
       ["enter","Entrance effect"],["exit","Exit effect"],["hide","Fade out"],["show","Fade in"],
-      ["size","Resize image / embed"],["scale","Scale"],["color","Change color"],["textsize","Change text size"],["point","Move one vertex"]],
+      ["size","Resize image / video / embed"],["scale","Scale"],["rotate","Rotate"],["color","Change color"],["textsize","Change text size"],["point","Move one vertex"]],
      onChange:(el,body)=>{ const args=body.querySelector('[data-key="args"]'); if(args) args.placeholder=ANIM_HINTS[el.value]||""; }},
     {key:"args",label:"Arguments",placeholder:ANIM_HINTS.move},
     {key:"dur",label:"Duration (seconds)",value:"0.7"},
@@ -2378,7 +2934,7 @@ $("#pptxIn").addEventListener("change",async e=>{
   try{
     const psl=await pptxToPsl(f);
     if(srcEl.value.trim() && !confirm("Replace the current script with the imported presentation?")) return;
-    srcEl.value=psl; selected=0; refresh();
+    srcEl.value=psl; selected=0; refresh(); markSaved();
   }catch(err){ alert("PowerPoint import failed: "+err.message); }
 });
 
@@ -2632,7 +3188,7 @@ async function pptxToPsl(file){
           note=`% (PowerPoint shape “${prst}” approximated as a rectangle)`;
         core=`!rect ${P(x,y)} ${P(w,h)}`;
       }
-      if(Math.abs(b.rot)>1) note=(note?note+"\n":"")+`% (shape was rotated ${R(b.rot)}° — PSL has no rotation)`;
+      if(Math.abs(b.rot)>1) st.rotate=R(b.rot);   // rotates in place about the shape's own (unrotated) bounding-box center
       addUnit({spid, core:styleStr(st)+core+(text?" "+text:""), ax:R(ax), ay:R(ay), note});
     }
 
@@ -2762,12 +3318,21 @@ async function pptxToPsl(file){
 (function boot(){
   const q=new URLSearchParams(location.search);
   const remote=q.get("present")||q.get("script");
-  if(!remote){ srcEl.value=SAMPLE; refresh(); return; }
+  if(!remote){
+    const rec=readAutosave();
+    srcEl.value=SAMPLE; selected=0; refresh();
+    savedBaseline=SAMPLE;
+    if(rec && rec.dirty && rec.text && rec.text.trim() && rec.text!==SAMPLE) offerDraftRestore(rec);
+    else persistAutosave();
+    const h=readHistory();                     // keep the auto-snapshot cadence continuous across reloads
+    if(h.length){ const last=h[h.length-1]; lastAutoSnapshotText=last.text; lastAutoSnapshotTime=last.ts; }
+    return;
+  }
   srcEl.value="% Loading "+remote+" …"; refresh();
   fetch(remote)
     .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
     .then(txt=>{
-      srcEl.value=txt; selected=0; refresh();
+      srcEl.value=txt; selected=0; refresh(); savedBaseline=txt;
       const s=parseInt(q.get("slide"),10);
       startPresent(isNaN(s)?0:s-1,{exact:!isNaN(s)});   // fullscreen needs a gesture: press f or ⛶
     })
@@ -2777,7 +3342,7 @@ async function pptxToPsl(file){
         +"{color=#b03030} "+String(err).replace(/\n/g," ")+"\n"
         +"Check the address, and that the host allows cross-origin requests.\n"
         +"---\n"+SAMPLE;
-      selected=0; refresh();
+      selected=0; refresh(); savedBaseline=srcEl.value;
     });
 })();
 </script>
