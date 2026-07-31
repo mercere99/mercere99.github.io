@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Slitherlink — Loop the Loop</title>
+<title>ShepherdLink — Fence the Flock</title>
 <style>
   :root{
     --page:#F4F7FB; --graph-line:rgba(59,111,212,.10); --paper:#FCFCFA;
@@ -75,6 +75,13 @@
     font-family:Georgia,"Times New Roman",serif; font-weight:700;
     font-size:clamp(1rem,4vmin,1.7rem); color:var(--ink);}
   .sqcell.done{color:#A9B4C6;}
+  .sqcell{border-radius:4px; cursor:pointer;}
+  .sqcell.animal{cursor:default; font-size:clamp(.95rem,3.4vmin,1.5rem);}
+  .sqcell.inz{background:#E2F1E0;}
+  .sqcell.outz{background:#EDE3CB;}
+  .sqcell.wrongcell{box-shadow:inset 0 0 0 2.5px var(--strike);}
+  .sqcell.actin{background:#E2F1E0; outline:2px dashed var(--win); outline-offset:-3px;}
+  .sqcell.actout{background:#EDE3CB; outline:2px dashed #8A6B2F; outline-offset:-3px;}
   .edge{position:relative; cursor:pointer;}
   .edge::after{content:''; position:absolute; border-radius:3px;}
   .hedge::after{left:-5px; right:-5px; top:50%; height:6px; transform:translateY(-50%);}
@@ -114,7 +121,7 @@
 <body>
 
 <header>
-  <h1>Slitherlink<span class="sub">loop the loop</span></h1>
+  <h1>ShepherdLink<span class="sub">fence the flock</span></h1>
   <div class="controls">
     <select id="boardsize" aria-label="Board size" title="Expert on the largest board can take a while to generate">
       <option value="7" selected>7×7</option>
@@ -133,7 +140,7 @@
     <button id="checkBtn">Check</button>
     <button id="helpBtn">Help</button>
   </div>
-  <div class="gamenav"><a href="sudoku.html">Sudoku</a> · <a href="kakuro.html">Kakuro</a> · <b>Slitherlink</b> · <a href="shepherdlink.html">ShepherdLink</a></div>
+  <div class="gamenav"><a href="sudoku.html">Sudoku</a> · <a href="kakuro.html">Kakuro</a> · <a href="slitherlink.html">Slitherlink</a> · <b>ShepherdLink</b></div>
 </header>
 
 <div id="profileCard">
@@ -151,14 +158,16 @@
 </div>
 
 <div class="boardwrap">
-  <div id="board" aria-label="Slitherlink board"></div>
+  <div id="board" aria-label="ShepherdLink board"></div>
   <div id="banner"><div class="msg">Solved!</div></div>
 </div>
 
 <footer>
-  Draw one closed loop along the dots; each number counts the loop edges around that cell.
-  <b>Click</b> an edge to draw a line (click again to erase) · <b>Ctrl/⌘-click</b> to mark an edge
-  as ruled out with × (again to unmark). Numbers fade once satisfied.
+  Draw one closed fence along the dots; each number counts the fence edges around that cell.
+  When the fence is done, every 🐑 must be <b>inside</b> it and every 🐺 <b>outside</b>.
+  <b>Click the middle of a cell</b> to cycle its mark: white (unknown) → green (inside) → tan (outside).
+  <b>Click</b> near an edge to draw a fence (click again to erase) · <b>Ctrl/⌘-click</b> to mark an edge
+  as ruled out with × (again to unmark). Numbers fade once satisfied; sheep and wolves are fixed.
   <b>Check</b> flags lines and ×s that contradict the solution; <b>Help</b> shows the easiest applicable
   technique — <span style="color:var(--accent)">blue</span> pattern,
   <span style="color:var(--win)">green</span> edges to draw, <span style="color:var(--strike)">dashed red</span> edges to rule out.
@@ -168,17 +177,19 @@
   <summary>What the techniques mean</summary>
   <dl>
     <dt>Clue counting<span class="tno">T1</span></dt>
-    <dd>A cell already has its number of lines (rule out the rest), or needs every undecided edge to reach it (draw them all).</dd>
+    <dd>A cell already has its number of fence segments (rule out the rest), or needs every undecided edge to reach it (draw them all).</dd>
     <dt>Dot rules<span class="tno">T2</span></dt>
     <dd>The loop passes through each dot 0 or 2 times. A dot with two lines rules out its other edges; a dot with one line and one open edge must continue; a lone open edge at an empty dot is ruled out.</dd>
-    <dt>Corner reasoning<span class="tno">T3</span></dt>
+    <dt>Fence parity<span class="tno">T3</span></dt>
+    <dd>The fence separates inside from outside. A fence edge with a known side puts the other side opposite; an × joins like sides; two known neighbours force the edge between them (fence if they differ, × if they match). The world beyond the border is always outside, so a border fence puts its cell inside.</dd>
+    <dt>Corner reasoning<span class="tno">T4</span></dt>
     <dd>Short case analysis at a cell's corner. A 3 whose corner is sealed from outside must use both corner edges; a 1 must use neither. A line entering a corner of a 1 exhausts it; entering a 3 forces the two far edges; entering a 2 must exit through the opposite corner, and a sealed corner of a 2 pushes the loop out through its neighbors.</dd>
-    <dt>3-3 patterns<span class="tno">T4</span></dt>
+    <dt>3-3 patterns<span class="tno">T5</span></dt>
     <dd>Two 3s side by side force the shared and outer parallel edges (and stop the shared edge from extending); two 3s on a diagonal force both outer corners.</dd>
-    <dt>No early loop<span class="tno">T5</span></dt>
+    <dt>No early loop<span class="tno">T6</span></dt>
     <dd>An edge that would join the two ends of an existing path may not be drawn if closing the loop there would leave the rest of the puzzle unfinishable.</dd>
-    <dt>One-edge trial<span class="tno">T6</span></dt>
-    <dd>Suppose a single edge is a line (or a ×) and follow the counting rules; if that quickly contradicts, the edge must be the opposite. The workhorse of hard slitherlinks.</dd>
+    <dt>One-step trial<span class="tno">T7</span></dt>
+    <dd>Suppose a single edge is a fence (or an ×) — or a single cell is inside (or outside) — and follow the counting, dot, and parity rules; if that quickly contradicts, it must be the opposite. The workhorse of hard boards.</dd>
   </dl>
 </details>
 
@@ -201,12 +212,13 @@ const cellEdges = i => {
 };
 
 let engine = null;
-const enginePromise = createSlitherModule().then(M => {
+const enginePromise = createShepherdModule().then(M => {
   engine = {
     generate: (level, rows, cols, seed) =>
-      JSON.parse(M.ccall("generate_slither", "string",
+      JSON.parse(M.ccall("generate_shepherd", "string",
                          ["number", "number", "number", "number"], [level, rows, cols, seed])),
-    hint: state => JSON.parse(M.ccall("slither_hint", "string", ["string"], [state])),
+    hint: (state, cells) =>
+      JSON.parse(M.ccall("shepherd_hint", "string", ["string", "string"], [state, cells])),
   };
 });
 
@@ -214,16 +226,22 @@ const enginePromise = createSlitherModule().then(M => {
 let puzzleInfo = null;
 let clues = new Array(NC).fill(-1);
 let st = new Array(E).fill(0);
-let edgeRects = null;               // cached geometry for nearest-edge picking              // 0 unknown, 1 line, 2 cross
+let cellMark = new Array(NC).fill(0);   // 0 unknown, 1 inside, 2 outside (player marks)
+let edgeRects = null, cellRects = null; // cached geometry for click routing              // 0 unknown, 1 line, 2 cross
 let undoStack = [], savepoints = [];
-const marks = { wrong:new Set(), pattern:new Set(), actline:new Set(), actcross:new Set(), cells:new Set() };
+const marks = { wrong:new Set(), wrongCells:new Set(), pattern:new Set(),
+                actline:new Set(), actcross:new Set(), cells:new Set(),
+                actIn:new Set(), actOut:new Set() };
 
-const snapshot = () => [...st];
-const restore  = s  => { st = [...s]; };
+const snapshot = () => ({ st: [...st], cellMark: [...cellMark] });
+const restore  = s  => { st = [...s.st]; cellMark = [...s.cellMark]; };
 const pushUndo = () => undoStack.push(snapshot());
 
 const assistEl = document.getElementById("assist");
-function clearAssist(){ marks.wrong.clear(); marks.pattern.clear(); marks.actline.clear(); marks.actcross.clear(); marks.cells.clear(); assistEl.textContent=""; }
+function clearAssist(){
+  for (const k of Object.keys(marks)) marks[k].clear();
+  assistEl.textContent = "";
+}
 function setAssist(kind, html){ assistEl.innerHTML = `<span class="msg ${kind}">${html}</span>`; }
 
 /* ---------- rendering ---------- */
@@ -259,6 +277,7 @@ function buildBoard(){
     }
   boardEl.appendChild(frag);
   edgeRects = null;
+  cellRects = null;
 }
 
 function render(){
@@ -273,11 +292,20 @@ function render(){
   }
   for (const el of boardEl.querySelectorAll(".sqcell")){
     const i = +el.dataset.cell;
-    el.textContent = clues[i] >= 0 ? clues[i] : "";
+    const isNum = clues[i] >= 0 && clues[i] <= 3;
+    const isAnimal = clues[i] === 4 || clues[i] === 5;
+    el.textContent = isNum ? clues[i] : clues[i] === 4 ? "🐑" : clues[i] === 5 ? "🐺" : "";
+    el.classList.toggle("animal", isAnimal);
     let lines = 0;
     for (const e of cellEdges(i)) if (st[e] === 1) lines++;
-    el.classList.toggle("done", clues[i] >= 0 && lines === clues[i]);
+    el.classList.toggle("done", isNum && lines === clues[i]);
+    const side = clues[i] === 4 ? 1 : clues[i] === 5 ? 2 : cellMark[i];
+    el.classList.toggle("inz",  side === 1);
+    el.classList.toggle("outz", side === 2);
     el.classList.toggle("hintcell", marks.cells.has(i));
+    el.classList.toggle("wrongcell", marks.wrongCells.has(i));
+    el.classList.toggle("actin",  marks.actIn.has(i));
+    el.classList.toggle("actout", marks.actOut.has(i));
   }
   undoBtn.disabled = undoStack.length === 0;
   bannerEl.classList.toggle("show", isSolved());
@@ -346,6 +374,14 @@ function renderProfile(info){
 // cache stays valid when the page scrolls; getBoundingClientRect is
 // viewport-relative and would otherwise drift once scrolled. Queries use
 // pageX/pageY to match.
+function cacheCellRects(){
+  cellRects = [];
+  const sx = window.scrollX, sy = window.scrollY;
+  for (const el of boardEl.querySelectorAll(".sqcell")){
+    const r = el.getBoundingClientRect();
+    cellRects.push({ cell: +el.dataset.cell, cx: (r.left + r.right) / 2 + sx, cy: (r.top + r.bottom) / 2 + sy });
+  }
+}
 function cacheEdgeRects(){
   edgeRects = [];
   const sx = window.scrollX, sy = window.scrollY;
@@ -359,7 +395,7 @@ function cacheEdgeRects(){
     });
   }
 }
-window.addEventListener("resize", () => { edgeRects = null; });
+window.addEventListener("resize", () => { edgeRects = null; cellRects = null; });
 
 function nearestEdge(px, py){
   if (!edgeRects) cacheEdgeRects();
@@ -376,9 +412,34 @@ function nearestEdge(px, py){
   return best && bestD <= pitch * 0.48 ? best : null;
 }
 
-/* ---------- actions ---------- */
+function nearestCell(px, py){
+  if (!cellRects) cacheCellRects();
+  let best = null, bestD = Infinity;
+  for (const r of cellRects){
+    const d = Math.hypot(px - r.cx, py - r.cy);
+    if (d < bestD){ bestD = d; best = r; }
+  }
+  return { cell: best ? best.cell : -1, d: bestD };
+}
+
+/* ---------- actions ----------
+   A click well inside a cell (within ~1/3 of the cell size of its centre)
+   toggles that cell's inside/outside mark; otherwise it acts on the nearest
+   edge, so clicks near the cell border still place fences. */
 boardEl.addEventListener("click", e => {
+  const cellHit = nearestCell(e.pageX, e.pageY);
   const near = nearestEdge(e.pageX, e.pageY);
+  const cell = boardEl.querySelector(".sqcell");
+  const pitch = cell ? cell.getBoundingClientRect().width : 40;
+  if (cellHit.cell >= 0 && cellHit.d < pitch * 0.34) {
+    const i = cellHit.cell;
+    if (clues[i] === 4 || clues[i] === 5) return;      // animals are fixed
+    pushUndo();
+    clearAssist();
+    cellMark[i] = (cellMark[i] + 1) % 3;               // unknown -> inside -> outside
+    render();
+    return;
+  }
   if (!near) return;
   const idx = near.e;
   pushUndo();
@@ -394,7 +455,11 @@ boardEl.addEventListener("mousemove", e => {
   if (hoverRaf) return;
   hoverRaf = requestAnimationFrame(() => {
     hoverRaf = 0;
-    const near = nearestEdge(px, py);
+    // only preview an edge when the pointer isn't sitting in a cell centre
+    const cellHit = nearestCell(px, py);
+    const cell = boardEl.querySelector(".sqcell");
+    const pitch = cell ? cell.getBoundingClientRect().width : 40;
+    const near = (cellHit.cell >= 0 && cellHit.d < pitch * 0.34) ? null : nearestEdge(px, py);
     boardEl.querySelectorAll(".edge.near").forEach(el => el.classList.remove("near"));
     if (near) near.el.classList.add("near");
   });
@@ -415,29 +480,45 @@ document.getElementById("saveBtn").addEventListener("click", () => {
 document.getElementById("checkBtn").addEventListener("click", () => {
   if (!puzzleInfo) return;
   clearAssist();
-  let wrong = 0;
+  let wrong = 0, wrongC = 0;
   for (let e = 0; e < E; e++){
     const solLine = puzzleInfo.solution[e] === "1";
     if ((st[e] === 1 && !solLine) || (st[e] === 2 && solLine)){ marks.wrong.add(e); wrong++; }
   }
+  for (let i = 0; i < NC; i++){
+    if (!cellMark[i]) continue;
+    const truth = puzzleInfo.solutionInside[i] === "1" ? 1 : 2;
+    if (cellMark[i] !== truth){ marks.wrongCells.add(i); wrongC++; }
+  }
   render();
-  if (!wrong) setAssist("good", isSolved() ? "Solved — the loop is complete." : "Everything checks out so far.");
-  else setAssist("bad", `Found ${wrong} mark${wrong>1?"s":""} that contradict the solution — highlighted in red.`);
+  if (!wrong && !wrongC){
+    setAssist("good", isSolved() ? "Solved — the flock is safely sorted." : "Everything checks out so far.");
+  } else {
+    const parts = [];
+    if (wrong)  parts.push(`${wrong} fence mark${wrong>1?"s":""}`);
+    if (wrongC) parts.push(`${wrongC} inside/outside mark${wrongC>1?"s":""}`);
+    setAssist("bad", "Found " + parts.join(" and ") + " that contradict the solution — highlighted in red.");
+  }
 });
 
 document.getElementById("helpBtn").addEventListener("click", async () => {
   if (!puzzleInfo) return;
   await enginePromise;
   clearAssist();
-  const h = engine.hint(st.join(""));
+  const h = engine.hint(st.join(""), cellMark.join(""));
   if (h.error){
     if (h.error === "solved") setAssist("good", "The puzzle is already solved!");
-    else if (h.error === "mistakes"){ h.edges.forEach(e => marks.wrong.add(e)); setAssist("bad", "Some of your marks contradict the solution — fix the highlighted edges before hinting."); }
+    else if (h.error === "mistakes"){
+      (h.edges || []).forEach(e => marks.wrong.add(e));
+      (h.cells || []).forEach(c => marks.wrongCells.add(c));
+      setAssist("bad", "Some of your marks contradict the solution — fix the highlighted ones before hinting.");
+    }
     else setAssist("bad", "No technique on the ladder applies — this position needs deeper case analysis (use a save point!).");
   } else {
     (h.patternEdges || []).forEach(e => marks.pattern.add(e));
     (h.patternCells || []).forEach(c => marks.cells.add(c));
     (h.actEdges || []).forEach((e, k) => (h.actStates[k] === 1 ? marks.actline : marks.actcross).add(e));
+    (h.actCells || []).forEach((c, k) => (h.actCellStates[k] === 1 ? marks.actIn : marks.actOut).add(c));
     setAssist("info", `<b>${h.name}</b> (T${h.tier}) — ${h.desc}`);
   }
   render();
@@ -457,6 +538,7 @@ async function newGame(){
     setDims(puzzleInfo.rows, puzzleInfo.cols);
     clues = puzzleInfo.clues.slice(0, NC);
     st = new Array(E).fill(0);
+    cellMark = new Array(NC).fill(0);
     undoStack = []; savepoints = [];
     buildBoard();
     render();

@@ -133,7 +133,7 @@
     <button id="checkBtn">Check</button>
     <button id="helpBtn">Help</button>
   </div>
-  <div class="gamenav"><a href="sudoku.html">Sudoku</a> · <a href="kakuro.html">Kakuro</a> · <b>Slitherlink</b></div>
+  <div class="gamenav"><a href="sudoku.html">Sudoku</a> · <a href="kakuro.html">Kakuro</a> · <b>Slitherlink</b> · <a href="shepherdlink.html">ShepherdLink</a></div>
 </header>
 
 <div id="profileCard">
@@ -344,15 +344,20 @@ function renderProfile(info){
 /* ---------- nearest-edge picking ----------
    Clicks and hovers anywhere on the board act on the closest edge, so a
    click slightly inside a cell still lands on the intended line. */
+// Rects are stored in PAGE coordinates (viewport rect + scroll offset) so the
+// cache stays valid when the page scrolls; getBoundingClientRect is
+// viewport-relative and would otherwise drift once scrolled. Queries use
+// pageX/pageY to match.
 function cacheEdgeRects(){
   edgeRects = [];
+  const sx = window.scrollX, sy = window.scrollY;
   for (const el of boardEl.querySelectorAll(".edge")){
     const r = el.getBoundingClientRect();
     edgeRects.push({
       e: +el.dataset.e, el,
       horiz: el.classList.contains("hedge"),
-      x1: r.left, x2: r.right, y1: r.top, y2: r.bottom,
-      cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2,
+      x1: r.left + sx, x2: r.right + sx, y1: r.top + sy, y2: r.bottom + sy,
+      cx: (r.left + r.right) / 2 + sx, cy: (r.top + r.bottom) / 2 + sy,
     });
   }
 }
@@ -375,7 +380,7 @@ function nearestEdge(px, py){
 
 /* ---------- actions ---------- */
 boardEl.addEventListener("click", e => {
-  const near = nearestEdge(e.clientX, e.clientY);
+  const near = nearestEdge(e.pageX, e.pageY);
   if (!near) return;
   const idx = near.e;
   pushUndo();
@@ -387,10 +392,11 @@ boardEl.addEventListener("click", e => {
 
 let hoverRaf = 0;
 boardEl.addEventListener("mousemove", e => {
+  const px = e.pageX, py = e.pageY;               // capture before the rAF fires
   if (hoverRaf) return;
   hoverRaf = requestAnimationFrame(() => {
     hoverRaf = 0;
-    const near = nearestEdge(e.clientX, e.clientY);
+    const near = nearestEdge(px, py);
     boardEl.querySelectorAll(".edge.near").forEach(el => el.classList.remove("near"));
     if (near) near.el.classList.add("near");
   });
