@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalah — play against a perfect machine</title>
+<style>
+  :root{
+    --bg:#221a14; --bg2:#2b211a;
+    --wood:#8a5a33; --wood-hi:#a97245; --wood-dk:#5f3c1f; --pit:#4a2e16;
+    --parchment:#ead9b8; --parchment-dk:#d9c49b; --ink:#2b2015; --ink-soft:#5a4630;
+    --brass:#e0a13c; --brass-dim:#9c7226; --ember:#c8502e;
+    --text:#e8dcc8; --text-dim:#b3a488;
+    --seed1:#d8c9a8; --seed2:#a4b29a; --seed3:#b9855f; --seed4:#8a95a6;
+    --radius:14px;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1200px 500px at 50% -10%, #33261c 0%, transparent 60%),
+      var(--bg);
+    color:var(--text); font-family:var(--sans); min-height:100vh;
+    display:flex; flex-direction:column; align-items:center; padding:14px 10px 30px;
+  }
+  header{width:100%;max-width:980px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(22px,4vw,32px);margin:0;letter-spacing:.5px}
+  h1 .sub{font-size:.5em;color:var(--text-dim);font-family:var(--sans);letter-spacing:.4px;margin-left:8px}
+  .hbtns{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  button{
+    font-family:var(--sans);font-size:14px;color:var(--text);
+    background:linear-gradient(#3a2c20,#31241a);border:1px solid #55402c;border-radius:9px;
+    padding:7px 13px;cursor:pointer;transition:border-color .15s, background .15s;
+  }
+  button:hover:not(:disabled){border-color:var(--brass-dim)}
+  button:disabled{opacity:.42;cursor:default}
+  button.primary{background:linear-gradient(#7a5426,#63431d);border-color:var(--brass-dim);color:#f5e6c8}
+  button.primary:hover:not(:disabled){border-color:var(--brass)}
+  kbd{font-family:var(--mono);font-size:11px;color:var(--text-dim);border:1px solid #4a3826;border-bottom-width:2px;border-radius:4px;padding:0 4px;margin-left:6px}
+
+  /* ---- setup bar ---- */
+  #setup{width:100%;max-width:980px;display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;
+    background:var(--bg2);border:1px solid #3d2e20;border-radius:var(--radius);padding:10px 14px;margin:12px 0 8px}
+  #setup label{font-size:13px;color:var(--text-dim);display:flex;align-items:center;gap:6px}
+  select{background:#1d1610;color:var(--text);border:1px solid #4a3826;border-radius:7px;padding:5px 7px;font-size:14px}
+
+  /* ---- status ---- */
+  #status{width:100%;max-width:980px;min-height:34px;display:flex;align-items:center;gap:10px;
+    font-family:var(--serif);font-size:clamp(15px,2.6vw,19px);padding:2px 6px}
+  #status .dot{width:10px;height:10px;border-radius:50%;background:var(--brass);flex:none;
+    box-shadow:0 0 10px 2px rgba(224,161,60,.45)}
+  #status.ai .dot{background:var(--seed4);box-shadow:0 0 10px 2px rgba(138,149,166,.45)}
+  #status.over .dot{background:var(--ember);box-shadow:0 0 10px 2px rgba(200,80,46,.5)}
+
+  /* ---- progress (exact search) ---- */
+  #progress{display:none;width:100%;max-width:980px;align-items:center;gap:12px;
+    background:var(--bg2);border:1px solid #3d2e20;border-radius:10px;padding:8px 14px;margin-bottom:8px;font-size:13px}
+  #progress.show{display:flex}
+  #progress .bar{flex:1;height:6px;border-radius:3px;background:#1d1610;overflow:hidden;position:relative}
+  #progress .bar i{position:absolute;inset:0;width:30%;border-radius:3px;background:linear-gradient(90deg,transparent,var(--brass),transparent);
+    animation:scan 1.2s linear infinite}
+  @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(400%)}}
+  #progress .nodes{font-family:var(--mono);color:var(--text-dim);min-width:12ch;text-align:right}
+
+  /* ---- board ---- */
+  #boardWrap{position:relative;width:100%;max-width:980px;user-select:none;-webkit-user-select:none}
+  #board{
+    display:grid;gap:clamp(4px,1vw,10px);padding:clamp(10px,2vw,20px);
+    grid-template-rows:auto 1fr 1fr auto;
+    background:
+      radial-gradient(140% 100% at 50% 0%, var(--wood-hi) 0%, var(--wood) 45%, var(--wood-dk) 100%);
+    border:2px solid #43301d;border-radius:calc(var(--radius) + 8px);
+    box-shadow:0 18px 40px -18px rgba(0,0,0,.8), inset 0 2px 0 rgba(255,255,255,.08), inset 0 -14px 30px rgba(0,0,0,.35);
+  }
+  .rowlabel{font-family:var(--serif);font-size:12px;letter-spacing:2.5px;text-transform:uppercase;
+    color:rgba(43,32,21,.85);grid-column:2 / -2;text-align:center}
+  .rowlabel.turnglow{color:#1f1408;text-shadow:0 0 8px rgba(224,161,60,.8)}
+  .pit,.store{
+    position:relative;background:
+      radial-gradient(100% 120% at 50% 30%, #3a230f 0%, var(--pit) 55%, #55371c 100%);
+    border-radius:50%;
+    box-shadow:inset 0 6px 14px rgba(0,0,0,.75), inset 0 -3px 6px rgba(255,200,130,.14), 0 1px 0 rgba(255,255,255,.10);
+    min-height:52px;
+  }
+  .pit{aspect-ratio:1/0.92}
+  .store{border-radius:999px;grid-row:2/span 2;aspect-ratio:auto}
+  .pit .count,.store .count{
+    position:absolute;left:50%;bottom:-4px;transform:translate(-50%,100%);
+    font-family:var(--mono);font-size:clamp(11px,1.8vw,14px);color:rgba(43,32,21,.95);font-weight:700}
+  .store .count{bottom:6px;transform:translateX(-50%);color:var(--parchment);font-size:clamp(14px,2.4vw,20px);
+    text-shadow:0 1px 2px rgba(0,0,0,.7)}
+  .pit.top .count{bottom:auto;top:-2px;transform:translate(-50%,-100%)}
+  .store .who{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:1.5px;
+    text-transform:uppercase;color:rgba(234,217,184,.55)}
+  .pit.legal{cursor:pointer}
+  .pit.legal::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid rgba(224,161,60,.0);transition:border-color .15s}
+  .pit.legal:hover::after,.pit.kbd-focus::after{border-color:rgba(224,161,60,.85);box-shadow:0 0 14px rgba(224,161,60,.35)}
+  .pit.hint::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--brass);
+    animation:hintpulse 1s ease-in-out infinite}
+  @keyframes hintpulse{0%,100%{box-shadow:0 0 6px rgba(224,161,60,.4)}50%{box-shadow:0 0 22px rgba(224,161,60,.9)}}
+  .pit.flash-cap,.store.flash-cap{animation:emberflash .9s ease-out}
+  @keyframes emberflash{0%{box-shadow:inset 0 0 30px rgba(200,80,46,.95),0 0 26px rgba(200,80,46,.8)}
+    100%{box-shadow:inset 0 6px 14px rgba(0,0,0,.75)}}
+  .pit .keynum{position:absolute;top:4px;left:50%;transform:translateX(-50%);
+    font-family:var(--mono);font-size:10px;color:rgba(234,217,184,.35)}
+
+  .pebbles{position:absolute;inset:12% 12% 16% 12%}
+  .pebble{position:absolute;width:17%;aspect-ratio:1;border-radius:50%;
+    box-shadow:inset -1px -2px 3px rgba(0,0,0,.5), inset 1px 1px 2px rgba(255,255,255,.35), 0 2px 3px rgba(0,0,0,.5)}
+  .pebble.pop{animation:pop .32s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes pop{0%{transform:scale(.2) translateY(-90%)}100%{transform:scale(1) translateY(0)}}
+  .pebble.fade{transition:opacity .35s;opacity:0}
+  .store .pebbles{inset:14% 18% 20% 18%}
+
+  /* sowing hand */
+  #hand{position:absolute;top:0;left:0;z-index:5;display:none;pointer-events:none;
+    min-width:34px;height:34px;padding:0 8px;border-radius:17px;
+    background:linear-gradient(#f0dfb8,#d9c49b);color:var(--ink);font-family:var(--mono);font-weight:700;font-size:15px;
+    align-items:center;justify-content:center;opacity:0;
+    box-shadow:0 6px 14px rgba(0,0,0,.55), inset 0 1px 0 #fff;
+    transition:transform var(--handms,140ms) cubic-bezier(.35,.9,.45,1), opacity .18s}
+  #hand::before{content:"✦";margin-right:5px;color:var(--brass-dim);font-size:11px}
+
+  /* ---- bottom controls ---- */
+  #controls{width:100%;max-width:980px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px}
+  #controls .speed{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim)}
+  input[type=range]{accent-color:var(--brass);width:130px}
+  #score{margin-left:auto;font-family:var(--mono);font-size:15px;color:var(--text-dim)}
+  #score b{color:var(--parchment);font-size:17px}
+
+  /* ---- toasts ---- */
+  #toasts{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:40;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+  .toast{font-family:var(--serif);font-size:16px;letter-spacing:.4px;color:var(--ink);
+    background:linear-gradient(#f0dfb8,var(--parchment-dk));border:1px solid #b99b64;border-radius:10px;
+    padding:8px 18px;box-shadow:0 10px 24px rgba(0,0,0,.5);animation:toastin .28s ease-out}
+  .toast.ember{background:linear-gradient(#e8a06a,#d97f4b);border-color:#a3502a;color:#2d1204}
+  @keyframes toastin{from{transform:translateY(-14px);opacity:0}to{transform:none;opacity:1}}
+  .toast.out{transition:opacity .4s, transform .4s;opacity:0;transform:translateY(-10px)}
+
+  /* ---- about drawer ---- */
+  #about{position:fixed;inset:0;z-index:60;display:none}
+  #about.open{display:block}
+  #about .scrim{position:absolute;inset:0;background:rgba(10,7,4,.6)}
+  #about .panel{position:absolute;top:0;right:0;bottom:0;width:min(680px,94vw);overflow-y:auto;
+    background:var(--parchment);color:var(--ink);padding:28px 30px 60px;box-shadow:-20px 0 60px rgba(0,0,0,.6)}
+  #about h2{font-family:var(--serif);font-size:26px;margin:.2em 0 .4em}
+  #about h3{font-family:var(--serif);font-size:19px;margin:1.4em 0 .4em;border-bottom:1px solid #c9b489;padding-bottom:4px}
+  #about p,#about li{font-size:14.5px;line-height:1.55;color:var(--ink)}
+  #about .lvl{margin:.5em 0}
+  #about .lvl b{font-family:var(--mono)}
+  #about .cite{font-size:13px;color:var(--ink-soft);line-height:1.5;margin:.4em 0}
+  #about .close{position:sticky;top:0;float:right;background:#d9c49b;color:var(--ink);border-color:#b99b64}
+  #about .note{background:#f4e9cf;border:1px solid #d3bd8e;border-radius:8px;padding:10px 14px;font-size:13.5px}
+
+  @media (max-width:560px){
+    #setup{gap:8px}
+    #setup label{font-size:12px}
+    .pit{min-height:44px}
+    #hand{height:28px;min-width:28px;font-size:13px}
+    kbd{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #hand{transition:none} .pebble.pop{animation:none} #progress .bar i{animation:none;width:100%;opacity:.4}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Kalah<span class="sub">count &amp; capture, solved</span></h1>
+  <div class="hbtns">
+    <button id="btnNew" class="primary">New game<kbd>N</kbd></button>
+    <button id="btnUndo" disabled>Undo<kbd>U</kbd></button>
+    <button id="btnHint" disabled>Hint<kbd>H</kbd></button>
+    <button id="btnAbout">About</button>
+  </div>
+</header>
+
+<div id="setup">
+  <label>Pits <select id="selPits"></select></label>
+  <label>Seeds <select id="selSeeds"></select></label>
+  <label>Opponent <select id="selLevel">
+    <option value="1" selected>Level 1 — random</option>
+    <option value="2">Level 2 — greedy</option>
+    <option value="3">Level 3 — shallow search</option>
+    <option value="4">Level 4 — deeper search</option>
+    <option value="5">Level 5 — strong search</option>
+    <option value="6">Level 6 — perfect play</option>
+  </select></label>
+  <label>First move <select id="selFirst">
+    <option value="0" selected>You</option>
+    <option value="1">Computer</option>
+  </select></label>
+  <label id="ttWrap" title="Memory for the exact solver's transposition table (Level 6 and hints)">Solver memory
+    <select id="selTT"><option value="256">256 MB</option><option value="512" selected>512 MB</option><option value="1024">1 GB</option></select>
+  </label>
+</div>
+
+<div id="status"><span class="dot"></span><span id="statusText">Loading engine…</span></div>
+
+<div id="progress">
+  <span id="progLabel">Exact search…</span>
+  <div class="bar"><i></i></div>
+  <span class="nodes" id="progNodes">0 nodes</span>
+  <button id="btnCancel">Cancel</button>
+</div>
+
+<div id="boardWrap">
+  <div id="board"></div>
+  <div id="hand">0</div>
+</div>
+
+<div id="controls">
+  <div class="speed">Sowing speed
+    <input type="range" id="speed" min="0" max="100" value="55">
+    <span id="speedLabel"></span><kbd>+/−</kbd>
+  </div>
+  <div id="score">You <b id="scoreYou">0</b> · <b id="scoreAI">0</b> Computer</div>
+</div>
+
+<div id="toasts"></div>
+
+<aside id="about">
+  <div class="scrim" id="aboutScrim"></div>
+  <div class="panel">
+    <button class="close" id="btnAboutClose">Close ✕</button>
+    <h2>About Kalah</h2>
+
+    <h3>The mancala family</h3>
+    <p>Kalah belongs to the mancala family of “count and capture” games: seeds are lifted from
+    a pit and sown one at a time around a board of pits and larger stores. Hundreds of variants
+    are played across Africa, the Middle East, and Asia — Oware (Awari), Bao, Omweso, Congkak,
+    and Sungka among the best known. Board-like rows of cup marks appear at ancient sites, and
+    mancala is often described as among the world's oldest games, though how old is genuinely
+    debated: carved holes are hard to date and harder to prove were used for play.</p>
+    <p>Kalah itself is modern: it was developed and commercialized in the United States by
+    William Julius Champion&nbsp;Jr. beginning in the 1940s (he patented designs in the 1950s),
+    and it became the mancala most Western players first meet.</p>
+
+    <h3>The rules used here</h3>
+    <p>Two rows of pits, one store per player. On your turn, lift all seeds from one of your
+    pits and sow counter-clockwise, one per pit, including your own store but skipping your
+    opponent's. Three special rules:</p>
+    <ul>
+      <li><b>Free turn</b> — if the last seed lands in your store, move again (this can chain).</li>
+      <li><b>Capture</b> — if the last seed lands in an empty pit on your side and the opposite
+      pit holds seeds, both that seed and the opposite pit's seeds go to your store.</li>
+      <li><b>Game end</b> — the moment either side's pits are all empty, each player sweeps the
+      seeds remaining on their own side into their store. Higher total wins.</li>
+    </ul>
+    <div class="note"><b>Variant note.</b> Under the <i>standard</i> capture rule used here, a
+    last seed landing opposite an <i>empty</i> pit captures nothing. In the “empty capture”
+    variant, that lone seed is banked anyway. The distinction matters below, because the two
+    variants have different solved values.</div>
+
+    <h3>Kalah has been solved</h3>
+    <p>Because seeds only ever move <i>into</i> stores and never come back out, the number of
+    seeds still in play can never increase — the game cannot cycle, and its positions form a
+    layered, acyclic graph. That structure makes exhaustive analysis tractable.</p>
+    <p class="cite">• Geoffrey Irving, Jeroen Donkers &amp; Jos Uiterwijk, “Solving Kalah,”
+    <i>ICGA Journal</i> 23(3), 2000, pp. 139–147 — solved Kalah for boards up to six pits under
+    the empty-capture rule; their Kalah(6,4) is a first-player win by 10.</p>
+    <p class="cite">• Anders Carstensen, 2011 — extended this to Kalah(6,6) (empty-capture),
+    proving a first-player win.</p>
+    <p class="cite">• Mark Rawlings, 2015 — quantified values for the <b>standard rules played
+    here</b>: Kalah(6,4) is a first-player win by <b>8</b> (final score 28–20 with best play on
+    both sides), Kalah(6,5) a win by 10; he also measured the empty-capture Kalah(6,6) value
+    as a win by 2.</p>
+    <p class="cite">• For comparison, Awari — a different mancala with different rules — was
+    proven a draw by John Romein &amp; Henri Bal (Vrije Universiteit Amsterdam, 2002).</p>
+    <p>This app's engine independently reproduces the standard-rules result: its exact search
+    from the 6×4 opening returns +8, and its perfect-vs-perfect self-play test finishes 28–20.</p>
+
+    <h3>What each level does</h3>
+    <p class="lvl"><b>Level 1.</b> Uniform random choice among legal moves.</p>
+    <p class="lvl"><b>Level 2.</b> Greedy one-ply lookahead: prefers moves that earn a free
+    turn, then the largest capture, breaking ties toward the pit nearest its store.</p>
+    <p class="lvl"><b>Level 3.</b> Alpha–beta search with iterative deepening to about 5 plies
+    (small node budget), evaluating positions by store difference only.</p>
+    <p class="lvl"><b>Level 4.</b> The same search deepened to about 9 plies with a larger
+    budget, adding on-board material to the evaluation.</p>
+    <p class="lvl"><b>Level 5.</b> Alpha–beta with a transposition table, move ordering, and
+    iterative deepening to about 15 plies; the evaluation adds free-turn chances, capture
+    threats, and pit vulnerability.</p>
+    <p class="lvl"><b>Level 6.</b> No heuristics: an exact solver. It runs MTD(f) — a sequence
+    of zero-window alpha–beta probes that converge on the true game value — over a
+    transposition table that stores proven value intervals. The table is keyed on pit contents
+    only: since banked seeds never re-enter play, the future of the game is independent of the
+    store counts, so one table entry serves every layer of the game's acyclic state graph.
+    Level 6's moves are game-theoretically optimal, computed live in your browser.</p>
+    <div class="note"><b>Honesty about time.</b> Level 6 really is exhaustive: the very first
+    move from a fresh 6×4 board is a ~250-million-node proof that can take from tens of seconds
+    up to a couple of minutes depending on your device (a progress readout appears, and you can
+    cancel). Once the table is warm, later exact moves are fast. Smaller boards solve almost
+    instantly. If you cancel an exact search, the app falls back to Level 5 for that one move
+    and says so — it will never label a heuristic move as perfect.</div>
+
+    <h3>Under the hood</h3>
+    <p>The engine is C++23 compiled to WebAssembly, running in a Web Worker so the page never
+    blocks. The interface animates sowing seed by seed with its own JavaScript rules mirror,
+    then cross-checks every resulting position against the engine, which is authoritative;
+    an illegal move can never reach the engine's state. Undo snapshots positions and restores
+    them through the engine. Keyboard: <b>1–P</b> choose a pit (1 is farthest from your store),
+    <b>U</b> undo, <b>H</b> hint, <b>N</b> new game, <b>+/−</b> sowing speed.</p>
+  </div>
+</aside>
+
+<script>
+"use strict";
+/* ============================================================
+   Embedded engine (base64 wasm), spliced in by embed_wasm.py
+   ============================================================ */
+const WASM_B64 = "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ACACRw0BCwtBACEAQQAhAwNAAkAgACABai0AACIFRQ0AIAUgCkoNACAFIARwIgVFDQAgACAFaiIFIAJODQAgASAFai0AAA0AIAMgASAKIAVrai0AAEEBaiIFIAMgBUobIQMLIABBAWoiACACRw0ACyAJQQFqIQUgA0EGbCEDQQAhAEEAIQECQCACQQFHBEAgAkEBcSEGIAJB/v///wdxIQJBACEEA0ACQCAAIAVqIgotAAANACAJIABBf3NqLQAAIgtFDQAgASALaiEBCwJAIAotAAENACAJIABBfnNqLQAAIgpFDQAgASAKaiEBCyAAQQJqIQAgBEECaiIEIAJHDQALIAZFDQELIAAgBWotAAANACAJIABBf3NqLQAAIgBFDQAgACABaiEBCyADIAdqIQcgAUEBdCEADAILQQAhACAFQQFHDQELIAcMAQsgByAAawshBwwBCyAIQgA3AzggCEIANwMwIAggAS0AADoAMCAIQTBqIAlqIgcgDS0AADoAAAJAIAlBAUYNACAIIAEtAAE6ADEgByAKLQACOgABIAlBAkYNACAIIAEtAAI6ADIgByAKLQADOgACIAlBA0YNACAIIAEtAAM6ADMgByAKLQAEOgADIAlBBEYNACAIIAEtAAQ6ADQgByAKLQAFOgAEIAlBBUYNACAIIAEtAAU6ADUgByAKLQAGOgAFIAlBBkYNACAIIAEtAAY6ADYgByAKLQAHOgAGIAlBB0YNACAIIAEtAAc6ADcgByAKLQAIOgAHC0F/IQsCQCAAKAIQIAgpAzgiG0LHtOyYrpLu08AAfSAIKQMwIhlClfip+pe33puef36FIhpCHoggGoVCucuT59Htkay/f34iGkIbiCAahULro8SZsbeS6JR/fiIaQh+IIBqFpyIUIAAoAhRxQRhsaiIJKQMAIBlSDQAgCSkDCCIaIBtSDQAgGSAahFANAAJAIAIgCS0AEksNACAJLgEQIBFBBHRqIQcCQAJAIAktABMiBg4CBAABCyAEIAdKDQEMAwsgBkECRw0AIAMgB04NAgtBfyAJLQAUIgcgB0H/AUYbIQsLIAhBJGogASAAIAsQFAJ/IAgoAixBAEwEQEGAhn4hB0H/AQwBC0EAIARrIRVBfyELIAJBAWshD0GAhn4hByADIQkDQCAIIAEvABA7ASAgCCABKQAINwMYIAggASkAADcDECAIQQRqIAhBEGoiBiAAIAhBJGogE2oiFi0AABALIAcCfyAILQAFQQFGBEAgBiAAKAIAIgpqLQAAIApBAXQgBmotAAFrQQR0DAELIAgtAARBAUYEQCAAIAhBEGogDyAJIAQgBRAVDAELIAAoAgAhDCAIIAgvASA7AUAgCCAIKQMYNwM4IAggCCkDEDcDMCAMQQFqIQoCQAJAIAxFBEBBACEGDAELIApBHnEhF0EAIQZBACENA0AgCEEQaiIYIhAgBmogBiAKaiISIAhBMGoiDmotAAA6AAAgECASaiAGIA5qLQAAOgAAIBAgBkEBciISaiAOIAogEmoiEGotAAA6AAAgECAYaiAOIBJqLQAAOgAAIAZBAmohBiANQQJqIg0gF0cNAAsgDEEBcQ0BCyAIQRBqIgwgBmogBiAKaiIKIAhBMGoiDWotAAA6AAAgCiAMaiAGIA1qLQAAOgAAC0EAIAAgCEEQaiAPIBVBACAJayAFEBVrCyIGSARAIBYtAAAhCyAGIgcgCSAGIAlKGyEJCyAEIAlKBEAgE0EBaiITIAgoAixIDQELC0F/IAsgC0EASBsLIQEgAC0AQA0AAkAgAiAAKAIQIAAoAhQgFHFBGGxqIgAtABJODQAgACkDACAZUg0AIAApAwggG1ENAQsgACABOgAUIAAgAjoAEiAAIBs3AwggACAZNwMAIABBAiAEIAdMIAMgB04bOgATIAAgByARQQR0azsBEAsgCEHQAGokACAHC4ADAQR+AkACQAJAIAAoAgAgACgCBCABKQMIIghCx7TsmK6S7tPAAH0gASkDACIHQpX4qfqXt96bnn9+hSIGQh6IIAaFQrnLk+fR7ZGsv39+IgZCG4ggBoVC66PEmbG3kuiUf34iBkIfiCAGhadxQTBsaiIBKQMAIgYgB1INACABKQMIIgkgCFINACAHIAmEQgBSDQELAkAgASkDGCAHUg0AIAEpAyAiCSAIUg0AIAcgCYRQDQAgAUEYaiEBDAELQX8gBCAEQQBIGyEAAn8CQCABLQAVIAVKBEAgBiABKQMIhEIAUg0BCyABIAU6ABUgASAAOgAUIAEgAzsBEiABIAI7ARAgASAINwMIIAEgBzcDAEEWDAELIAEgBToALSABIAA6ACwgASADOwEqIAEgAjsBKCABIAg3AyAgASAHNwMYQS4LIAFqQQA7AQAMAQsgAS4BECACSARAIAEgAjsBEAsgAS4BEiADSgRAIAEgAzsBEgsgBEEASA0AIAEgBDoAFAsLBgAgACQACwQAIwAL";
+
+/* ============================================================
+   Local rules mirror, used only to drive the animation.
+   The wasm engine remains authoritative; results are cross-checked.
+   Absolute layout: [0..P-1] south pits, [P] south store,
+                    [P+1..2P] north pits, [2P+1] north store.
+   ============================================================ */
+/*SIM-BEGIN*/
+function simMove(cellsIn, side, pitRel, P) {
+  const c = cellsIn.slice();
+  const NCELLS = 2 * P + 2;
+  const myBase = side === 0 ? 0 : P + 1;
+  const myStore = side === 0 ? P : 2 * P + 1;
+  const oppStore = side === 0 ? 2 * P + 1 : P;
+  const src = myBase + pitRel;
+  const steps = [];
+  let n = c[src];
+  if (pitRel < 0 || pitRel >= P || n === 0) return null;   // illegal
+  c[src] = 0;
+  steps.push({ type: "take", cell: src, n });
+  let pos = src;
+  let last = -1;
+  while (n > 0) {
+    pos = (pos + 1) % NCELLS;
+    if (pos === oppStore) continue;         // skip opponent's store
+    c[pos] += 1; n -= 1;
+    steps.push({ type: "drop", cell: pos, hand: n });
+    last = pos;
+  }
+  let freeTurn = false, captured = 0;
+  if (last === myStore) {
+    freeTurn = true;
+    steps.push({ type: "free" });
+  } else if (last >= myBase && last < myBase + P && c[last] === 1) {
+    const opposite = 2 * P - last;          // mirror pit on the other side
+    if (c[opposite] > 0) {
+      captured = c[last] + c[opposite];
+      c[myStore] += captured;
+      c[last] = 0; c[opposite] = 0;
+      steps.push({ type: "capture", from: last, opposite, store: myStore, n: captured });
+    }
+  }
+  // game ends the moment either side is empty; both sweep their own seeds
+  let southSum = 0, northSum = 0;
+  for (let i = 0; i < P; i++) { southSum += c[i]; northSum += c[P + 1 + i]; }
+  let terminal = false;
+  if (southSum === 0 || northSum === 0) {
+    terminal = true;
+    if (southSum > 0) { steps.push({ type: "sweep", side: 0, n: southSum }); c[P] += southSum; for (let i = 0; i < P; i++) c[i] = 0; }
+    if (northSum > 0) { steps.push({ type: "sweep", side: 1, n: northSum }); c[2 * P + 1] += northSum; for (let i = 0; i < P; i++) c[P + 1 + i] = 0; }
+  }
+  const nextSide = (freeTurn || terminal) ? side : 1 - side;
+  return { steps, cells: c, side: nextSide, freeTurn, captured, terminal };
+}
+/*SIM-END*/
+
+/* ============================================================
+   Worker: owns the wasm engine
+   ============================================================ */
+const WORKER_SRC = `
+"use strict";
+let E = null, mem = null, pits = 6;
+function cellsOut() {
+  const n = 2 * pits + 2;
+  const buf = new Uint8Array(mem.buffer, E.eng_state_buf(), n);
+  return Array.from(buf);
+}
+function cellsIn(arr) {
+  new Uint8Array(mem.buffer, E.eng_state_buf(), arr.length).set(arr);
+}
+onmessage = async (ev) => {
+  const m = ev.data;
+  try {
+    if (m.cmd === "boot") {
+      const bin = Uint8Array.from(atob(m.b64), ch => ch.charCodeAt(0));
+      const { instance } = await WebAssembly.instantiate(bin, { env: {
+        js_assert_fail: (line) => { throw new Error("engine assertion @" + line); },
+        js_progress: (nodes) => postMessage({ type: "progress", nodes }),
+      }});
+      E = instance.exports; mem = E.memory;
+      postMessage({ id: m.id, ok: true });
+    } else if (m.cmd === "init") {
+      const mb = E.eng_init(m.pits, m.seeds, m.exactMB, 64);
+      if (mb > 0) {
+        pits = m.pits;
+        E.eng_seed((Math.random() * 0x100000000) >>> 0, (Math.random() * 0x100000000) >>> 0);
+      }
+      postMessage({ id: m.id, ok: mb > 0, mb });
+    } else if (m.cmd === "reset") {
+      E.eng_reset(m.first); postMessage({ id: m.id, ok: true });
+    } else if (m.cmd === "get") {
+      const s = E.eng_get_state();
+      postMessage({ id: m.id, cells: cellsOut(), side: s & 1, over: s >= 2 });
+    } else if (m.cmd === "set") {
+      cellsIn(m.cells); E.eng_set_state(m.side); postMessage({ id: m.id, ok: true });
+    } else if (m.cmd === "apply") {
+      const r = E.eng_apply(m.pit);
+      const s = E.eng_get_state();
+      postMessage({ id: m.id, r, cells: cellsOut(), side: s & 1, over: s >= 2 });
+    } else if (m.cmd === "choose") {
+      const t0 = performance.now();
+      const pit = E.eng_choose(m.level);
+      postMessage({ id: m.id, pit, ms: performance.now() - t0, nodes: E.eng_nodes() });
+    } else if (m.cmd === "solve") {
+      const t0 = performance.now();
+      const pit = E.eng_solve();
+      postMessage({ id: m.id, pit, value: E.eng_solve_value(),
+                    ms: performance.now() - t0, nodes: E.eng_nodes() });
+    }
+  } catch (err) {
+    postMessage({ id: m.id, error: String(err) });
+  }
+};
+`;
+
+class EngineProxy {
+  constructor() { this.worker = null; this.next = 1; this.pending = new Map(); this.onProgress = null; }
+  async start() {
+    this.worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" })));
+    this.worker.onmessage = (ev) => {
+      const m = ev.data;
+      if (m.type === "progress") { this.onProgress && this.onProgress(m.nodes); return; }
+      const p = this.pending.get(m.id);
+      if (p) { this.pending.delete(m.id); m.error ? p.reject(new Error(m.error)) : p.resolve(m); }
+    };
+    await this.call({ cmd: "boot", b64: WASM_B64 });
+  }
+  call(msg) {
+    return new Promise((resolve, reject) => {
+      msg.id = this.next++;
+      this.pending.set(msg.id, { resolve, reject });
+      this.worker.postMessage(msg);
+    });
+  }
+  kill() {
+    if (this.worker) this.worker.terminate();
+    for (const p of this.pending.values()) p.reject(new Error("canceled"));
+    this.pending.clear();
+    this.worker = null;
+  }
+}
+
+/* ============================================================
+   App state + UI
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const boardEl = $("board"), handEl = $("hand"), wrapEl = $("boardWrap");
+const SEED_COLORS = ["--seed1", "--seed2", "--seed3", "--seed4"];
+
+let eng = new EngineProxy();
+let cfg = { pits: 6, seeds: 4, level: 4, first: 0, ttMB: 512 };
+let engineExactMB = 64;        // what the worker currently has allocated
+let cells = [], side = 0, over = false;
+let phase = "boot";            // boot | human | anim | ai | solving | over
+let undoStack = [];            // snapshots {cells, side} at each human decision point
+let animToken = 0;             // bumped to abort in-flight animations (new game/undo)
+let solveGen = 0;              // bumped when a solve is canceled
+let hintPit = -1;
+
+/* ---------- setup selects ---------- */
+for (let p = 2; p <= 8; p++) $("selPits").add(new Option(p, p, p === 6, p === 6));
+for (let s = 1; s <= 8; s++) $("selSeeds").add(new Option(s, s, s === 4, s === 4));
+
+/* ---------- speed ---------- */
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (reduced) $("speed").value = "0";
+function stepMs() {                       // slider 0..100 -> 0(instant)..520ms
+  const v = +$("speed").value;
+  return v === 0 ? 0 : Math.round(40 + (v / 100) * 480);
+}
+function updateSpeedLabel() {
+  const ms = stepMs();
+  $("speedLabel").textContent = ms === 0 ? "instant" : ms + " ms/seed";
+  document.documentElement.style.setProperty("--handms", Math.max(60, ms * 0.8) + "ms");
+}
+$("speed").oninput = updateSpeedLabel; updateSpeedLabel();
+
+/* ---------- board construction ---------- */
+function buildBoard() {
+  const P = cfg.pits;
+  boardEl.innerHTML = "";
+  boardEl.style.gridTemplateColumns =
+    `minmax(44px,0.9fr) repeat(${P}, 1fr) minmax(44px,0.9fr)`;
+  const mk = (cls) => { const d = document.createElement("div"); d.className = cls; return d; };
+
+  const labN = mk("rowlabel"); labN.id = "labN"; labN.textContent = "Computer"; labN.style.gridRow = 1;
+  boardEl.appendChild(labN);
+
+  const storeN = mk("store"); storeN.dataset.abs = 2 * P + 1; storeN.style.gridColumn = 1; storeN.style.gridRow = "2 / span 2";
+  storeN.innerHTML = `<span class="who">CPU</span><div class="pebbles"></div><span class="count">0</span>`;
+  boardEl.appendChild(storeN);
+
+  for (let col = 0; col < P; col++) {           // top row: abs 2P .. P+1
+    const abs = 2 * P - col;
+    const pit = mk("pit top"); pit.dataset.abs = abs;
+    pit.style.gridColumn = col + 2; pit.style.gridRow = 2;
+    pit.innerHTML = `<div class="pebbles"></div><span class="count">0</span>`;
+    boardEl.appendChild(pit);
+  }
+  for (let col = 0; col < P; col++) {           // bottom row: abs 0 .. P-1
+    const abs = col;
+    const pit = mk("pit"); pit.dataset.abs = abs;
+    pit.style.gridColumn = col + 2; pit.style.gridRow = 3;
+    pit.innerHTML = `<span class="keynum">${col + 1}</span><div class="pebbles"></div><span class="count">0</span>`;
+    boardEl.appendChild(pit);
+  }
+  const storeS = mk("store"); storeS.dataset.abs = P; storeS.style.gridColumn = P + 2; storeS.style.gridRow = "2 / span 2";
+  storeS.innerHTML = `<span class="who">You</span><div class="pebbles"></div><span class="count">0</span>`;
+  boardEl.appendChild(storeS);
+
+  const labS = mk("rowlabel"); labS.id = "labS"; labS.textContent = "You"; labS.style.gridRow = 4;
+  boardEl.appendChild(labS);
+
+  boardEl.querySelectorAll(".pit").forEach(el => {
+    el.addEventListener("click", () => onPitClick(+el.dataset.abs));
+  });
+}
+const cellEl = (abs) => boardEl.querySelector(`[data-abs="${abs}"]`);
+
+/* deterministic pebble placement */
+function hash2(a, b) { let h = (a * 374761393 + b * 668265263) >>> 0; h = (h ^ (h >>> 13)) * 1274126177 >>> 0; return (h ^ (h >>> 16)) >>> 0; }
+function pebbleStyle(abs, k, isStore) {
+  const h = hash2(abs + 1, k + 1);
+  const ang = (h % 360) * Math.PI / 180;
+  const rad = ((h >>> 9) % 1000) / 1000;
+  const rx = 41 * Math.sqrt(rad), ry = (isStore ? 44 : 38) * Math.sqrt(rad);
+  const x = 50 + rx * Math.cos(ang) - 8.5, y = 50 + ry * Math.sin(ang * 1.7) - 8.5;
+  const col = SEED_COLORS[(h >>> 5) % SEED_COLORS.length];
+  return { x, y, col };
+}
+function renderCell(abs, n, popLast) {
+  const el = cellEl(abs); if (!el) return;
+  const isStore = el.classList.contains("store");
+  const box = el.querySelector(".pebbles");
+  const want = Math.min(n, isStore ? 40 : 26);
+  while (box.children.length > want) box.removeChild(box.lastChild);
+  while (box.children.length < want) {
+    const k = box.children.length;
+    const s = pebbleStyle(abs, k, isStore);
+    const d = document.createElement("div");
+    d.className = "pebble" + (popLast && k === want - 1 && stepMs() > 0 ? " pop" : "");
+    d.style.left = s.x + "%"; d.style.top = s.y + "%";
+    d.style.background = `radial-gradient(circle at 32% 28%, #fff8, transparent 45%), var(${s.col})`;
+    box.appendChild(d);
+  }
+  el.querySelector(".count").textContent = n;
+}
+function renderAll() {
+  for (let i = 0; i < 2 * cfg.pits + 2; i++) renderCell(i, cells[i], false);
+  $("scoreYou").textContent = cells[cfg.pits];
+  $("scoreAI").textContent = cells[2 * cfg.pits + 1];
+}
+
+/* ---------- status / toasts ---------- */
+function setStatus(text, mode) {
+  $("statusText").textContent = text;
+  $("status").className = mode || "";
+}
+function toast(text, ember) {
+  const d = document.createElement("div");
+  d.className = "toast" + (ember ? " ember" : "");
+  d.textContent = text;
+  $("toasts").appendChild(d);
+  setTimeout(() => { d.classList.add("out"); setTimeout(() => d.remove(), 450); }, 1500);
+}
+
+/* ---------- legal highlighting ---------- */
+function refreshLegal() {
+  const P = cfg.pits;
+  boardEl.querySelectorAll(".pit").forEach(el => el.classList.remove("legal", "hint", "kbd-focus"));
+  $("labS").classList.toggle("turnglow", !over && side === 0);
+  $("labN").classList.toggle("turnglow", !over && side === 1);
+  if (phase !== "human") return;
+  for (let i = 0; i < P; i++) if (cells[i] > 0) cellEl(i).classList.add("legal");
+  if (hintPit >= 0) cellEl(hintPit)?.classList.add("hint");
+}
+function setButtons() {
+  $("btnUndo").disabled = !(phase === "human" && undoStack.length >= 2) && !(phase === "over" && undoStack.length >= 1);
+  $("btnHint").disabled = phase !== "human";
+}
+
+/* ---------- hand / animation ---------- */
+function centerOf(abs) {
+  const r = cellEl(abs).getBoundingClientRect(), w = wrapEl.getBoundingClientRect();
+  return { x: r.left - w.left + r.width / 2, y: r.top - w.top + r.height / 2 };
+}
+const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+function moveHand(abs) {
+  const p = centerOf(abs);
+  handEl.style.transform = `translate(${p.x - 17}px, ${p.y - 17}px)`;
+}
+
+async function animateMove(sim, token) {
+  const ms = stepMs();
+  const before = cells.slice();
+  if (ms === 0) {                       // instant mode: jump, still flash events
+    cells = sim.cells.slice(); renderAll();
+    for (const st of sim.steps) {
+      if (st.type === "capture") {
+        cellEl(st.from).classList.add("flash-cap"); cellEl(st.opposite).classList.add("flash-cap");
+        toast(`Capture! +${st.n}`, true);
+      }
+      if (st.type === "free") toast(side === 0 ? "Free turn — go again" : "Computer gets a free turn");
+    }
+    return;
+  }
+  const work = before.slice();
+  handEl.style.display = "flex";
+  for (const st of sim.steps) {
+    if (token !== animToken) return;   // aborted by new game / undo
+    if (st.type === "take") {
+      work[st.cell] = 0; renderCell(st.cell, 0, false);
+      handEl.textContent = st.n;
+      moveHand(st.cell);
+      handEl.style.opacity = "1";
+      await sleep(Math.max(140, ms));
+    } else if (st.type === "drop") {
+      moveHand(st.cell);
+      await sleep(ms);
+      if (token !== animToken) return;
+      work[st.cell] += 1; renderCell(st.cell, work[st.cell], true);
+      handEl.textContent = st.hand;
+      if (st.cell === cfg.pits) $("scoreYou").textContent = work[st.cell];
+      if (st.cell === 2 * cfg.pits + 1) $("scoreAI").textContent = work[st.cell];
+    } else if (st.type === "capture") {
+      await sleep(180);
+      if (token !== animToken) return;
+      cellEl(st.from).classList.add("flash-cap");
+      cellEl(st.opposite).classList.add("flash-cap");
+      cellEl(st.store).classList.add("flash-cap");
+      toast(`Capture! +${st.n}`, true);
+      await sleep(420);
+      work[st.store] += st.n; work[st.from] = 0; work[st.opposite] = 0;
+      renderCell(st.from, 0, false); renderCell(st.opposite, 0, false);
+      renderCell(st.store, work[st.store], true);
+      setTimeout(() => boardEl.querySelectorAll(".flash-cap").forEach(e => e.classList.remove("flash-cap")), 900);
+    } else if (st.type === "free") {
+      toast(sideOfMover(sim) === 0 ? "Free turn — go again" : "Computer gets a free turn");
+    } else if (st.type === "sweep") {
+      const P = cfg.pits, store = st.side === 0 ? P : 2 * P + 1;
+      toast((st.side === 0 ? "You sweep" : "Computer sweeps") + ` ${st.n} remaining seed${st.n > 1 ? "s" : ""}`);
+      for (let i = 0; i < P; i++) { const a = st.side === 0 ? i : P + 1 + i; work[a] = 0; renderCell(a, 0, false); }
+      work[store] += st.n; renderCell(store, work[store], true);
+      await sleep(300);
+    }
+  }
+  handEl.style.opacity = "0";
+  setTimeout(() => { if (token === animToken) handEl.style.display = "none"; }, 220);
+  cells = sim.cells.slice();
+  renderAll();
+}
+function sideOfMover(sim) { return sim.side === undefined ? 0 : (sim.freeTurn || sim.terminal ? sim.side : 1 - sim.side); }
+
+/* ---------- progress panel ---------- */
+let solveT0 = 0;
+function showProgress(label) {
+  solveT0 = performance.now();
+  $("progLabel").textContent = label;
+  $("progNodes").textContent = "0 nodes";
+  $("progress").classList.add("show");
+}
+function hideProgress() { $("progress").classList.remove("show"); }
+eng.onProgress = onProgressTick;
+function onProgressTick(nodes) {
+  const s = (performance.now() - solveT0) / 1000;
+  $("progNodes").textContent = (nodes / 1e6).toFixed(1) + " Mn · " + s.toFixed(0) + "s";
+}
+
+/* ---------- engine helpers ---------- */
+async function engineInit(exactMB) {
+  const r = await eng.call({ cmd: "init", pits: cfg.pits, seeds: cfg.seeds, exactMB, heurMB: 64 });
+  if (!r.ok) throw new Error("engine init failed");
+  engineExactMB = r.mb;
+  return r.mb;
+}
+async function ensureBigTT() {
+  if (engineExactMB >= cfg.ttMB) return;
+  const snap = { cells: cells.slice(), side };
+  const got = await engineInit(cfg.ttMB);
+  await eng.call({ cmd: "set", cells: snap.cells, side: snap.side });
+  if (got < cfg.ttMB) toast(`Solver memory limited to ${got} MB on this device`);
+}
+async function restartWorker() {           // cancel path: rebuild + restore
+  eng.kill();
+  eng = new EngineProxy();
+  eng.onProgress = onProgressTick;
+  await eng.start();
+  await engineInit(64);
+  await eng.call({ cmd: "set", cells: cells.slice(), side });
+}
+
+/* ---------- game flow ---------- */
+async function newGame() {
+  animToken++; solveGen++; hideProgress(); hintPit = -1;
+  if (phase === "ai" || phase === "solving") {   // a search may be hogging the
+    eng.kill();                                  // worker; replace it so init
+    eng = new EngineProxy();                     // doesn't queue behind it
+    eng.onProgress = onProgressTick;
+    await eng.start();
+  }
+  cfg.pits = +$("selPits").value; cfg.seeds = +$("selSeeds").value;
+  cfg.level = +$("selLevel").value; cfg.first = +$("selFirst").value;
+  cfg.ttMB = +$("selTT").value;
+  setStatus("Setting up…");
+  buildBoard();
+  await engineInit(64);
+  await eng.call({ cmd: "reset", first: cfg.first });
+  const st = await eng.call({ cmd: "get" });
+  cells = st.cells; side = st.side; over = false;
+  undoStack = [];
+  renderAll();
+  if (side === 0) enterHumanTurn(); else runAITurn();
+}
+
+function enterHumanTurn() {
+  phase = "human"; over = false;
+  undoStack.push({ cells: cells.slice(), side });
+  setStatus("Your turn — pick one of your pits", "");
+  refreshLegal(); setButtons();
+}
+
+async function onPitClick(abs) {
+  if (phase !== "human") return;
+  const P = cfg.pits;
+  if (abs >= P) return;                    // not a south pit
+  await playHuman(abs);
+}
+
+async function playHuman(pitRel) {
+  const sim = simMove(cells, 0, pitRel, cfg.pits);
+  if (!sim) { toast("That pit is empty"); return; }
+  hintPit = -1;
+  phase = "anim"; refreshLegal(); setButtons();
+  setStatus("Sowing…");
+  const token = ++animToken;
+
+  const [er] = await Promise.all([
+    eng.call({ cmd: "apply", pit: pitRel }),
+    animateMove(sim, token),
+  ]).catch(() => [null]);
+  if (!er || token !== animToken) return;
+  if (er.r < 0) { console.error("engine rejected move", pitRel); return; }
+  crossCheck(sim, er);
+  cells = er.cells; side = er.side; over = er.over;
+  renderAll();
+
+  if (over) return finishGame();
+  if (sim.freeTurn) { enterHumanTurn(); return; }
+  runAITurn();
+}
+
+async function runAITurn() {
+  phase = "ai"; refreshLegal(); setButtons();
+  const L = cfg.level;
+  let chosen, exactVal = null, canceledToL5 = false;
+
+  if (L === 6) {
+    await ensureBigTT();
+    const myGen = ++solveGen;
+    setStatus(`Computer is thinking (Level 6 — exact search)…`, "ai");
+    showProgress("Exact search — proving the optimal move");
+    try {
+      const r = await eng.call({ cmd: "solve" });
+      if (myGen !== solveGen) return;      // canceled meanwhile
+      chosen = r.pit; exactVal = r.value;
+    } catch (e) {
+      if (myGen !== solveGen) return;      // worker was killed by cancel
+      throw e;
+    } finally {
+      if (myGen === solveGen) hideProgress();
+    }
+  } else {
+    setStatus(`Computer is thinking (Level ${L})…`, "ai");
+    await sleep(stepMs() === 0 ? 60 : 350);   // beat, so turns read clearly
+    const r = await eng.call({ cmd: "choose", level: L });
+    chosen = r.pit;
+  }
+  if (chosen == null || chosen < 0) return;
+
+  // Engine gave a mover-relative pit for north; animate + apply
+  const sim = simMove(cells, 1, chosen, cfg.pits);
+  if (!sim) { console.error("AI produced illegal move?", chosen); return; }
+  phase = "anim";
+  if (exactVal !== null) {
+    const msg = exactVal > 0 ? `computer wins by ${exactVal}` :
+                exactVal < 0 ? `you can win by ${-exactVal}` : "a draw";
+    setStatus(`Computer plays (perfect play: ${msg} from here)…`, "ai");
+  } else {
+    setStatus("Computer plays…", "ai");
+  }
+  const token = ++animToken;
+  const [er] = await Promise.all([
+    eng.call({ cmd: "apply", pit: chosen }),
+    animateMove(sim, token),
+  ]).catch(() => [null]);
+  if (!er || token !== animToken) return;
+  crossCheck(sim, er);
+  cells = er.cells; side = er.side; over = er.over;
+  renderAll();
+
+  if (over) return finishGame();
+  if (sim.freeTurn) return runAITurn();     // visible chained free turns
+  enterHumanTurn();
+}
+
+function crossCheck(sim, er) {
+  const a = sim.cells.join(","), b = er.cells.join(",");
+  if (a !== b || (sim.side !== er.side && !er.over)) {
+    console.error("UI/engine divergence — engine wins", { ui: a, engine: b });
+    toast("Display resynced from engine");
+  }
+}
+
+function finishGame() {
+  phase = "over";
+  const you = cells[cfg.pits], ai = cells[2 * cfg.pits + 1];
+  const msg = you > ai ? `You win ${you}–${ai} (+${you - ai})`
+            : ai > you ? `Computer wins ${ai}–${you} (+${ai - you})`
+            : `Draw, ${you}–${ai}`;
+  setStatus(msg + " — press N for a new game", "over");
+  toast(msg, you <= ai);
+  refreshLegal(); setButtons();
+}
+
+/* ---------- undo ---------- */
+async function doUndo() {
+  if (phase === "human") {
+    if (undoStack.length < 2) return;
+    undoStack.pop();
+  } else if (phase !== "over" || undoStack.length < 1) return;
+  const snap = undoStack[undoStack.length - 1];
+  animToken++; solveGen++; hideProgress(); hintPit = -1;
+  cells = snap.cells.slice(); side = snap.side; over = false;
+  await eng.call({ cmd: "set", cells: cells.slice(), side });
+  handEl.style.opacity = "0"; handEl.style.display = "none";
+  renderAll();
+  phase = "human";
+  setStatus("Your turn — position restored", "");
+  refreshLegal(); setButtons();
+}
+
+/* ---------- hint ---------- */
+async function doHint() {
+  if (phase !== "human") return;
+  await ensureBigTT();
+  const myGen = ++solveGen;
+  phase = "solving"; refreshLegal(); setButtons();
+  setStatus("Solving your position exactly…");
+  showProgress("Exact search — computing your best move");
+  try {
+    const r = await eng.call({ cmd: "solve" });
+    if (myGen !== solveGen) return;
+    hideProgress();
+    phase = "human";
+    hintPit = r.pit;
+    const v = r.value;
+    const msg = v > 0 ? `you win by ${v}` : v < 0 ? `best defense loses by ${-v}` : "a draw";
+    setStatus(`Hint: pit ${r.pit + 1} — perfect play from here is ${msg}.`);
+    refreshLegal(); setButtons();
+  } catch (e) {
+    if (myGen !== solveGen) return;
+    hideProgress(); phase = "human"; refreshLegal(); setButtons();
+  }
+}
+
+/* ---------- cancel exact search ---------- */
+$("btnCancel").onclick = async () => {
+  const wasAI = phase === "ai";
+  solveGen++;
+  hideProgress();
+  setStatus("Canceling exact search…", "ai");
+  await restartWorker();
+  if (wasAI) {
+    toast("Exact search canceled — this move uses Level 5 instead");
+    setStatus("Computer is thinking (Level 5 — fallback)…", "ai");
+    phase = "ai";
+    const r = await eng.call({ cmd: "choose", level: 5 });
+    const sim = simMove(cells, 1, r.pit, cfg.pits);
+    phase = "anim";
+    const token = ++animToken;
+    const [er] = await Promise.all([
+      eng.call({ cmd: "apply", pit: r.pit }),
+      animateMove(sim, token),
+    ]).catch(() => [null]);
+    if (!er || token !== animToken) return;
+    crossCheck(sim, er);
+    cells = er.cells; side = er.side; over = er.over;
+    renderAll();
+    if (over) return finishGame();
+    if (sim.freeTurn) return runAITurn();
+    enterHumanTurn();
+  } else {
+    phase = "human";
+    setStatus("Hint canceled — your turn");
+    refreshLegal(); setButtons();
+  }
+};
+
+/* ---------- wiring ---------- */
+$("btnNew").onclick = () => newGame();
+$("btnUndo").onclick = () => doUndo();
+$("btnHint").onclick = () => doHint();
+$("btnAbout").onclick = () => $("about").classList.add("open");
+$("btnAboutClose").onclick = () => $("about").classList.remove("open");
+$("aboutScrim").onclick = () => $("about").classList.remove("open");
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT") return;
+  const k = ev.key;
+  if (k === "Escape") $("about").classList.remove("open");
+  else if (k === "n" || k === "N") newGame();
+  else if (k === "u" || k === "U") doUndo();
+  else if (k === "h" || k === "H") doHint();
+  else if (k === "+" || k === "=") { $("speed").value = Math.max(0, +$("speed").value - 12); updateSpeedLabel(); }
+  else if (k === "-" || k === "_") { $("speed").value = Math.min(100, +$("speed").value + 12); updateSpeedLabel(); }
+  else if (/^[1-8]$/.test(k) && phase === "human") {
+    const pit = +k - 1;
+    if (pit < cfg.pits && cells[pit] > 0) playHuman(pit);
+  }
+});
+
+/* ---------- boot ---------- */
+(async () => {
+  try {
+    await eng.start();
+    await newGame();
+  } catch (e) {
+    setStatus("Engine failed to load: " + e.message, "over");
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
