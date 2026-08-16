@@ -140,19 +140,24 @@
   .toast.out{transition:opacity .4s, transform .4s;opacity:0;transform:translateY(-10px)}
 
   /* ---- about drawer ---- */
-  #about{position:fixed;inset:0;z-index:60;display:none}
-  #about.open{display:block}
-  #about .scrim{position:absolute;inset:0;background:rgba(10,7,4,.6)}
-  #about .panel{position:absolute;top:0;right:0;bottom:0;width:min(680px,94vw);overflow-y:auto;
+  #about,#transcript{position:fixed;inset:0;z-index:60;display:none}
+  #about.open,#transcript.open{display:block}
+  #about .scrim,#transcript .scrim{position:absolute;inset:0;background:rgba(10,7,4,.6)}
+  #about .panel,#transcript .panel{position:absolute;top:0;right:0;bottom:0;width:min(680px,94vw);overflow-y:auto;
     background:var(--parchment);color:var(--ink);padding:28px 30px 60px;box-shadow:-20px 0 60px rgba(0,0,0,.6)}
-  #about h2{font-family:var(--serif);font-size:26px;margin:.2em 0 .4em}
+  #about h2,#transcript h2{font-family:var(--serif);font-size:26px;margin:.2em 0 .4em}
   #about h3{font-family:var(--serif);font-size:19px;margin:1.4em 0 .4em;border-bottom:1px solid #c9b489;padding-bottom:4px}
   #about p,#about li{font-size:14.5px;line-height:1.55;color:var(--ink)}
   #about .lvl{margin:.5em 0}
   #about .lvl b{font-family:var(--mono)}
   #about .cite{font-size:13px;color:var(--ink-soft);line-height:1.5;margin:.4em 0}
-  #about .close{position:sticky;top:0;float:right;background:#d9c49b;color:var(--ink);border-color:#b99b64}
-  #about .note{background:#f4e9cf;border:1px solid #d3bd8e;border-radius:8px;padding:10px 14px;font-size:13.5px}
+  #about .close,#transcript .close{position:sticky;top:0;float:right;background:#d9c49b;color:var(--ink);border-color:#b99b64}
+  #about .note,#transcript .note{background:#f4e9cf;border:1px solid #d3bd8e;border-radius:8px;padding:10px 14px;font-size:13.5px}
+
+  #transcript pre{font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--ink);
+    background:#f4e9cf;border:1px solid #d3bd8e;border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+  #transcript .row{display:flex;gap:8px;align-items:center;margin:.6em 0}
+  #transcript .row button{background:#d9c49b;color:var(--ink);border-color:#b99b64}
 
   @media (max-width:560px){
     #setup{gap:8px}
@@ -174,6 +179,7 @@
     <button id="btnNew" class="primary">New game<kbd>N</kbd></button>
     <button id="btnUndo" disabled>Undo<kbd>U</kbd></button>
     <button id="btnHint" disabled>Hint<kbd>H</kbd></button>
+    <button id="btnLog">Transcript<kbd>T</kbd></button>
     <button id="btnAbout">About</button>
   </div>
 </header>
@@ -182,10 +188,10 @@
   <label>Pits <select id="selPits"></select></label>
   <label>Seeds <select id="selSeeds"></select></label>
   <label>Opponent <select id="selLevel">
-    <option value="1" selected>Level 1 — random</option>
+    <option value="1">Level 1 — random</option>
     <option value="2">Level 2 — greedy</option>
     <option value="3">Level 3 — shallow search</option>
-    <option value="4">Level 4 — deeper search</option>
+    <option value="4" selected>Level 4 — deeper search</option>
     <option value="5">Level 5 — strong search</option>
     <option value="6">Level 6 — perfect play</option>
   </select></label>
@@ -221,6 +227,23 @@
 </div>
 
 <div id="toasts"></div>
+
+<aside id="transcript">
+  <div class="scrim" id="logScrim"></div>
+  <div class="panel">
+    <button class="close" id="btnLogClose">Close ✕</button>
+    <h2>Game transcript</h2>
+    <div class="row">
+      <button id="btnLogDownload">Download .txt</button>
+      <button id="btnLogCopy">Copy</button>
+      <span id="logHint" style="font-size:13px;color:var(--ink-soft)"></span>
+    </div>
+    <pre id="logText"></pre>
+    <div class="note" style="margin-top:14px">Pits are numbered from each player's own
+    far end toward their store, so “pit 1” is the pit farthest from the mover's store —
+    matching the numerals printed under your pits. Undo rewinds the transcript too.</div>
+  </div>
+</aside>
 
 <aside id="about">
   <div class="scrim" id="aboutScrim"></div>
@@ -467,7 +490,9 @@ let cfg = { pits: 6, seeds: 4, level: 4, first: 0, ttMB: 512 };
 let engineExactMB = 64;        // what the worker currently has allocated
 let cells = [], side = 0, over = false;
 let phase = "boot";            // boot | human | anim | ai | solving | over
-let undoStack = [];            // snapshots {cells, side} at each human decision point
+let undoStack = [];            // snapshots {cells, side, hist} at each human decision point
+let history = [];              // transcript entries, one per move played
+let gameMeta = null;           // header info for the transcript
 let animToken = 0;             // bumped to abort in-flight animations (new game/undo)
 let solveGen = 0;              // bumped when a solve is canceled
 let hintPit = -1;
@@ -704,6 +729,84 @@ async function restartWorker() {           // cancel path: rebuild + restore
   await eng.call({ cmd: "set", cells: cells.slice(), side });
 }
 
+/* ---------- transcript ---------- */
+function startLog() {
+  const d = new Date();
+  gameMeta = {
+    when: d.toLocaleString(),
+    stamp: d.toISOString().slice(0, 16).replace(/[-:T]/g, ""),
+    pits: cfg.pits, seeds: cfg.seeds, first: cfg.first, level: cfg.level,
+    result: null,
+  };
+  history = [];
+}
+// who: 0 you / 1 computer. pitRel is mover-relative (0-based).
+function logMove(who, pitRel, sim, info) {
+  const ev = [];
+  if (sim.freeTurn) ev.push("free turn");
+  if (sim.captured) ev.push(`capture ${sim.captured}`);
+  for (const st of sim.steps) if (st.type === "sweep")
+    ev.push(`${st.side === 0 ? "you sweep" : "computer sweeps"} ${st.n}`);
+  history.push({
+    who, pit: pitRel + 1,
+    events: ev,
+    you: sim.cells[cfg.pits], ai: sim.cells[2 * cfg.pits + 1],
+    level: who === 1 ? (info && info.level) : null,
+    value: info && info.value != null ? info.value : null,
+    fallback: !!(info && info.fallback),
+  });
+}
+function transcriptText() {
+  if (!gameMeta) return "";
+  const L = [];
+  L.push(`Kalah ${gameMeta.pits}x${gameMeta.seeds} — standard rules (capture requires a non-empty opposite pit)`);
+  L.push(gameMeta.when);
+  L.push(`First move: ${gameMeta.first === 0 ? "You" : "Computer"}`);
+  L.push("");
+  L.push(" ply  player    move   notes                              score  You-CPU");
+  L.push(" ---  --------  -----  ---------------------------------  --------------");
+  history.forEach((h, i) => {
+    const notes = [];
+    if (h.level) notes.push(`L${h.level}${h.fallback ? " (fallback)" : ""}`);
+    if (h.value != null) {
+      notes.push(h.value > 0 ? `exact: CPU +${h.value}`
+               : h.value < 0 ? `exact: You +${-h.value}` : "exact: draw");
+    }
+    notes.push(...h.events);
+    L.push(
+      String(i + 1).padStart(4) + "  " +
+      (h.who === 0 ? "You     " : "Computer") + "  " +
+      ("pit " + h.pit).padEnd(5) + "  " +
+      notes.join(", ").padEnd(33) + "  " +
+      (String(h.you).padStart(6) + " -" + String(h.ai).padStart(4))
+    );
+  });
+  L.push("");
+  L.push(gameMeta.result ? "Result: " + gameMeta.result : "Game in progress.");
+  return L.join("\n");
+}
+function refreshLog() {
+  $("logText").textContent = transcriptText() || "No moves yet.";
+  $("logHint").textContent = history.length
+    ? `${history.length} move${history.length > 1 ? "s" : ""} recorded`
+    : "";
+}
+$("btnLog").onclick = () => { refreshLog(); $("transcript").classList.add("open"); };
+$("btnLogClose").onclick = () => $("transcript").classList.remove("open");
+$("logScrim").onclick = () => $("transcript").classList.remove("open");
+$("btnLogDownload").onclick = () => {
+  const blob = new Blob([transcriptText() + "\n"], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `kalah-${gameMeta.pits}x${gameMeta.seeds}-${gameMeta.stamp}.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+$("btnLogCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText(transcriptText()); toast("Transcript copied"); }
+  catch { toast("Clipboard blocked — use Download"); }
+};
+
 /* ---------- game flow ---------- */
 async function newGame() {
   animToken++; solveGen++; hideProgress(); hintPit = -1;
@@ -723,13 +826,14 @@ async function newGame() {
   const st = await eng.call({ cmd: "get" });
   cells = st.cells; side = st.side; over = false;
   undoStack = [];
+  startLog();
   renderAll();
   if (side === 0) enterHumanTurn(); else runAITurn();
 }
 
 function enterHumanTurn() {
   phase = "human"; over = false;
-  undoStack.push({ cells: cells.slice(), side });
+  undoStack.push({ cells: cells.slice(), side, hist: history.length });
   setStatus("Your turn — pick one of your pits", "");
   refreshLegal(); setButtons();
 }
@@ -756,6 +860,7 @@ async function playHuman(pitRel) {
   if (!er || token !== animToken) return;
   if (er.r < 0) { console.error("engine rejected move", pitRel); return; }
   crossCheck(sim, er);
+  logMove(0, pitRel, sim, null);
   cells = er.cells; side = er.side; over = er.over;
   renderAll();
 
@@ -766,8 +871,8 @@ async function playHuman(pitRel) {
 
 async function runAITurn() {
   phase = "ai"; refreshLegal(); setButtons();
-  const L = cfg.level;
-  let chosen, exactVal = null, canceledToL5 = false;
+  const L = cfg.level;               // read fresh each turn: level changes apply at once
+  let chosen, exactVal = null;
 
   if (L === 6) {
     await ensureBigTT();
@@ -810,6 +915,7 @@ async function runAITurn() {
   ]).catch(() => [null]);
   if (!er || token !== animToken) return;
   crossCheck(sim, er);
+  logMove(1, chosen, sim, { level: L, value: exactVal });
   cells = er.cells; side = er.side; over = er.over;
   renderAll();
 
@@ -833,6 +939,8 @@ function finishGame() {
             : ai > you ? `Computer wins ${ai}–${you} (+${ai - you})`
             : `Draw, ${you}–${ai}`;
   setStatus(msg + " — press N for a new game", "over");
+  if (gameMeta) gameMeta.result = msg;
+  if ($("transcript").classList.contains("open")) refreshLog();
   toast(msg, you <= ai);
   refreshLegal(); setButtons();
 }
@@ -846,6 +954,9 @@ async function doUndo() {
   const snap = undoStack[undoStack.length - 1];
   animToken++; solveGen++; hideProgress(); hintPit = -1;
   cells = snap.cells.slice(); side = snap.side; over = false;
+  history.length = Math.min(history.length, snap.hist);
+  if (gameMeta) gameMeta.result = null;
+  if ($("transcript").classList.contains("open")) refreshLog();
   await eng.call({ cmd: "set", cells: cells.slice(), side });
   handEl.style.opacity = "0"; handEl.style.display = "none";
   renderAll();
@@ -899,6 +1010,7 @@ $("btnCancel").onclick = async () => {
     ]).catch(() => [null]);
     if (!er || token !== animToken) return;
     crossCheck(sim, er);
+    logMove(1, r.pit, sim, { level: 5, fallback: true });
     cells = er.cells; side = er.side; over = er.over;
     renderAll();
     if (over) return finishGame();
@@ -912,6 +1024,17 @@ $("btnCancel").onclick = async () => {
 };
 
 /* ---------- wiring ---------- */
+$("selLevel").onchange = () => {
+  cfg.level = +$("selLevel").value;         // takes effect on the computer's next move
+  toast(`Opponent set to Level ${cfg.level}`);
+  if (phase === "ai" || phase === "solving")
+    toast("Applies from the next computer move");
+};
+for (const id of ["selPits", "selSeeds", "selFirst", "selTT"]) {
+  $(id).onchange = () => {
+    if (phase !== "boot") toast("Takes effect on the next new game");
+  };
+}
 $("btnNew").onclick = () => newGame();
 $("btnUndo").onclick = () => doUndo();
 $("btnHint").onclick = () => doHint();
@@ -922,7 +1045,8 @@ $("aboutScrim").onclick = () => $("about").classList.remove("open");
 document.addEventListener("keydown", (ev) => {
   if (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT") return;
   const k = ev.key;
-  if (k === "Escape") $("about").classList.remove("open");
+  if (k === "Escape") { $("about").classList.remove("open"); $("transcript").classList.remove("open"); }
+  else if (k === "t" || k === "T") { refreshLog(); $("transcript").classList.toggle("open"); }
   else if (k === "n" || k === "N") newGame();
   else if (k === "u" || k === "U") doUndo();
   else if (k === "h" || k === "H") doHint();
