@@ -30,11 +30,11 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;background:var(--ink);color:var(--chrome-text);font-family:var(--ui);font-size:14px;overflow:hidden}
+body{margin:0;background:var(--ink);color:var(--chrome-text);font-family:var(--ui);font-size:14px;overflow:hidden;display:flex;flex-direction:column}
 button{font-family:var(--ui)}
 
 /* ---------- top bar ---------- */
-.topbar{display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.topbar{display:flex;align-items:center;gap:10px;flex:0 0 52px;height:52px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel)}
 .brand{display:flex;align-items:baseline;gap:8px;margin-right:8px;user-select:none}
 .brand b{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.02em;color:var(--chrome-text)}
 .brand b em{font-style:normal;color:var(--amber)}
@@ -74,7 +74,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .drow{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
 
 /* ---------- editor layout ---------- */
-.split{display:flex;height:calc(100% - 52px);--edw:44%}
+.split{display:flex;flex:1;min-height:0;--edw:44%}
 .editor-pane{width:var(--edw);min-width:0;display:flex;flex-direction:column}
 .split.ed-min .editor-pane{display:none}
 .split.ed-max .preview-pane{display:none}
@@ -152,6 +152,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .slide .math-err{font-family:var(--mono);font-size:.85em;color:#b03030;border-bottom:1px dotted #b03030;cursor:help}
 .slide .math-raw{font-family:var(--mono);font-size:.9em}
 .slide .katex-display{margin:.3em 0}
+.slide .inline-nobr{white-space:nowrap}
 .slide .box-text{width:100%;height:100%;display:flex;font-size:26px;line-height:1.3;color:#233;box-sizing:border-box;overflow:hidden}
 .slide .box-text .box-inner{display:block;width:100%}
 .s-h1{font-family:var(--slide-display,var(--display));font-weight:700;font-size:72px;line-height:1.12;letter-spacing:-.01em}
@@ -163,9 +164,18 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .s-li.lv1{margin-left:52px;font-size:27px}
 .s-li.lv2{margin-left:104px;font-size:25px}
 .s-li.lv1 .mk,.s-li.lv2 .mk{color:#6b7482;font-weight:400}
+.slide a:link{color:var(--slide-link-color,#0645ad)}
+.slide a:visited{color:var(--slide-visited-link-color,#0b0080)}
 .s-img img{display:block;max-width:100%;border-radius:3px}
 .slide .abs-item{position:absolute;max-width:760px}
 .slide code{font-family:var(--mono);font-size:.85em;background:rgba(31,111,107,.10);border:1px solid rgba(31,111,107,.25);border-radius:4px;padding:1px 6px}
+.slide .s-code{max-width:100%;margin:0;padding:18px 22px;border:1px solid #d9d6cd;border-radius:7px;background:#f3f1eb;
+                    color:#232830;font-family:var(--mono);font-size:21px;line-height:1.4;overflow:hidden}
+.slide .s-code code,.slide .s-code code.hljs{display:block;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit}
+.slide .s-table{max-width:100%;border-collapse:collapse;border:2px solid var(--slide-accent,var(--teal));font-size:24px;line-height:1.3}
+.slide .s-table th,.slide .s-table td{padding:10px 15px;border:1px solid #aeb5b7;vertical-align:top}
+.slide .s-table th{background:rgba(31,111,107,.13);font-weight:600;color:inherit}
+.slide .s-table tbody tr:nth-child(even){background:rgba(35,40,48,.035)}
 .hidden-item{visibility:hidden}
 
 /* ---------- presentation mode ---------- */
@@ -178,8 +188,17 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .hud .dots{display:flex;gap:5px}
 .hud .dot{width:7px;height:7px;border-radius:50%;background:#3a4556}
 .hud .dot.done{background:var(--amber)}
+.hudbtn{width:26px;height:26px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--panel2);color:var(--chrome-text);font-size:14px;line-height:1;cursor:pointer}
+.hudbtn:hover{border-color:var(--amber-dim);color:#fff}
+.hudbtn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .blackout{position:absolute;inset:0;background:#000;z-index:8;display:none}
 .blackout.on{display:block}
+
+/* presenter status shown in the controller/editor window */
+.pconsole{display:none;position:fixed;left:50%;bottom:14px;z-index:45;transform:translateX(-50%);max-width:calc(100vw - 32px);
+          padding:8px 15px;border:1px solid var(--line);border-radius:18px;background:rgba(17,21,28,.94);box-shadow:0 6px 24px rgba(0,0,0,.35);
+          color:var(--chrome-text);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pconsole.on{display:block}
 
 /* ---------- overview (v) ---------- */
 .overview{position:absolute;left:0;top:0;bottom:0;width:220px;background:rgba(17,21,28,.95);border-right:1px solid var(--line);overflow-y:auto;padding:14px 12px;z-index:9;transform:translateX(-100%);transition:transform .22s ease}
@@ -206,7 +225,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 #printRoot{position:fixed;left:-9999px;top:0;visibility:hidden}
 @media print{
   @page{size:13.333333in 7.5in;margin:0}
-  html,body{width:13.333333in;height:auto;margin:0!important;overflow:visible;background:#fff}
+  html,body{display:block;width:13.333333in;height:auto;margin:0!important;overflow:visible;background:#fff}
   body>:not(#printRoot){display:none!important}
   #printRoot{position:static;visibility:visible;width:13.333333in;margin:0;padding:0}
   .pslide{position:relative;width:13.333333in;height:7.5in;margin:0;overflow:hidden;
@@ -264,7 +283,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
   <div class="menu" id="mPresent"><button class="mbtn">Present</button><div class="mlist">
     <button class="mitem" id="miPresent">▶ Present</button>
-    <button class="mitem" id="miPresentHere">Present from Selected</button>
+    <button class="mitem" id="miPresentBeginning">Present from Beginning</button>
     <button class="mitem" id="miPresenter">⧉ Presenter View</button>
     <button class="mitem" id="miPresent2" style="display:none">Present on 2nd Screen</button>
   </div></div>
@@ -276,8 +295,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   <div class="spacer"></div>
   <span class="kbd-hint"><kbd>space</kbd> advance · <kbd>n</kbd>/<kbd>p</kbd> slide · <kbd>v</kbd> overview · <kbd>b</kbd> black · <kbd>esc</kbd> exit</span>
   <button class="btn icon" id="btnPresenterQ" title="Presenter view — slides in a separate window, notes here">⧉</button>
-  <button class="btn icon primary" id="btnPresentQ" title="Present (fullscreen)">▶</button>
-  <input type="file" id="fileIn" accept=".psl,.txt,.md,.slides" style="display:none">
+  <button class="btn icon primary" id="btnPresentQ" title="Present from current slide (fullscreen)">▶</button>
+  <input type="file" id="fileIn" accept=".psl,.sd,.txt,.md,.slides" style="display:none">
   <input type="file" id="pptxIn" accept=".pptx" style="display:none">
 </div>
 
@@ -327,7 +346,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!---</td><td>Start a <b>pocket</b> slide: rendered in the editor and reachable by direct navigation (overview, thumbnails, <code>?slide=N</code>), but skipped when advancing with space/n. It still <i>executes</i>, so <code>!set</code> and <code>\${…}</code> math there affect later slides. Built-in <code>slide_hidden</code> is 1 on these slides.</td></tr>
       <tr><td>!if expr … !else … !endif</td><td>Conditional lines (nestable). Truthy = non-zero number or non-empty string; combine with comparisons, e.g. <code>!if slide_num > 3</code> or <code>!if \${x*2} == 10</code>.</td></tr>
       <tr><td>!import(theme.psl)</td><td>Splice a PSL template file in at this point — perfect for shared <code>!set</code>/<code>!all</code> house styles. Fetched relative to the page (CORS applies); imports may nest but cannot add slides.</td></tr>
-      <tr><td>[shown text](https://…)</td><td>Inline link, opens in a new tab.</td></tr>
+      <tr><td>[shown text](https://…)<br>[](https://…)</td><td>Inline link, opens in a new tab. Leave the shown text blank to display the URL. Balanced parentheses are allowed inside the URL.</td></tr>
+      <tr><td>first line{{br}}second line</td><td>Force a line break without starting a new text item or bullet. Other safe inline controls: <code>{{wbr}}</code>, <code>{{nbsp}}</code>, and <code>{{sub|text}}</code>, <code>{{sup|text}}</code>, <code>{{mark|text}}</code>, <code>{{u|text}}</code>, <code>{{s|text}}</code>, <code>{{small|text}}</code>, <code>{{nobr|text}}</code>.</td></tr>
+      <tr><td>Normal {{size=44px|large}} normal</td><td>Change font size within a line. Units may be <code>px</code>, <code>pt</code>, <code>em</code>, <code>rem</code>, or <code>%</code>; a number without a unit means pixels. Other inline markup works inside the resized text.</td></tr>
       <tr><td>!foreach i 1 6 [step] … !endfor</td><td>Repeat the body once per value (inclusive; step may be fractional or negative; nestable). <code>\${i}</code> works everywhere in the body — labels, coordinates, durations — so one loop can build and animate a whole family of elements. Use <code>\${…}</code> for computed bounds.</td></tr>
       <tr><td># Title / ## Subtitle</td><td>Big centered title and subtitle (title slides).</td></tr>
       <tr><td>### Slide title</td><td>Heading at the top of a regular slide.</td></tr>
@@ -342,7 +363,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
     <h3>Variables, expressions &amp; deck styling</h3>
     <table>
-      <tr><td>!set test 5</td><td>Define any variable. Numeric values become numbers; anything else is a string. Reserved style names configure the deck: <code>bg</code> <code>dim</code> <code>tint</code> <code>color</code> <code>accent</code> <code>font</code> <code>headfont</code> (e.g. <code>!set font Georgia, serif</code>).</td></tr>
+      <tr><td>!set test 5</td><td>Define any variable. Numeric values become numbers; anything else is a string. Reserved style names configure the deck: <code>bg</code> <code>dim</code> <code>tint</code> <code>color</code> <code>accent</code> <code>linkcolor</code> <code>visitedlinkcolor</code> <code>font</code> <code>headfont</code> (e.g. <code>!set font Georgia, serif</code>).</td></tr>
       <tr><td>The value is \${test}</td><td><code>\${…}</code> anywhere in slide text substitutes an expression: variables, numbers, strings, <code>+ - * / % ( )</code>. <code>+</code> concatenates strings.</td></tr>
       <tr><td>\${test*2 + 1}</td><td>Math works, with normal precedence.</td></tr>
       <tr><td>\${test = test + 1}</td><td>Assignment: prints the new value <i>and</i> updates the variable. Expressions run at parse time, top to bottom, so results are deterministic.</td></tr>
@@ -367,7 +388,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>![caption](url)</td><td>Image. Size with <code>{w=0.3}</code> (fraction of slide width) or pixels.</td></tr>
       <tr><td>!bg(url)  ·  !bg(#123456)</td><td>Slide background image (covers slide) or color.</td></tr>
       <tr><td>{dim=0.5, tint=#000} !bg(url)  ·  !dim 0.5</td><td>Darken (or tint) the background so text on top stays readable. <code>dim</code> is 0–1.</td></tr>
-      <tr><td>!embed(https://your.app)</td><td>Embed a live web app as an iframe. Position with <code>@()</code>, size with <code>{w=, h=}</code>. Thumbnails show a placeholder.</td></tr>
+      <tr><td>!embed(https://your.app)</td><td>Embed a live web app as a sandboxed iframe. Position with <code>@()</code>, size with <code>{w=, h=}</code>. Scripts, forms, pop-ups, fullscreen, autoplay, presentations, and downloads are available; SlideDown does not grant camera, microphone, or clipboard permission. Thumbnails show a placeholder.</td></tr>
       <tr><td>!video(clip.mp4)<br>!audio(voice.mp3)</td><td>Native video / audio. Position with <code>@()</code>, size video with <code>{w=, h=}</code> (defaults to 16:9). Style flags: <code>autoplay</code> (starts when the element is revealed — browsers require <code>muted</code> for videos to autoplay reliably), <code>loop</code>, <code>muted</code>, <code>controls=0</code>, and <code>poster=url</code> for a video cover frame. Playback pauses automatically when the element is hidden or you leave the slide. Thumbnails and print show the poster or a placeholder.</td></tr>
       <tr><td>!chart bar (0.2, 0.3) (0.6, 0.5) Q1:14, Q2:22, Q3:19<br>!chart line (x, y) (w, h) 2023:4, 2024:9<br>!chart pie (0.5, 0.5) 0.25 A:40, B:35, C:25</td><td>Native charts from <code>label:value</code> pairs. Bar and line take a top-left corner and size; pie takes a center and radius. Styling: <code>colors=(#1f6f6b, #d97b4a, …)</code> sets the series palette (or <code>fill=</code> for one color), <code>color=</code> the axis/label ink, <code>size=</code> the label text size, <code>thick=</code> the line-chart stroke, and <code>values=0</code> hides the numeric labels. Values can be computed with <code>\${…}</code>. Charts are shapes, so <code>!anim</code> enter/exit, scale, rotate, hide and show all work on them.</td></tr>
       <tr><td>!set transition fade 0.4<br>!transition slide</td><td>Slide-to-slide transitions during presentation: <code>fade</code>, <code>slide</code> (direction follows travel), <code>slideleft</code>, <code>slideright</code>, or <code>none</code>, with an optional duration in seconds. <code>!set transition …</code> applies from that slide onward; a <code>!transition …</code> line overrides it for its own slide only (it applies when <i>entering</i> that slide). Editor preview, thumbnails, and print always cut; the transition is skipped for users with reduced-motion enabled.</td></tr>
@@ -415,7 +436,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>n / p</td><td>Next / previous slide (skipping remaining steps).</td></tr>
       <tr><td>v</td><td>Slide overview sidebar; click a slide to jump — including pocket (<code>!---</code>) slides, shown dashed.</td></tr>
       <tr><td>⧉ Presenter view</td><td>Opens the slides in a separate window — drag it to the projector and press <code>F</code> (or click once) there for fullscreen. This window becomes your console: the script is your notes, auto-scrolled to the current slide, with thumbnails as a click-to-jump overview. Both windows' keyboards drive the show.</td></tr>
-      <tr><td>b · f / ⛶ · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit. The Present buttons enter fullscreen automatically; "▶ 2nd screen" (shown when an extended display is detected, Chromium browsers) presents fullscreen on your other monitor.</td></tr>
+      <tr><td>b · f / ⛶ · home / end · esc</td><td>Blackout · fullscreen · first/last slide · exit. The play button and <b>Present ▸ Present</b> start at the current editor slide; use <b>Present from Beginning</b> to start over. Present commands enter fullscreen automatically. "▶ 2nd screen" (shown when an extended display is detected, Chromium browsers) presents fullscreen on your other monitor.</td></tr>
     </table>
     <h3>Printing &amp; handouts</h3>
     <p class="sub" style="margin:6px 0 0"><b>File ▸ Print / Save as PDF</b> lays out one slide per page, fully advanced (all reveal steps shown), with pocket slides omitted and embeds shown as placeholders. The print stylesheet requests full-bleed 16:9 landscape pages. Enable “background graphics” if slide backgrounds look washed out; for physical paper, use “Fit to printable area” if your printer cannot print borderlessly.</p>
@@ -442,6 +463,124 @@ const px = (v, span) => (Math.abs(v) <= 1 ? v*span : v);   // fraction or pixels
 const cx = v => px(v, SW), cy = v => px(v, SH);
 
 function escapeHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function escapeAttr(s){return escapeHtml(String(s)).replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
+
+/* URLs in PSL are data, not markup. Restrict active schemes before inserting
+   them into generated links or frames; attribute-escape ampersands so an HTML
+   entity cannot disguise a blocked scheme (for example java&#x73;cript:). */
+function urlScheme(raw){
+  const s=String(raw||"")
+    .replace(/&#(\d{1,7});/g,(_,n)=>String.fromCodePoint(Math.min(Number(n),0x10ffff)))
+    .replace(/&#x([0-9a-f]{1,6});/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)))
+    .trim().replace(/[\u0000-\u001f\u007f]/g,"");
+  const m=/^([a-z][a-z0-9+.-]*):/i.exec(s);
+  return m?m[1].toLowerCase():null;
+}
+function isSafeLinkUrl(raw){
+  const scheme=urlScheme(raw);
+  return scheme===null || ["http","https","mailto","tel"].includes(scheme);
+}
+function isSafeEmbedUrl(raw){
+  const scheme=urlScheme(raw);
+  return scheme===null || scheme==="http" || scheme==="https";
+}
+
+/* Replace Markdown links after the source has been HTML-escaped. A scanner is
+   used instead of a URL regex so nested, balanced parentheses remain part of
+   the destination. An empty label displays the URL itself. */
+function renderInlineLinks(h){
+  const opener=/\[([^\]]*)\]\(/g;
+  let out="", copiedThrough=0, match;
+  while((match=opener.exec(h))){
+    const linkStart=match.index;
+    if(h[linkStart-1]==="!") continue;
+    const urlStart=opener.lastIndex;
+    let depth=1, close=-1, invalid=false;
+    for(let i=urlStart;i<h.length;i++){
+      const ch=h[i];
+      if(/\s/.test(ch)){ invalid=true; break; }
+      if(ch==="(") depth++;
+      else if(ch===")" && --depth===0){ close=i; break; }
+    }
+    if(invalid || close<0 || close===urlStart){
+      opener.lastIndex=linkStart+1;
+      continue;
+    }
+    const url=h.slice(urlStart,close);
+    const normalized=url.replace(/&amp;/g,"&");
+    if(!isSafeLinkUrl(normalized)){
+      opener.lastIndex=close+1;
+      continue;
+    }
+    const text=match[1] || escapeHtml(normalized);
+    out+=h.slice(copiedThrough,linkStart)
+      +'<a href="'+escapeAttr(normalized)+'" target="_blank" rel="noopener noreferrer">'+text+"</a>";
+    copiedThrough=close+1;
+    opener.lastIndex=copiedThrough;
+  }
+  return out+h.slice(copiedThrough);
+}
+
+/* Render a small, explicit allowlist of inline controls. The scanner skips
+   generated HTML tags, so control-like text inside a link URL cannot alter an
+   attribute. Paired controls may contain links, emphasis, or other controls. */
+function renderInlineControls(h){
+  const tags={sub:"sub",sup:"sup",mark:"mark",u:"u",s:"s",small:"small"};
+  let out="";
+  for(let i=0;i<h.length;){
+    if(h[i]==="<"){
+      const end=h.indexOf(">",i+1);
+      if(end>=0){ out+=h.slice(i,end+1); i=end+1; continue; }
+    }
+    if(!h.startsWith("{{",i)){ out+=h[i++]; continue; }
+
+    let sep=-1, shortEnd=-1;
+    for(let j=i+2;j<h.length;j++){
+      if(h.startsWith("}}",j)){ shortEnd=j; break; }
+      if(h[j]==="|" && sep<0) sep=j;
+    }
+    if(shortEnd<0){ out+=h.slice(i); break; }
+
+    if(sep<0 || shortEnd<sep){
+      const name=h.slice(i+2,shortEnd).trim().toLowerCase();
+      const simple={br:"<br>",wbr:"<wbr>",nbsp:"&nbsp;"}[name];
+      out+=simple||h.slice(i,shortEnd+2);
+      i=shortEnd+2;
+      continue;
+    }
+
+    let depth=1, close=-1;
+    for(let j=sep+1;j<h.length;){
+      if(h[j]==="<"){
+        const end=h.indexOf(">",j+1);
+        if(end>=0){ j=end+1; continue; }
+      }
+      if(h.startsWith("{{",j)){ depth++; j+=2; continue; }
+      if(h.startsWith("}}",j)){
+        if(--depth===0){ close=j; break; }
+        j+=2; continue;
+      }
+      j++;
+    }
+    if(close<0){ out+=h.slice(i); break; }
+
+    const name=h.slice(i+2,sep).trim().toLowerCase();
+    const content=renderInlineControls(h.slice(sep+1,close));
+    const size=/^size\s*=\s*((?:\d+(?:\.\d*)?|\.\d+)(?:px|pt|em|rem|%)?)$/i.exec(name);
+    if(size){
+      const value=/[a-z%]$/i.test(size[1])?size[1]:size[1]+"px";
+      out+='<span class="inline-size" style="font-size:'+value+'">'+content+"</span>";
+    }else if(tags[name]){
+      out+="<"+tags[name]+">"+content+"</"+tags[name]+">";
+    }else if(name==="nobr"){
+      out+='<span class="inline-nobr">'+content+"</span>";
+    }else{
+      out+=h.slice(i,close+2);
+    }
+    i=close+2;
+  }
+  return out;
+}
 
 /* LaTeX -> HTML via KaTeX. Never throws: if KaTeX is unavailable (offline)
    the raw source is shown in mono; a KaTeX parse error shows the source
@@ -475,10 +614,8 @@ function inlineMd(s){
   let h = escapeHtml(raw);
   // entities stay usable: &nbsp; &mdash; &rarr; &#8594; &#x1F600; ... (never tags)
   h = h.replace(/&amp;(#\d{1,7}|#x[0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,30});/g,"&$1;");
-  h = h.replace(/(^|[^!])\[([^\]]+)\]\(([^)\s]+)\)/g,(all,pre,txt,url)=>{
-    if(/^javascript:/i.test(url)) return all;
-    return pre+'<a href="'+url.replace(/"/g,"%22")+'" target="_blank" rel="noopener">'+txt+"</a>";
-  });
+  h = renderInlineLinks(h);
+  h = renderInlineControls(h);
   h = h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
   h = h.replace(/\*([^*]+)\*/g,"<i>$1</i>");
   h = h.replace(/\u0000(\d+)\u0000/g,(_,i)=>stash[+i]);
@@ -777,11 +914,13 @@ function substVars(text, vars, warnings, whereStr){
   });
 }
 
-const RE_POS   = /^@\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)\s*/;
+const NUM_PATTERN=String.raw`[+-]?(?:\d+(?:\.\d*)?|\.\d+)`;
+const STRICT_NUMBER=new RegExp(`^${NUM_PATTERN}$`);
+const RE_POS   = new RegExp(`^@\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\)\\s*`);
 const RE_LABEL = /^\[([A-Za-z_][\w-]*)\](?!\()\s*/;   // (?!\() so [text](url) links survive
 const RE_STYLE = /^\{([^}]*)\}\s*/;
-const RE_PAIR  = /\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)/g;
-const RE_DUR   = /(?:^|\s)([\d.]+)\s*s\s*$/;
+const RE_PAIR  = new RegExp(`\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\)`,"g");
+const RE_DUR   = /(?:^|\s)(\S+)\s*s\s*$/i;
 
 function parseStyle(s){
   const st={}; let lastKey=null;
@@ -801,14 +940,21 @@ function parseStyle(s){
   }
   return st;
 }
-function takeDur(s){ // returns [restString, durationSeconds]
+function takeDur(s){ // returns [restString, durationSeconds, errorMessage]
   const m=s.match(RE_DUR);
-  return m ? [s.slice(0,m.index).trim(), parseFloat(m[1])] : [s.trim(), DEFAULT_DUR];
+  if(!m) return [s.trim(), DEFAULT_DUR, null];
+  if(!STRICT_NUMBER.test(m[1])) return [s.trim(), DEFAULT_DUR, `invalid duration “${m[1]}s”`];
+  const dur=Number(m[1]);
+  if(!Number.isFinite(dur)||dur<0) return [s.trim(), DEFAULT_DUR, `duration must be a finite non-negative number`];
+  return [s.slice(0,m.index).trim(), dur, null];
 }
 function pairs(s){
   const out=[]; let m; RE_PAIR.lastIndex=0;
   while((m=RE_PAIR.exec(s))) out.push([parseFloat(m[1]),parseFloat(m[2])]);
   return out;
+}
+function leadingNumber(s){
+  return new RegExp(`^\\s*(${NUM_PATTERN})(?=\\s|$)`).exec(s);
 }
 
 function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
@@ -845,6 +991,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
 
   const srcLines=body.split("\n").map((text,i)=>({text, n:i+1}));
   processLines(srcLines);
+  validateSlideAnimations(slide, warnings, slideIndex);
   // Effective transition for ENTERING this slide: a per-slide !transition line
   // wins; otherwise whatever `!set transition` is in force at this point in
   // the deck (so a mid-deck !set changes it from that slide onward).
@@ -911,6 +1058,10 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     let {pos,label,style,rest}=extractPrefixes(line);
     line=rest;
     if(!line) continue;
+    if(line.startsWith("@(")){
+      warnings.push(`${where(lnNo)}: malformed position — expected @(x, y) with numeric coordinates`);
+      continue;
+    }
 
     // --- fenced code block: ```lang ... ``` (lines kept verbatim) ---
     if(line.startsWith("```")){
@@ -955,7 +1106,15 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     // --- animation lines ---
     if((m=line.match(/^!anim\s+([\w-]+)\s+(\w+)\s*(.*)$/i))){
       const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,where(lnNo),vars);
-      if(a){ if(style.ease) a.ease=String(style.ease).toLowerCase(); cur().anims.push(a); }
+      if(a){
+        a.where=where(lnNo);
+        if(style.ease){
+          a.ease=String(style.ease).toLowerCase();
+          if(!["linear","ease","easeinout","easein","easeout","back","bounce","elastic"].includes(a.ease))
+            warnings.push(`${where(lnNo)}: unknown easing “${a.ease}”`);
+        }
+        cur().anims.push(a);
+      }
       continue;
     }
     // --- background (optional {dim=..,tint=..} via style prefix) ---
@@ -969,15 +1128,18 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       continue;
     }
     // dim an existing background (or start a black scrim) on its own line
-    if((m=line.match(/^!dim\s+([\d.]+)\s*$/i))){
+    if((m=line.match(/^!dim\b\s*(.*?)\s*$/i))){
+      if(!STRICT_NUMBER.test(m[1])){ warnings.push(`${where(lnNo)}: !dim needs a number from 0 to 1`); continue; }
       slide.bg = slide.bg || {color:null};
-      slide.bg.dim = clamp(parseFloat(m[1]),0,1);
+      slide.bg.dim = clamp(Number(m[1]),0,1);
       if(style.tint!=null) slide.bg.tint = style.tint;
       continue;
     }
     // --- embedded web app (iframe) ---
     if((m=line.match(/^!embed\((.+)\)\s*$/i))){
-      addItem({id:nextId++, kind:"embed", src:m[1].trim(), label, style, pos});
+      const src=m[1].trim();
+      if(!isSafeEmbedUrl(src)) warnings.push(`${where(lnNo)}: blocked unsafe embed URL scheme in “${src}”`);
+      addItem({id:nextId++, kind:"embed", src, blocked:!isSafeEmbedUrl(src), label, style, pos});
       continue;
     }
     // --- native video / audio ---
@@ -996,7 +1158,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       if(ctype==="pie"){
         if(pm.length<1) ok=false;
         else{
-          const after=rest2.slice(endOf2(pm[0])), rm=after.match(/^\s*(-?[\d.]+)/);
+          const after=rest2.slice(endOf2(pm[0])), rm=leadingNumber(after);
           if(!rm) ok=false;
           else{ item.cx=cvx(+pm[0][1],vars); item.cy=cvy(+pm[0][2],vars);
                 item.r=cvlen(parseFloat(rm[1]),vars,SH); geomEnd=endOf2(pm[0])+rm[0].length; }
@@ -1023,10 +1185,12 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       continue;
     }
     // --- per-slide transition override (deck-wide default: !set transition …) ---
-    if((m=line.match(/^!transition\s+(\S+)(?:\s+([\d.]+))?\s*$/i))){
+    if((m=line.match(/^!transition\s+(\S+)(?:\s+(\S+))?\s*$/i))){
       const ty=m[1].toLowerCase();
       if(!["none","fade","slide","slideleft","slideright"].includes(ty))
         warnings.push(`${where(lnNo)}: unknown transition “${ty}” — use none, fade, slide, slideleft, or slideright`);
+      else if(m[2] && (!STRICT_NUMBER.test(m[2]) || Number(m[2])<0))
+        warnings.push(`${where(lnNo)}: transition duration must be a non-negative number`);
       else slide.transition=ty+(m[2]?" "+m[2]:"");
       continue;
     }
@@ -1044,7 +1208,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
         if(pm.length<2){ok=false;} else { item.coords=[P(0),P(1)]; geomEnd=endOf(pm[1]); }
       }else if(kind==="circle"){
         if(pm.length<1){ok=false;} else {
-          const after=rest2.slice(endOf(pm[0])); const rm=after.match(/^\s*(-?[\d.]+)/);
+          const after=rest2.slice(endOf(pm[0])); const rm=leadingNumber(after);
           if(!rm){ok=false;} else { item.coords=[P(0)]; item.r=cvlen(parseFloat(rm[1]),vars,SH); geomEnd=endOf(pm[0])+rm[0].length; }
         }
       }else if(kind==="ellipse"){
@@ -1067,7 +1231,9 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
         }
       }else if(kind==="star"){
         if(pm.length<1){ok=false;} else {
-          const nums=[...rest2.slice(endOf(pm[0])).matchAll(/-?[\d.]+/g)].map(x=>parseFloat(x[0]));
+          const tail=rest2.slice(endOf(pm[0]));
+          const tm=tail.match(new RegExp(`^\\s*(${NUM_PATTERN})\\s+(${NUM_PATTERN})(?:\\s+(${NUM_PATTERN}))?`));
+          const nums=tm?[Number(tm[1]),Number(tm[2]),...(tm[3]!=null?[Number(tm[3])]:[])]:[];
           if(nums.length<2){ok=false;} else {
             const [cx0,cy0]=P(0), pts=Math.max(3,Math.round(nums[0]));
             const rOut=cvlen(nums[1],vars,SH), rIn=nums.length>2?cvlen(nums[2],vars,SH):rOut*0.45;
@@ -1077,7 +1243,6 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
               item.coords.push([cx0+r*Math.cos(a), cy0+r*Math.sin(a)]);
             }
             item.kind="polygon"; item.ccx=cx0; item.ccy=cy0;
-            const tm=rest2.slice(endOf(pm[0])).match(/^(\s*-?[\d.]+){2,3}/);
             geomEnd=endOf(pm[0])+(tm?tm[0].length:0);
           }
         }
@@ -1129,15 +1294,21 @@ function extractPrefixes(line){
 }
 
 function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
-  let [args,dur]=takeDur(argsRaw);
+  let [args,dur,durError]=takeDur(argsRaw);
   const bad=msg=>{warnings.push(`${whereStr}: ${msg}`); return null;};
+  if(durError) return bad(durError);
   switch(verb){
-    case "hide": case "show": return {target,verb,dur};
+    case "hide": case "show": return args ? bad(`${verb} takes only an optional duration`) : {target,verb,dur};
     case "path":{ const p=pairs(args); if(p.length<2) return bad("path needs (ctrlx,ctrly) (destx,desty)");
       return {target,verb,dur,cxp:cvx(p[0][0],vars),cyp:cvy(p[0][1],vars),x:cvx(p[1][0],vars),y:cvy(p[1][1],vars)}; }
     case "enter": case "exit":{
       const em=args.match(/^([a-z]+)/i);
-      return {target,verb,dur,effect:em?em[1].toLowerCase():"fade"}; }
+      const effect=em?em[1].toLowerCase():"fade";
+      const allowed=verb==="enter"
+        ? ["fade","slideleft","slideright","slideup","slidedown","grow","drop","spin"]
+        : ["fade","slideleft","slideright","slideup","slidedown","shrink","drop","spin"];
+      if(args && !allowed.includes(effect)) return bad(`unknown ${verb} effect “${effect}”`);
+      return {target,verb,dur,effect}; }
     case "move":{ const p=pairs(args); if(!p.length) return bad("move needs (x,y)");
       return {target,verb,dur,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
     case "point":{ const n=parseInt(args); const p=pairs(args);
@@ -1148,7 +1319,7 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
     case "scale":{ const v=parseFloat(args); if(isNaN(v)) return bad("scale needs a factor");
       return {target,verb,dur,f:v}; }
     case "rotate":{
-      const rm=args.match(/^(-?[\d.]+)\s*(?:around\s*\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\))?\s*$/i);
+      const rm=args.match(new RegExp(`^(${NUM_PATTERN})\\s*(?:around\\s*\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\))?\\s*$`,"i"));
       if(!rm) return bad("rotate needs a degree value, optionally “around (x,y)”");
       const deg=parseFloat(rm[1]);
       return rm[2]!=null
@@ -1157,6 +1328,35 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
     case "color": return args ? {target,verb,dur,color:args} : bad("color needs a value");
     case "textsize": return args ? {target,verb,dur,size:args} : bad("textsize needs a size");
     default: return bad(`unknown animation “${verb}”`);
+  }
+}
+
+/* Validate operations against the completed slide so forward label references
+   are allowed, while misspellings and renderer no-ops become visible errors. */
+function validateSlideAnimations(slide, warnings, slideIndex){
+  const labels=new Map(), duplicates=new Set();
+  for(const item of slide.items){
+    if(!item.label) continue;
+    if(labels.has(item.label)) duplicates.add(item.label);
+    labels.set(item.label,item);
+  }
+  for(const label of duplicates)
+    warnings.push(`slide ${slideIndex+1}: duplicate label “${label}” — animations target the last item with that label`);
+
+  for(const steps of slide.steps) for(const phase of steps) for(const a of phase.anims){
+    const item=labels.get(a.target), at=a.where||`slide ${slideIndex+1}`;
+    if(!item){ warnings.push(`${at}: animation targets unknown label “${a.target}”`); continue; }
+    const kind=item.kind;
+    if(a.verb==="size" && !["img","embed","video"].includes(kind))
+      warnings.push(`${at}: size animation is not supported for ${kind} “${a.target}”`);
+    else if((a.verb==="move"||a.verb==="path") && kind==="chart")
+      warnings.push(`${at}: ${a.verb} animation is not supported for chart “${a.target}”`);
+    else if(a.verb==="point" && (!item.coords || a.n>item.coords.length))
+      warnings.push(`${at}: point ${a.n} does not exist on ${kind} “${a.target}”`);
+    else if(a.verb==="textsize" && (["img","embed","video","audio","line","arrow","polyline","curve","chart"].includes(kind) && !item.text))
+      warnings.push(`${at}: textsize animation needs an element containing text`);
+    else if(a.verb==="color" && ["img","embed","video","audio"].includes(kind))
+      warnings.push(`${at}: color animation is not supported for ${kind} “${a.target}”`);
   }
 }
 </script>
@@ -1186,6 +1386,8 @@ function renderSlide(slideDef, opts){
   if(st.font)     root.style.fontFamily=st.font;
   if(st.headfont) root.style.setProperty("--slide-display", st.headfont);
   if(st.accent)   root.style.setProperty("--slide-accent", st.accent);
+  if(st.linkcolor) root.style.setProperty("--slide-link-color", st.linkcolor);
+  if(st.visitedlinkcolor) root.style.setProperty("--slide-visited-link-color", st.visitedlinkcolor);
   if(st.color){
     root.style.color=st.color;
     root.style.setProperty("--h2c", `color-mix(in srgb, ${st.color} 72%, transparent)`);
@@ -1323,15 +1525,16 @@ function buildEmbed(it,flow,absLayer,opts){
   box.style.width=w+"px"; box.style.height=h+"px";
   if(d.style.opacity) box.style.opacity=d.style.opacity;
   it.embedW=w; it.embedH=h; it.embedBox=box;
-  if(opts.thumb){                       // don't spin up live iframes in the rail
+  if(opts.thumb || d.blocked){          // don't spin up live or unsafe iframes
     box.classList.add("embed-ph");
     let host=""; try{ host=new URL(d.src,location.href).host; }catch(e){ host=d.src; }
-    box.innerHTML=`<span>▷ ${escapeHtml(host||"embedded app")}</span>`;
+    box.innerHTML=`<span>${d.blocked?"⚠ blocked embed":"▷ "+escapeHtml(host||"embedded app")}</span>`;
   }else{
     const fr=document.createElement("iframe");
     fr.src=d.src; fr.loading="lazy";
-    fr.setAttribute("allow","fullscreen; autoplay; clipboard-read; clipboard-write; camera; microphone; xr-spatial-tracking");
-    fr.setAttribute("referrerpolicy","no-referrer-when-downgrade");
+    fr.setAttribute("allow","fullscreen; autoplay");
+    fr.setAttribute("sandbox","allow-scripts allow-forms allow-popups allow-presentation allow-downloads");
+    fr.setAttribute("referrerpolicy","no-referrer");
     box.appendChild(fr); it.iframe=fr;
   }
   placeItem(it,flow,absLayer,box);
@@ -1617,7 +1820,10 @@ const EASINGS={
   elastic:t=> t===0?0 : t===1?1 : Math.pow(2,-10*t)*Math.sin((t*10-0.75)*(2*Math.PI/3))+1,
 };
 class Tween{
-  constructor(dur,onUpdate,ease){ this.dur=Math.max(0.01,dur)*1000; this.onUpdate=onUpdate; this.ease=ease||easeInOut; this.done=false; }
+  constructor(dur,onUpdate,ease){
+    const safeDur=Number.isFinite(dur)&&dur>=0?dur:DEFAULT_DUR;
+    this.dur=Math.max(0.01,safeDur)*1000; this.onUpdate=onUpdate; this.ease=ease||easeInOut; this.done=false;
+  }
   start(){ return new Promise(res=>{
     this.resolve=res; this.t0=performance.now();
     const tick=now=>{ if(this.done) return;
@@ -1928,7 +2134,7 @@ function offerDraftRestore(rec){
   showNotice({ text:"Found an unsaved draft from "+relTime(rec.ts)+".",
     actions:[
       {label:"Restore", primary:true, onClick:()=>{
-        srcEl.value=rec.text; selected=clamp(rec.selected||0,0,Infinity); refresh(); markSaved(); hideNotice(); }},
+        srcEl.value=rec.text; selected=clamp(rec.selected||0,0,Infinity); refresh(); persistAutosave(); hideNotice(); }},
       {label:"Discard", onClick:()=>{ markSaved(); hideNotice(); }},
     ] });
 }
@@ -2028,7 +2234,14 @@ function buildThumbs(container,onPick,markSelected){
    This keeps a live-embed preview from reloading its iframe on every keystroke
    elsewhere in the script. Resize just re-fits the existing render. */
 let lastPreviewKey=null;
-function previewKey(i){ const r=slideRanges[i]||[0,0]; return i+"|"+srcEl.value.slice(r[0],r[1]); }
+function previewKey(i){
+  // Key the resolved slide, not merely its local source slab: !all, imports,
+  // earlier variables, and deck render settings can all change its output.
+  const renderSettings={};
+  for(const k of ["font","headfont","accent","linkcolor","visitedlinkcolor","color","bg","dim","tint"])
+    if(deck.settings&&deck.settings[k]!=null) renderSettings[k]=deck.settings[k];
+  return JSON.stringify([i,renderSettings,deck.slides[i]]);
+}
 function showPreview(){
   if(!deck.slides.length){ stageHolder.innerHTML=""; lastPreviewKey=null; return; }
   const key=previewKey(selected);
@@ -2291,9 +2504,9 @@ presentEl.addEventListener("click",e=>{
 });
 
 /* ---------- files, buttons ---------- */
-$("#btnPresentQ").addEventListener("click",()=>startPresent(0,{fs:true}));
-$("#miPresent").addEventListener("click",()=>startPresent(0,{fs:true}));
-$("#miPresentHere").addEventListener("click",()=>startPresent(selected,{fs:true,exact:true}));
+$("#btnPresentQ").addEventListener("click",()=>startPresent(selected,{fs:true,exact:true}));
+$("#miPresent").addEventListener("click",()=>startPresent(selected,{fs:true,exact:true}));
+$("#miPresentBeginning").addEventListener("click",()=>startPresent(0,{fs:true}));
 $("#miPresent2").addEventListener("click",presentOnSecondScreen);
 $("#hudFs").addEventListener("click",toggleFullscreen);
 $("#btnPresenterQ").addEventListener("click",openPresenterView);
@@ -2727,6 +2940,7 @@ Markdown pipe tables, with optional alignment markers:
 ---
 ### Deck-wide styling with !set
 - \`!set bg\` / \`!set color\` / \`!set accent\` — default background & colors
+- \`!set linkcolor\` / \`!set visitedlinkcolor\` — unvisited and visited link colors
 - \`!set font\` and \`!set headfont\` — change every slide's fonts
 - {font=Courier New, monospace} …or per element: {font=Courier New, monospace}
 
