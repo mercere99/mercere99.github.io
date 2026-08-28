@@ -183,6 +183,27 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .present.on{display:block}
 .present .pstage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 .present .pholder{position:relative;overflow:hidden}
+.pnav{display:none;position:relative;width:56px;height:64px;padding:0;border:1px solid rgba(226,168,75,.72);border-radius:18px;background:rgba(30,37,48,.88);
+      color:#fff;font-family:var(--ui);font-size:42px;font-weight:400;line-height:1;cursor:pointer;z-index:6;touch-action:manipulation;
+      -webkit-tap-highlight-color:transparent;box-shadow:0 5px 22px rgba(0,0,0,.35)}
+.pnav:active{background:var(--amber);color:#241a08;transform:scale(.96)}
+.pnav:focus-visible{outline:3px solid var(--amber);outline-offset:3px}
+.pnav:disabled{opacity:.28;cursor:default}
+.pnav:disabled:active{background:rgba(30,37,48,.88);color:#fff;transform:none}
+/* Phone-only navigation. JS adds these classes using mobile/touch signals so
+   resizing a desktop browser does not create redundant on-screen controls. */
+.present.phone-ui .pnav{display:block}
+.present.phone-ui.phone-landscape .pstage{display:grid;grid-template-columns:72px minmax(0,1fr) 72px;grid-template-rows:1fr;
+                                         padding:max(0px,env(safe-area-inset-top)) max(0px,env(safe-area-inset-right))
+                                                 max(0px,env(safe-area-inset-bottom)) max(0px,env(safe-area-inset-left))}
+.present.phone-ui.phone-landscape .pnav-back{grid-column:1;grid-row:1;justify-self:center;align-self:center}
+.present.phone-ui.phone-landscape .pholder{grid-column:2;grid-row:1;justify-self:center;align-self:center}
+.present.phone-ui.phone-landscape .pnav-forward{grid-column:3;grid-row:1;justify-self:center;align-self:center}
+.present.phone-ui.phone-portrait .pstage{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;align-content:center;row-gap:16px}
+.present.phone-ui.phone-portrait .pholder{grid-column:1 / -1;grid-row:1;justify-self:center}
+.present.phone-ui.phone-portrait .pnav{grid-row:2}
+.present.phone-ui.phone-portrait .pnav-back{grid-column:1;justify-self:end;margin-right:10px}
+.present.phone-ui.phone-portrait .pnav-forward{grid-column:2;justify-self:start;margin-left:10px}
 .hud{position:absolute;right:18px;bottom:14px;display:flex;align-items:center;gap:12px;background:rgba(17,21,28,.82);border:1px solid var(--line);border-radius:20px;padding:6px 14px;z-index:5;transition:opacity .3s}
 .hud .count{font-family:var(--mono);font-size:12.5px;color:var(--chrome-text)}
 .hud .dots{display:flex;gap:5px}
@@ -322,7 +343,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 </div>
 
 <div class="present" id="present">
-  <div class="pstage"><div class="pholder" id="pholder"></div></div>
+  <div class="pstage">
+    <button class="pnav pnav-back" id="pnavBack" type="button" aria-label="Go backward" title="Go backward">‹</button>
+    <div class="pholder" id="pholder"></div>
+    <button class="pnav pnav-forward" id="pnavForward" type="button" aria-label="Go forward" title="Go forward">›</button>
+  </div>
   <div class="blackout" id="blackout"></div>
   <div class="overview" id="overview"><h4>Slides — click to jump</h4><div id="overviewList"></div></div>
   <div class="hud" id="hud"><span class="count" id="hudCount"></span><span class="dots" id="hudDots"></span><button class="hudbtn" id="hudFs" title="Fullscreen (f)">⛶</button></div>
@@ -432,6 +457,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <table>
       <tr><td>space / → / click</td><td>Advance one step (past a … or on to the next slide). Pressing during an animation finishes it instantly.</td></tr>
       <tr><td>←</td><td>Back one step.</td></tr>
+      <tr><td>phone ‹ / › · swipe</td><td>Touch controls appear automatically in presentation mode: beside the slide in landscape, or below it in portrait. Swipe left/right on the slide to advance/go back.</td></tr>
       <tr><td>Backspace</td><td>Back one whole slide.</td></tr>
       <tr><td>n / p</td><td>Next / previous slide (skipping remaining steps).</td></tr>
       <tr><td>v</td><td>Slide overview sidebar; click a slide to jump — including pocket (<code>!---</code>) slides, shown dashed.</td></tr>
@@ -2261,6 +2287,7 @@ function markSelectedThumb(behavior){
   if(el) el.scrollIntoView({block:"nearest",behavior:behavior||"smooth"});
 }
 window.addEventListener("resize",()=>{ if(presentOn) layoutPresent(); else showPreview(); });
+window.addEventListener("orientationchange",()=>{ if(presentOn) layoutPresent(); });
 
 /* thumbnails need a stable click handler (rebuild-free selection) */
 function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>jumpEditorToSlide(i),true); markSelectedThumb("auto"); }
@@ -2301,7 +2328,7 @@ srcEl.addEventListener("click",syncFromCaret);
 srcEl.addEventListener("keyup",e=>{ if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","PageUp","PageDown","Home","End"].includes(e.key)) syncFromCaret(); });
 
 /* ---------- presentation mode ---------- */
-const presentEl=$("#present"), pholder=$("#pholder"), hudCount=$("#hudCount"),
+const presentEl=$("#present"), pholder=$("#pholder"), pnavBack=$("#pnavBack"), pnavForward=$("#pnavForward"), hudCount=$("#hudCount"),
       hudDots=$("#hudDots"), overviewEl=$("#overview"), overviewList=$("#overviewList"),
       blackout=$("#blackout");
 let presentOn=false, curSlide=0, player=null;
@@ -2314,12 +2341,27 @@ function nextVisible(i){ for(let k=i+1;k<deck.slides.length;k++) if(!deck.slides
 function prevVisible(i){ for(let k=i-1;k>=0;k--) if(!deck.slides[k].hidden) return k; return -1; }
 function firstVisible(){ const k=deck.slides.findIndex(s=>!s.hidden); return k<0?0:k; }
 function lastVisible(){ for(let k=deck.slides.length-1;k>=0;k--) if(!deck.slides[k].hidden) return k; return deck.slides.length-1; }
+function phonePresentationLayout(){
+  const uaMobile=navigator.userAgentData&&typeof navigator.userAgentData.mobile==="boolean"
+    ? navigator.userAgentData.mobile
+    : /iPhone|iPod|IEMobile|Windows Phone|Android.+Mobile/i.test(navigator.userAgent||"");
+  const touchSized=window.matchMedia&&matchMedia("(pointer: coarse)").matches
+    && Math.min(innerWidth,innerHeight)<=600 && Math.max(innerWidth,innerHeight)<=1100;
+  const phone=!!(uaMobile||touchSized), landscape=innerWidth>innerHeight;
+  presentEl.classList.toggle("phone-ui",phone);
+  presentEl.classList.toggle("phone-landscape",phone&&landscape);
+  presentEl.classList.toggle("phone-portrait",phone&&!landscape);
+  return {phone,landscape};
+}
 function layoutPresent(){
   if(presenterMode){
     if(!presenterWin||presenterWin.closed) return;
     fitInto(presenterHolder, presenterWin.innerWidth-8, presenterWin.innerHeight-8);
   }else{
-    fitInto(pholder, window.innerWidth-24, window.innerHeight-24);
+    const mobile=phonePresentationLayout();
+    if(mobile.phone&&mobile.landscape) fitInto(pholder, Math.max(1,innerWidth-144), innerHeight);
+    else if(mobile.phone) fitInto(pholder, innerWidth, Math.max(1,innerHeight-96));
+    else fitInto(pholder, window.innerWidth-24, window.innerHeight-24);
   }
 }
 
@@ -2348,6 +2390,7 @@ function startPresent(fromIndex, o={}){
 }
 function exitPresent(){
   presentOn=false; presentEl.classList.remove("on");
+  presentEl.classList.remove("phone-ui","phone-landscape","phone-portrait");
   killLiveTransition();
   overviewEl.classList.remove("on"); blackout.classList.remove("on");
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
@@ -2424,6 +2467,8 @@ function updateHud(){
       d.className="dot"+(s<=player.step?" done":"");
       hudDots.appendChild(d);
     }
+  pnavBack.disabled=player.step<=0&&prevVisible(curSlide)<0;
+  pnavForward.disabled=!player.busy&&player.step>=player.stepCount-1&&nextVisible(curSlide)<0;
 }
 /* Scroll the script (the presenter's notes) to a slide WITHOUT stealing focus. */
 function revealSlideInEditor(i){
@@ -2459,6 +2504,35 @@ function toggleOverview(){
     });
   }
 }
+
+/* Phone swipe navigation. A horizontal gesture advances/reverses one step;
+   interactive embeds, media, the HUD, overview, and buttons retain their own
+   touch behavior. Suppress the synthetic click that commonly follows touchend
+   so a swipe never advances twice. */
+let phoneSwipe=null, suppressPresentClickUntil=0;
+function swipeControlTarget(target){
+  return target.closest&&target.closest(".pnav,.hud,.overview,.s-embed,.s-media");
+}
+presentEl.addEventListener("touchstart",e=>{
+  if(!presentEl.classList.contains("phone-ui")||e.touches.length!==1||swipeControlTarget(e.target)){ phoneSwipe=null; return; }
+  const t=e.touches[0]; phoneSwipe={x:t.clientX,y:t.clientY,time:Date.now()};
+},{passive:true});
+presentEl.addEventListener("touchmove",e=>{
+  if(!phoneSwipe||e.touches.length!==1) return;
+  const t=e.touches[0], dx=t.clientX-phoneSwipe.x, dy=t.clientY-phoneSwipe.y;
+  if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)) e.preventDefault();
+},{passive:false});
+presentEl.addEventListener("touchend",e=>{
+  if(!phoneSwipe||e.changedTouches.length!==1){ phoneSwipe=null; return; }
+  const start=phoneSwipe, t=e.changedTouches[0], dx=t.clientX-start.x, dy=t.clientY-start.y;
+  phoneSwipe=null;
+  const threshold=Math.max(44,Math.min(innerWidth,innerHeight)*.12);
+  if(Date.now()-start.time<=1000&&Math.abs(dx)>=threshold&&Math.abs(dx)>Math.abs(dy)*1.25){
+    e.preventDefault(); suppressPresentClickUntil=Date.now()+500;
+    dx<0?advance():backStep();
+  }
+},{passive:false});
+presentEl.addEventListener("touchcancel",()=>{ phoneSwipe=null; },{passive:true});
 
 /* ---------- keyboard (shared by the main window and the presenter popup) ---------- */
 function handleShowKey(e){
@@ -2498,7 +2572,8 @@ document.addEventListener("keydown",e=>{
   handleShowKey(e);
 });
 presentEl.addEventListener("click",e=>{
-  if(overviewEl.contains(e.target)||$("#hud").contains(e.target)) return;
+  if(Date.now()<suppressPresentClickUntil) return;
+  if(overviewEl.contains(e.target)||$("#hud").contains(e.target)||e.target.closest(".pnav")) return;
   if(e.target.closest&&e.target.closest(".s-embed,.s-media")) return;   // interacting with an embedded app or media player
   advance();
 });
@@ -2509,6 +2584,8 @@ $("#miPresent").addEventListener("click",()=>startPresent(selected,{fs:true,exac
 $("#miPresentBeginning").addEventListener("click",()=>startPresent(0,{fs:true}));
 $("#miPresent2").addEventListener("click",presentOnSecondScreen);
 $("#hudFs").addEventListener("click",toggleFullscreen);
+pnavBack.addEventListener("click",backStep);
+pnavForward.addEventListener("click",advance);
 $("#btnPresenterQ").addEventListener("click",openPresenterView);
 $("#miPresenter").addEventListener("click",openPresenterView);
 
