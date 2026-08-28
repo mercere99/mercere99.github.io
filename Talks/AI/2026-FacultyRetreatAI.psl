@@ -1,12 +1,16 @@
 !set bg #08111F
 !set color #F4F1E8
 !set accent #5DE4C7
-!set linkcolor #69c7ff
-!set visitedlinkcolor #c59cff
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
 
 # CS Curricula in the Age of AI
 ## 2026 CSE Faculty Retreat
+
+@(0.7,0.9) `ofria.com/Talks/AI`
+{w=0.15} @(0.74,0.62) ![image](/Talks/AI/Retreat-QR.png)
 ---
+@(0.7,0.9) `ofria.com/Talks/AI`
 ### Four overarching topics about AI:
 How should we…
 ...
@@ -18,6 +22,7 @@ How should we…
 ...
 - …plan for continued AI improvements?
 ---
+@(0.7,0.9) `ofria.com/Talks/AI`
 ### AI capabilities are improving exponentially
 
 ...
@@ -37,6 +42,7 @@ How should we…
 {w=0.88, h=0.9} !embed(https://ofria.com/Slides/slidedown.html)
 ---
 ### Top Concerns about overuse of AI
+@(0.7,0.9) `ofria.com/Talks/AI`
 ...
 - AI-facilitated plagiarism or dishonesty
 ...
@@ -88,13 +94,15 @@ What outcomes do we want to elevate having to do with AI?
 ...
 {size=24px} - Clear requirements specification
 ...
-{size=24px} - Higher expectations in class projects when AI use is expected
+{size=24px} - Higher expectations in class projects that use AI
 ...
 What topics can we deemphasize?
 ...
 {size=24px} - Web development? App development?
 ...
 {size=24px} - ???
+...
+{color=white, thick=4, textcolor=#ccffcc, fill=black, size=44} !textbox (0.2, 0.3) (0.6, 0.4) For this to work, we need to{{br}}ensure that of our students{{br}}have access to quality AI!
 ---
 ### How do we stop students from outsourcing learning to AI?
 ...
