@@ -399,6 +399,13 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <h2>Slide<em>Down</em> — Portable Slide Language (PSL) reference</h2>
     <p class="sub">Coordinates may be fractions of the slide (0–1) or pixels in a 1280×720 space. Values ≤ 1 are treated as fractions.</p>
 
+    <h3>Editing shortcuts</h3>
+    <table>
+      <tr><td>Cmd/Ctrl + B / I / U</td><td>Make the highlighted editor text bold, italic, or underlined.</td></tr>
+      <tr><td>Cmd/Ctrl + S</td><td>Download the current presentation.</td></tr>
+      <tr><td>Cmd/Ctrl + Z / Y</td><td>Undo or redo. Copy, cut, paste, and browser Find keep their standard shortcuts.</td></tr>
+    </table>
+
     <h3>Structure</h3>
     <table>
       <tr><td>---</td><td>Start a new slide.</td></tr>
@@ -2102,7 +2109,46 @@ function fitInto(holder, maxW, maxH){
 const srcEl=$("#src"), thumbRail=$("#thumbRail"), stageHolder=$("#stageHolder"), warnbar=$("#warnbar");
 let parseTimer=null;
 srcEl.addEventListener("input",()=>{ clearTimeout(parseTimer); parseTimer=setTimeout(refresh,300); scheduleAutosave(); });
+function replaceEditorRange(start,end,text,selectionStart,selectionEnd){
+  const before=srcEl.value;
+  srcEl.focus(); srcEl.setSelectionRange(start,end);
+  try{ document.execCommand("insertText",false,text); }catch(_){}
+  if(srcEl.value===before){
+    srcEl.setRangeText(text,start,end,"end");
+    srcEl.dispatchEvent(new Event("input",{bubbles:true}));
+  }
+  srcEl.setSelectionRange(selectionStart,selectionEnd);
+}
+function formatEditorSelection(open,close){
+  const a=srcEl.selectionStart, b=srcEl.selectionEnd;
+  if(a===b) return;
+  const selected=srcEl.value.slice(a,b);
+  replaceEditorRange(a,b,open+selected+close,a+open.length,a+open.length+selected.length);
+}
 srcEl.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&!e.altKey){
+    const key=e.key.toLowerCase();
+    // Copy, cut, paste, undo, and find retain their native browser behavior.
+    if(key==="b"||key==="i"||key==="u"){
+      e.preventDefault();
+      if(key==="b") formatEditorSelection("**","**");
+      else if(key==="i") formatEditorSelection("*","*");
+      else formatEditorSelection("{{u|","}}");
+      return;
+    }
+    if(key==="s"){
+      e.preventDefault(); downloadCurrentDocument(); return;
+    }
+    if(key==="y"){
+      const before=srcEl.value;
+      let redone=false;
+      try{ redone=document.execCommand("redo"); }catch(_){}
+      // If execCommand is unavailable, leave Ctrl+Y to the browser on
+      // platforms where it is already the native redo shortcut.
+      if(redone||srcEl.value!==before) e.preventDefault();
+      return;
+    }
+  }
   if(e.key==="Tab"){ e.preventDefault();
     const {selectionStart:a,selectionEnd:b,value:v}=srcEl;
     srcEl.value=v.slice(0,a)+"  "+v.slice(b); srcEl.selectionStart=srcEl.selectionEnd=a+2;
@@ -2221,7 +2267,11 @@ function contentFingerprint(text){
   return (h>>>0).toString(36)+":"+text.length;
 }
 function isDownloaded(doc=currentDoc,text=srcEl.value){ return !!(doc&&doc.downloadedFingerprint&&doc.downloadedFingerprint===contentFingerprint(text)); }
-function isDirty(){ return !!currentDoc&&!isDownloaded(currentDoc,srcEl.value); }
+function isDirty(){
+  if(!currentDoc) return false;
+  if(currentDoc.transient&&srcEl.value===currentDoc.text) return false;
+  return !isDownloaded(currentDoc,srcEl.value);
+}
 function cleanedTitle(value){ return String(value||"").replace(/\s+/g," ").trim().slice(0,120)||"Presentation"; }
 function downloadFilename(title){
   const stem=cleanedTitle(title).replace(/[<>:"/\\|?*\x00-\x1f]/g,"_").replace(/[. ]+$/g,"")||"Presentation";
@@ -2245,10 +2295,13 @@ function newDocument(title,text=NEW_DECK_TEXT){
   return {id:makeId(),title,text,createdAt:now,updatedAt:now,lastOpenedAt:now,selected:0,
     downloadedFingerprint:null,lastDownloadedAt:null,lastDownloadedFilename:null};
 }
+function starterDocument(){ const doc=newDocument("Presentation",SAMPLE); doc.transient=true; return doc; }
 async function persistCurrentDocument(){
   clearTimeout(autosaveTimer); autosaveTimer=null;
   if(!currentDoc||autosaveDisabled) return false;
+  if(currentDoc.transient&&currentDoc.text===srcEl.value) return true;
   if(currentDoc.text!==srcEl.value) currentDoc.updatedAt=Date.now();
+  delete currentDoc.transient;
   currentDoc.text=srcEl.value; currentDoc.selected=selected;
   try{
     await dbPut("docs",currentDoc); quotaWarned=false; updateDocumentChrome(); await renderRecentDocuments(); checkStoragePressure(); return true;
@@ -2716,9 +2769,9 @@ presentEl.addEventListener("click",e=>{
 /* ---------- files, buttons ---------- */
 function updateDocumentChrome(){
   if(!currentDoc) return;
-  const localOnly=!isDownloaded(currentDoc,srcEl.value);
+  const localOnly=isDirty();
   $("#docTitle").textContent=currentDoc.title;
-  $("#docTitle").title=(localOnly?"Saved only in this browser — ":"Downloaded — ")+"click to rename";
+  $("#docTitle").title=(currentDoc.transient?"Starter presentation — ":localOnly?"Saved only in this browser — ":"Downloaded — ")+"click to rename";
   $("#miSave").textContent="Download “"+downloadFilename(currentDoc.title)+"”";
   document.title=(localOnly?"• ":"")+currentDoc.title+" — SlideDown";
 }
@@ -2766,6 +2819,13 @@ async function deleteVersionsForDoc(docId){
   const tx=libraryDB.transaction("versions","readwrite"), store=tx.objectStore("versions");
   versions.forEach(v=>store.delete(v.id)); await idbTransactionDone(tx);
 }
+async function showStarterPresentation(){
+  currentDoc=starterDocument(); autosaveDisabled=false;
+  srcEl.value=currentDoc.text; selected=0; refresh();
+  lastAutoSnapshotText=null; lastAutoSnapshotTime=0;
+  await dbDelete("settings","currentDocId");
+  updateDocumentChrome(); await renderRecentDocuments(); hideNotice();
+}
 async function removeLocalDocument(id){
   const doc=await dbGet("docs",id); if(!doc) return;
   const active=doc.id===currentDoc?.id, text=active?srcEl.value:doc.text;
@@ -2778,9 +2838,7 @@ async function removeLocalDocument(id){
     currentDoc=null;
     const remaining=(await dbGetAll("docs")).sort((a,b)=>(b.lastOpenedAt||0)-(a.lastOpenedAt||0));
     if(remaining.length) await switchDocument(remaining[0].id);
-    else{
-      const doc2=newDocument(await nextPresentationTitle()); await dbPut("docs",doc2); await switchDocument(doc2.id);
-    }
+    else await showStarterPresentation();
   }else await renderRecentDocuments();
 }
 async function createPresentation(text=NEW_DECK_TEXT,wantedTitle=null,downloadedFilename=null){
@@ -2795,6 +2853,7 @@ async function createPresentation(text=NEW_DECK_TEXT,wantedTitle=null,downloaded
 async function renameCurrentDocument(value){
   if(!currentDoc) return;
   currentDoc.title=await uniqueTitle(value,currentDoc.id); currentDoc.updatedAt=Date.now();
+  delete currentDoc.transient;
   await dbPut("docs",currentDoc); updateDocumentChrome(); await renderRecentDocuments();
 }
 async function downloadCurrentDocument(){
@@ -2802,6 +2861,7 @@ async function downloadCurrentDocument(){
   const filename=downloadFilename(currentDoc.title), blob=new Blob([srcEl.value],{type:"text/plain"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  delete currentDoc.transient;
   currentDoc.downloadedFingerprint=contentFingerprint(srcEl.value); currentDoc.lastDownloadedAt=Date.now();
   currentDoc.lastDownloadedFilename=filename; await persistCurrentDocument();
 }
@@ -3837,9 +3897,18 @@ async function pptxToPsl(file){
 async function initializeLocalLibrary(){
   libraryDB=await openLibrary();
   let docs=await dbGetAll("docs"), recovered=null;
+  const versionDocIds=new Set((await dbGetAll("versions")).map(v=>v.docId));
+  const oldStarters=docs.filter(d=>d.title==="Presentation"&&d.text===SAMPLE&&!d.downloadedFingerprint&&!versionDocIds.has(d.id));
+  if(oldStarters.length){
+    for(const doc of oldStarters){ await dbDelete("docs",doc.id); await deleteVersionsForDoc(doc.id); }
+    docs=docs.filter(d=>!oldStarters.some(s=>s.id===d.id));
+  }
   if(!docs.length){
     recovered=readLegacy(LEGACY_AUTOSAVE_KEY);
-    const doc=newDocument("Presentation",recovered?.text||SAMPLE);
+    if(!recovered){
+      await showStarterPresentation(); requestDurableStorage(); checkStoragePressure(true); return;
+    }
+    const doc=newDocument("Presentation",recovered.text||SAMPLE);
     doc.selected=clamp(recovered?.selected||0,0,Infinity);
     await dbPut("docs",doc);
     const oldHistory=readLegacy(LEGACY_HISTORY_KEY);
@@ -3874,7 +3943,7 @@ async function initializeLocalLibrary(){
     window.slidedownReady=initializeLocalLibrary().catch(err=>{
       console.error("SlideDown library unavailable",err);
       const rec=readLegacy(LEGACY_AUTOSAVE_KEY);
-      currentDoc=newDocument("Presentation",rec?.text||SAMPLE); currentDoc.selected=rec?.selected||0;
+      currentDoc=rec?newDocument("Presentation",rec.text||SAMPLE):starterDocument(); currentDoc.selected=rec?.selected||0;
       srcEl.value=currentDoc.text; selected=currentDoc.selected; autosaveDisabled=true; refresh(); updateDocumentChrome();
       showNotice({text:"Browser storage is unavailable. Download your work before closing this page.",
         actions:[{label:"Download",primary:true,onClick:downloadCurrentDocument}]});
