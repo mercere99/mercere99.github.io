@@ -178,12 +178,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
 /* ---------- the slide itself (1280 x 720 logical) ---------- */
 .slide{position:absolute;left:0;top:0;width:1280px;height:720px;background:var(--paper);color:var(--slide-ink);transform-origin:0 0;font-family:var(--ui);overflow:hidden;background-size:cover;background-position:center}
-.slide .flow{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;padding:64px 84px;align-items:flex-start;z-index:1}
+.slide .flow{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;padding:64px 84px;align-items:flex-start}
 .slide .bg-scrim{position:absolute;inset:0;z-index:0;pointer-events:none}
 .slide .flow.title-slide{justify-content:center;align-items:center;text-align:center}
-.slide .abs-layer{position:absolute;inset:0;pointer-events:none;z-index:2}
+.slide .abs-layer{position:absolute;inset:0;pointer-events:none}
 .slide .abs-layer>*{pointer-events:auto}
-.slide svg.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.slide svg.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .slide .s-embed{position:relative;border-radius:8px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.28);background:#0d1016}
 .slide .s-embed iframe{width:100%;height:100%;border:0;display:block;background:#fff}
 .slide .s-embed.embed-ph{display:flex;align-items:center;justify-content:center;border:1px dashed #9aa;background:#eef1f3}
@@ -480,8 +480,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <h3>Placement, labels, styling (prefixes, any order, before content)</h3>
     <table>
       <tr><td>@(0.55, 0.1) text or element</td><td>Absolute position: top-left anchor at 55% across, 10% down. Add <code>{anchor=center}</code> to center on the point.</td></tr>
-      <tr><td>[mylabel] element</td><td>Name an element so animations can target it.</td></tr>
-      <tr><td>{size=44px, color=crimson} text</td><td>Style overrides. Keys: <code>size</code> <code>color</code> <code>font</code> <code>fill</code> <code>w</code> <code>h</code> <code>thick</code> <code>align</code> <code>valign</code> <code>anchor</code> <code>opacity</code> <code>rotate</code> · shapes/boxes also: <code>textcolor</code> <code>pad</code> <code>round</code> <code>tint</code> <code>dim</code>.</td></tr>
+      <tr><td>[mylabel] element<br>[lex:phase,front_end] element</td><td>Name an element so animations and expressions can target it; add reusable tags after a colon. Use <code>[:tag1,tag2]</code> when no unique label is needed.</td></tr>
+      <tr><td>!style block {fill=#09e, round=20}<br>{$block, size=48} element</td><td>Define and reuse a named style. Named styles and explicit properties compose left to right, so later entries override earlier ones. Declarations may span multiple lines.</td></tr>
+      <tr><td>{size=44px, color=crimson} text</td><td>Style overrides. Keys: <code>size</code> <code>color</code> <code>font</code> <code>fill</code> <code>stroke</code> <code>w</code> <code>h</code> <code>thick</code> <code>align</code> <code>valign</code> <code>anchor</code> <code>opacity</code> <code>rotate</code> <code>z</code> · shapes/boxes also: <code>textcolor</code> <code>pad</code> <code>round</code> <code>tint</code> <code>dim</code>.</td></tr>
       <tr><td>{rotate=25} !rect (…)(…)</td><td>Give an element a starting rotation, in degrees, about its own center.</td></tr>
     </table>
 
@@ -511,24 +512,29 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!anim poly point 4 (x,y) 1s</td><td><code>point</code> now animates <b>any</b> vertex of any multi-point shape. Members: polygons expose <code>x y w h cx cy n</code> plus per-vertex <code>x1 y1 x2 y2 …</code>.</td></tr>
     </table>
 
-    <h3>Animations (target a [label]; duration optional, default 0.7s)</h3>
+    <h3>Animations (target a label or @tag; duration optional, default 0.7s)</h3>
     <table>
       <tr><td>!anim pic hide 0.5s   ·   !anim pic show</td><td>Fade out / fade in.</td></tr>
-      <tr><td>!anim pic move (0.6, 0.2) 1s</td><td>Move to a new position. Shapes move by their first-listed point; flow text is lifted out of flow.</td></tr>
+      <tr><td>!anim pic move (0.6, 0.2) 1s</td><td>Move to a new position. Shapes move by their first-listed point; a tag selection moves its bounding-box top-left to the destination.</td></tr>
+      <tr><td>!anim @front_end translate (80, 0) 0.5s</td><td>Move every current member by the same relative offset. Tag selections are resolved when the phase begins.</td></tr>
       <tr><td>!anim arrow1 point 2 (0.8, 0.5) 1s</td><td>Move just point 1 or 2 of a line/arrow.</td></tr>
       <tr><td>!anim pic size 0.45 1s</td><td>Animate an image to a new width.</td></tr>
       <tr><td>!anim pic scale 1.6 0.5s</td><td>Scale any element about its center.</td></tr>
       <tr><td>!anim pic rotate 180 1s</td><td>Rotate an element to an absolute angle (degrees), pivoting on its own center.</td></tr>
+      <tr><td>!anim @front_end scale 1.2 0.5s<br>!anim @front_end rotate 15 0.5s</td><td>Transform a tag selection as one temporary unit around its shared center. Tag scale and rotation are relative and may run simultaneously with movement when they select the exact same members.</td></tr>
       <tr><td>!anim hand rotate 90 around (0.5, 0.5) 1s</td><td>Rotate around any point in the slide, not just the element's own center — e.g. a clock hand around the clock face, or one shape orbiting another.</td></tr>
       <tr><td>!anim word color #cc2244 0.5s</td><td>Animate text color / shape stroke.</td></tr>
+      <tr><td>!anim @nodes fill white 0.5s<br>!anim @nodes stroke black 0.5s</td><td>Animate <code>fill</code>, <code>stroke</code>, <code>textcolor</code>, <code>opacity</code>, <code>thick</code>, or <code>round</code> across a selection.</td></tr>
       <tr><td>!anim word textsize 54px 0.7s</td><td>Animate font size.</td></tr>
+      <tr><td>!tag parser remove front_end<br>!tag optimizer add front_end</td><td>Change later tag membership. Put <code>&gt;&gt;&gt;</code> or <code>...</code> between membership changes and dependent animations.</td></tr>
+      <tr><td>!anim @nodes front<br>!anim node z 20</td><td>Discrete layering: <code>z</code>, <code>front</code>, <code>back</code>, <code>forward</code>, and <code>backward</code>. Tag selections move as a layer block and retain internal source order.</td></tr>
     </table>
     <table style="margin-top:6px">
       <tr><td>{ease=bounce} !anim pic move …</td><td>Easing on any animation: <code>linear easein easeout back bounce elastic</code> (default is ease in-out).</td></tr>
       <tr><td>!anim pic path (cx,cy) (x,y) 1s</td><td>Move along a quadratic Bézier from the current position via a control point.</td></tr>
       <tr><td>!anim pic enter drop<br>!anim pic exit slideleft 0.4s</td><td>Entrance / exit effects: <code>fade slideleft slideright slideup slidedown grow drop spin</code> (exit also <code>shrink</code>). For an entrance, declare the element and its <code>enter</code> in the <i>same</i> step — it appears with the effect. <code>drop</code> defaults to a bounce.</td></tr>
     </table>
-    <p class="sub" style="margin-top:14px">Consecutive <code>!anim</code> lines run <b>simultaneously</b>. Separate with <code>...</code> to wait for a keypress, or <code>&gt;&gt;&gt;</code> to auto-run in sequence. The <b>Insert ▸ Animation…</b> menu builds these lines for you.</p>
+    <p class="sub" style="margin-top:14px">Consecutive <code>!anim</code> lines run <b>simultaneously</b>. Geometric selections in one phase must be disjoint or contain exactly the same members; use <code>&gt;&gt;&gt;</code> between partial overlaps. Separate with <code>...</code> to wait for a keypress, or <code>&gt;&gt;&gt;</code> to auto-run in sequence. The <b>Insert ▸ Animation…</b> menu builds these lines for you.</p>
 
     <h3>Presenting</h3>
     <table>
@@ -763,7 +769,7 @@ const mixColor=(A,B,t)=>`rgba(${Math.round(A.r+(B.r-A.r)*t)},${Math.round(A.g+(B
    but NOT inside a ``` code fence. Returns char offsets so the editor
    can map caret position -> slide with identical logic. */
 // A fence may open after position/label/style prefixes, e.g.  {w=0.5} ```cpp
-const FENCE_OPEN=/^(?:@\([^)]*\)\s*|\[[\w-]+\]\s*|\{[^}]*\}\s*)*```/;
+const FENCE_OPEN=/^(?:@\([^)]*\)\s*|\[(?:[A-Za-z_][\w-]*)?(?::[A-Za-z_][\w-]*(?:\s*,\s*[A-Za-z_][\w-]*)*)?\]\s*|\{[^}]*\}\s*)*```/;
 function splitSlides(text){
   const lines=text.replace(/\r\n?/g,"\n").split("\n");
   const slabs=[]; let buf=[], slabStart=0, off=0, inFence=false, hidden=false;
@@ -871,7 +877,7 @@ function readDocumentPalette(text,warnings=[]){
 
 function parseScript(text){
   const warnings=[];
-  const vars={ __labels:{}, __palette:readDocumentPalette(text,warnings),
+  const vars={ __labels:{}, __styles:{}, __palette:readDocumentPalette(text,warnings),
     slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI, nbsp:"\u00A0" };
   // Hidden (!---) "pocket" slides ARE parsed and executed — their variable
   // math affects later slides — but presentation skips them when advancing.
@@ -1067,12 +1073,12 @@ function substVars(text, vars, warnings, whereStr){
 const NUM_PATTERN=String.raw`[+-]?(?:\d+(?:\.\d*)?|\.\d+)`;
 const STRICT_NUMBER=new RegExp(`^${NUM_PATTERN}$`);
 const RE_POS   = new RegExp(`^@\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\)\\s*`);
-const RE_LABEL = /^\[([A-Za-z_][\w-]*)\](?!\()\s*/;   // (?!\() so [text](url) links survive
+const RE_LABEL = /^\[((?:[A-Za-z_][\w-]*)?)(?::([A-Za-z_][\w-]*(?:\s*,\s*[A-Za-z_][\w-]*)*))?\](?!\()\s*/;
 const RE_STYLE = /^\{(?!\{)([^}]*)\}\s*/;
 const RE_PAIR  = new RegExp(`\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\)`,"g");
 const RE_DUR   = /(?:^|\s)(\S+)\s*s\s*$/i;
 
-function parseStyle(s){
+function parseStyle(s, namedStyles, warnings, whereStr){
   const st={}; let lastKey=null;
   // A bare word continues the previous value only where that's meaningful:
   // inside unbalanced parens (fill=rgba(1,2,3,.5)) or font stacks
@@ -1081,7 +1087,13 @@ function parseStyle(s){
   const unbalanced=v=>{ const t=String(v); let d=0; for(const ch of t){ if(ch==="(")d++; else if(ch===")")d--; } return d>0; };
   for(const part of s.split(/[,;]/)){
     const eq=part.indexOf("="), t=part.trim();
-    if(eq>=0 && !(lastKey && unbalanced(st[lastKey]))){
+    const ref=/^\$([A-Za-z_][\w-]*)$/.exec(t);
+    if(ref){
+      const base=namedStyles&&namedStyles[ref[1]];
+      if(base) Object.assign(st,base);
+      else if(warnings) warnings.push(`${whereStr||"style"}: unknown named style “${ref[1]}”`);
+      lastKey=null;
+    }else if(eq>=0 && !(lastKey && unbalanced(st[lastKey]))){
       lastKey=part.slice(0,eq).trim().toLowerCase(); st[lastKey]=part.slice(eq+1).trim();
     }else if(t){
       if(lastKey && (unbalanced(st[lastKey]) || lastKey.includes("font"))) st[lastKey]+=", "+t;
@@ -1205,8 +1217,11 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     line=substVars(line, vars, warnings, where(lnNo));
 
     // --- prefixes: @(x,y), [label], {style} — any order ---
-    let {pos,label,style,rest}=extractPrefixes(line);
+    let {pos,label,tags,style,rest}=extractPrefixes(line,vars.__styles,warnings,where(lnNo));
     line=rest;
+    if(style.z!=null && !Number.isInteger(Number(style.z))){
+      warnings.push(`${where(lnNo)}: z style needs an integer layer`); delete style.z;
+    }
     if(!line) continue;
     if(line.startsWith("@(")){
       warnings.push(`${where(lnNo)}: malformed position — expected @(x, y) with numeric coordinates`);
@@ -1223,7 +1238,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       }
       if(!closed) warnings.push(`${where(lnNo)}: unterminated code fence`);
       k=j;                                   // skip past the closing fence
-      addItem({id:nextId++, kind:"code", lang, code:buf.join("\n"), label, style, pos});
+      addItem({id:nextId++, kind:"code", lang, code:buf.join("\n"), label, tags, style, pos});
       continue;
     }
 
@@ -1242,12 +1257,34 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
         aligns=all[1].map(c=>c.startsWith(":")&&c.endsWith(":")?"center":c.endsWith(":")?"right":c.startsWith(":")?"left":null);
         rows=all.slice(2);
       }
-      addItem({id:nextId++, kind:"table", head, aligns, rows, label, style, pos});
+      addItem({id:nextId++, kind:"table", head, aligns, rows, label, tags, style, pos});
       continue;
     }
 
     // Palette declarations are collected document-wide before slide parsing.
     if(/^!set\s+palette\b/i.test(line)) continue;
+
+    // --- named styles: !style name {key=value, ...} ---
+    if((m=line.match(/^!style\s+([A-Za-z_][\w-]*)\s*\{(.*)\}\s*$/i))){
+      vars.__styles[m[1]]=parseStyle(m[2],vars.__styles,warnings,where(lnNo));
+      continue;
+    }
+    if((m=line.match(/^!style\s+([A-Za-z_][\w-]*)\s*\{(.*)$/i))){
+      const parts=[m[2]]; let j=k+1, closed=false;
+      for(;j<L.length;j++){
+        const expanded=substVars(L[j].text.trim(),vars,warnings,where(L[j].n));
+        const close=expanded.indexOf("}");
+        if(close>=0){ parts.push(expanded.slice(0,close)); closed=true; break; }
+        parts.push(expanded);
+      }
+      if(!closed) warnings.push(`${where(lnNo)}: unterminated !style block`);
+      else vars.__styles[m[1]]=parseStyle(parts.join(" "),vars.__styles,warnings,where(lnNo));
+      k=closed?j:L.length; continue;
+    }
+    if(/^!style\b/i.test(line)){
+      warnings.push(`${where(lnNo)}: !style needs “!style name {key=value, ...}”`);
+      continue;
+    }
 
     // --- variables: !set name value (value already ${}-substituted) ---
     if((m=line.match(/^!set\s+([A-Za-z_]\w*)\s*(.*)$/i))){
@@ -1256,8 +1293,27 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       continue;
     }
 
+    // --- timed tag membership changes (kept in their own phase) ---
+    if((m=line.match(/^!tag\s+(@?[A-Za-z_][\w-]*)\s+(add|remove)\s+(.+)$/i))){
+      const changed=m[3].split(/[\s,]+/).filter(Boolean);
+      if(!changed.length || changed.some(t=>!/^[A-Za-z_][\w-]*$/.test(t)))
+        warnings.push(`${where(lnNo)}: !tag needs one or more valid tag names`);
+      else if(cur().anims.length)
+        warnings.push(`${where(lnNo)}: put >>> or ... before !tag so membership changes do not share an animation phase`);
+      else cur().tagOps.push({target:m[1],action:m[2].toLowerCase(),tags:changed,where:where(lnNo)});
+      continue;
+    }
+    if(/^!tag\b/i.test(line)){
+      warnings.push(`${where(lnNo)}: !tag needs “!tag target add|remove tag”`);
+      continue;
+    }
+
     // --- animation lines ---
-    if((m=line.match(/^!anim\s+([\w-]+)\s+(\w+)\s*(.*)$/i))){
+    if((m=line.match(/^!anim\s+(@?[\w-]+)\s+(\w+)\s*(.*)$/i))){
+      if(cur().tagOps.length){
+        warnings.push(`${where(lnNo)}: put >>> or ... after !tag before animating its new membership`);
+        continue;
+      }
       const a=parseAnim(m[1],m[2].toLowerCase(),m[3],warnings,where(lnNo),vars);
       if(a){
         a.where=where(lnNo);
@@ -1292,12 +1348,12 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     if((m=line.match(/^!embed\((.+)\)\s*$/i))){
       const src=m[1].trim();
       if(!isSafeEmbedUrl(src)) warnings.push(`${where(lnNo)}: blocked unsafe embed URL scheme in “${src}”`);
-      addItem({id:nextId++, kind:"embed", src, blocked:!isSafeEmbedUrl(src), label, style, pos});
+      addItem({id:nextId++, kind:"embed", src, blocked:!isSafeEmbedUrl(src), label, tags, style, pos});
       continue;
     }
     // --- native video / audio ---
     if((m=line.match(/^!(video|audio)\((.+)\)\s*$/i))){
-      addItem({id:nextId++, kind:m[1].toLowerCase(), src:m[2].trim(), label, style, pos});
+      addItem({id:nextId++, kind:m[1].toLowerCase(), src:m[2].trim(), label, tags, style, pos});
       continue;
     }
     // --- charts: !chart bar|line (x,y) (w,h) A:1, B:2   ·   !chart pie (cx,cy) r A:1, B:2 ---
@@ -1306,7 +1362,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       RE_PAIR.lastIndex=0;
       const pm=[...rest2.matchAll(RE_PAIR)];
       const endOf2=mm=>mm.index+mm[0].length;
-      const item={id:nextId++, kind:"chart", ctype, label, style, pos:null};
+      const item={id:nextId++, kind:"chart", ctype, label, tags, style, pos:null};
       let ok=true, geomEnd=0;
       if(ctype==="pie"){
         if(pm.length<1) ok=false;
@@ -1351,7 +1407,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     if((m=line.match(/^!(line|arrow|circle|ellipse|rect|textbox|box|polygon|polyline|triangle|diamond|star|curve)\b(.*)$/i))){
       let kind=m[1].toLowerCase(); if(kind==="box") kind="textbox";
       const rest2=m[2];
-      const item={id:nextId++, kind, label, style, pos:null};
+      const item={id:nextId++, kind, label, tags, style, pos:null};
       let ok=true, geomEnd=0;
       RE_PAIR.lastIndex=0;                     // matchAll clones the regex WITH its lastIndex
       const pm=[...rest2.matchAll(RE_PAIR)];
@@ -1411,42 +1467,49 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
 
     // --- images ---
     if((m=line.match(/^!\[([^\]]*)\]\((.+)\)\s*$/))){
-      addItem({id:nextId++, kind:"img", alt:m[1], src:m[2].trim(), label, style, pos});
+      addItem({id:nextId++, kind:"img", alt:m[1], src:m[2].trim(), label, tags, style, pos});
       continue;
     }
     // --- headings, bullets, paragraphs ---
     // (prefixes may also follow the marker, e.g. "- {color=red} text")
     let item;
     if((m=line.match(/^(#{1,3})\s+(.*)$/))){
-      const lvl=m[1].length, inner=extractPrefixes(m[2]);
+      const lvl=m[1].length, inner=extractPrefixes(m[2],vars.__styles,warnings,where(lnNo));
       item={id:nextId++, kind:"h"+lvl, text:inner.rest, label:inner.label||label,
-            style:Object.assign(style,inner.style), pos:inner.pos||pos};
+            tags:[...new Set([...tags,...inner.tags])], style:Object.assign(style,inner.style), pos:inner.pos||pos};
       if(lvl===1) slide.hasH1=true; if(lvl===3) slide.hasH3=true;
     }else if((m=line.match(/^-\s+(.*)$/))){
-      const inner=extractPrefixes(m[1]);
+      const inner=extractPrefixes(m[1],vars.__styles,warnings,where(lnNo));
       item={id:nextId++, kind:"li", lv:clamp(Math.floor(indent/2),0,2), text:inner.rest,
-            label:inner.label||label, style:Object.assign(style,inner.style), pos:inner.pos||pos};
+            label:inner.label||label, tags:[...new Set([...tags,...inner.tags])],
+            style:Object.assign(style,inner.style), pos:inner.pos||pos};
     }else{
-      item={id:nextId++, kind:"p", text:line, label, style, pos};
+      item={id:nextId++, kind:"p", text:line, label, tags, style, pos};
     }
     addItem(item);
   }
   }
 }
-function newPhase(){ return {reveals:[], anims:[]}; }
+function newPhase(){ return {reveals:[], tagOps:[], anims:[]}; }
 
-function extractPrefixes(line){
-  let pos=null, label=null, style={}, moved=true;
+function extractPrefixes(line,namedStyles,warnings,whereStr){
+  let pos=null, label=null, tags=[], style={}, moved=true;
   while(moved){
     moved=false; let m;
     if((m=line.match(RE_POS)))  { pos={x:parseFloat(m[1]),y:parseFloat(m[2])}; line=line.slice(m[0].length); moved=true; }
-    if((m=line.match(RE_LABEL))){ label=m[1]; line=line.slice(m[0].length); moved=true; }
-    if((m=line.match(RE_STYLE))){ Object.assign(style,parseStyle(m[1])); line=line.slice(m[0].length); moved=true; }
+    if((m=line.match(RE_LABEL))){
+      if(!m[1]&&!m[2]) break;
+      label=m[1]||null;
+      if(m[2]) tags.push(...m[2].split(",").map(t=>t.trim()));
+      tags=[...new Set(tags)]; line=line.slice(m[0].length); moved=true;
+    }
+    if((m=line.match(RE_STYLE))){ Object.assign(style,parseStyle(m[1],namedStyles,warnings,whereStr)); line=line.slice(m[0].length); moved=true; }
   }
-  return {pos,label,style,rest:line};
+  return {pos,label,tags,style,rest:line};
 }
 
 function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
+  const hadDuration=RE_DUR.test(argsRaw);
   let [args,dur,durError]=takeDur(argsRaw);
   const bad=msg=>{warnings.push(`${whereStr}: ${msg}`); return null;};
   if(durError) return bad(durError);
@@ -1464,6 +1527,8 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
       return {target,verb,dur,effect}; }
     case "move":{ const p=pairs(args); if(!p.length) return bad("move needs (x,y)");
       return {target,verb,dur,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
+    case "translate":{ const p=pairs(args); if(!p.length) return bad("translate needs (dx,dy)");
+      return {target,verb,dur,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
     case "point":{ const n=parseInt(args); const p=pairs(args);
       if(!(n>=1)||!p.length) return bad("point needs a point index and (x,y)");
       return {target,verb,dur,n,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
@@ -1478,7 +1543,15 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
       return rm[2]!=null
         ? {target,verb,dur,deg,hasOrigin:true,x:cvx(parseFloat(rm[2]),vars),y:cvy(parseFloat(rm[3]),vars)}
         : {target,verb,dur,deg,hasOrigin:false}; }
-    case "color": return args ? {target,verb,dur,color:resolvePaletteColor(args,vars.__palette)} : bad("color needs a value");
+    case "color": case "fill": case "stroke": case "textcolor":
+      return args ? {target,verb,dur,color:resolvePaletteColor(args,vars.__palette)} : bad(`${verb} needs a color value`);
+    case "opacity":{ const v=Number(args); return args&&Number.isFinite(v)&&v>=0&&v<=1
+      ? {target,verb,dur,value:v} : bad("opacity needs a number from 0 to 1"); }
+    case "thick": case "round": return args ? {target,verb,dur,size:args} : bad(`${verb} needs a size`);
+    case "z":{ const v=Number(args); return args&&!hadDuration&&Number.isInteger(v)
+      ? {target,verb,dur:0,value:v} : bad("z needs an integer layer"); }
+    case "front": case "back": case "forward": case "backward":
+      return args||hadDuration ? bad(`${verb} does not take a value or duration`) : {target,verb,dur:0};
     case "textsize": return args ? {target,verb,dur,size:args} : bad("textsize needs a size");
     default: return bad(`unknown animation “${verb}”`);
   }
@@ -1495,21 +1568,86 @@ function validateSlideAnimations(slide, warnings, slideIndex){
   }
   for(const label of duplicates)
     warnings.push(`slide ${slideIndex+1}: duplicate label “${label}” — animations target the last item with that label`);
+  const tagState=new Map(slide.items.map(item=>[item.id,new Set(item.tags||[])]));
+  const resolve=target=>{
+    if(target.startsWith("@")){
+      const tag=target.slice(1);
+      return slide.items.filter(item=>tagState.get(item.id).has(tag));
+    }
+    const item=labels.get(target); return item?[item]:[];
+  };
+  const describe=target=>target.startsWith("@")?`tag “${target.slice(1)}”`:`label “${target}”`;
+  const geometric=new Set(["move","path","translate","scale","rotate"]);
+  const channel=verb=>["move","path","translate"].includes(verb)?"position":verb;
 
-  for(const steps of slide.steps) for(const phase of steps) for(const a of phase.anims){
-    const item=labels.get(a.target), at=a.where||`slide ${slideIndex+1}`;
-    if(!item){ warnings.push(`${at}: animation targets unknown label “${a.target}”`); continue; }
-    const kind=item.kind;
-    if(a.verb==="size" && !["img","embed","video"].includes(kind))
-      warnings.push(`${at}: size animation is not supported for ${kind} “${a.target}”`);
-    else if((a.verb==="move"||a.verb==="path") && kind==="chart")
-      warnings.push(`${at}: ${a.verb} animation is not supported for chart “${a.target}”`);
-    else if(a.verb==="point" && (!item.coords || a.n>item.coords.length))
-      warnings.push(`${at}: point ${a.n} does not exist on ${kind} “${a.target}”`);
-    else if(a.verb==="textsize" && (["img","embed","video","audio","line","arrow","polyline","curve","chart"].includes(kind) && !item.text))
-      warnings.push(`${at}: textsize animation needs an element containing text`);
-    else if(a.verb==="color" && ["img","embed","video","audio"].includes(kind))
-      warnings.push(`${at}: color animation is not supported for ${kind} “${a.target}”`);
+  for(const steps of slide.steps) for(const phase of steps){
+    for(const op of phase.tagOps||[]){
+      const targets=resolve(op.target); op.targetIds=targets.map(item=>item.id);
+      if(!targets.length) warnings.push(`${op.where}: !tag targets unknown or empty ${describe(op.target)}`);
+      for(const item of targets) for(const tag of op.tags){
+        if(op.action==="add") tagState.get(item.id).add(tag);
+        else tagState.get(item.id).delete(tag);
+      }
+    }
+
+    for(const a of phase.anims){
+      const targets=resolve(a.target), at=a.where||`slide ${slideIndex+1}`;
+      a.targetIds=targets.map(item=>item.id);
+      if(!targets.length){
+        warnings.push(a.target.startsWith("@")
+          ? `${at}: animation targets empty ${describe(a.target)}`
+          : `${at}: animation targets unknown ${describe(a.target)}`);
+        a.invalid=true; continue;
+      }
+      if(a.target.startsWith("@") && a.verb==="point"){
+        warnings.push(`${at}: point animation requires one labeled element, not ${describe(a.target)}`);
+        a.invalid=true; continue;
+      }
+      for(const item of targets){
+        const kind=item.kind, subject=a.target.startsWith("@")
+          ? `${kind} in ${describe(a.target)}` : `${kind} “${a.target}”`;
+        if(a.verb==="size" && !["img","embed","video"].includes(kind)){
+          warnings.push(`${at}: size animation is not supported for ${subject}`); a.invalid=true;
+        }else if((a.verb==="move"||a.verb==="path") && kind==="chart" && !a.target.startsWith("@")){
+          warnings.push(`${at}: ${a.verb} animation is not supported for ${subject}`); a.invalid=true;
+        }else if(a.verb==="point" && (!item.coords || a.n>item.coords.length)){
+          warnings.push(`${at}: point ${a.n} does not exist on ${subject}`); a.invalid=true;
+        }else if(a.verb==="textsize" && (["img","embed","video","audio","line","arrow","polyline","curve","chart"].includes(kind) && !item.text)){
+          warnings.push(`${at}: textsize animation needs every element in ${describe(a.target)} to contain text`); a.invalid=true;
+        }else if(["color","fill","stroke","textcolor","thick","round"].includes(a.verb) && ["img","embed","video","audio"].includes(kind)){
+          warnings.push(`${at}: color animation is not supported for ${kind} in ${describe(a.target)}`); a.invalid=true;
+        }else if(a.verb==="fill" && ["line","arrow","polyline","curve"].includes(kind)){
+          warnings.push(`${at}: fill animation is not supported for ${subject}`); a.invalid=true;
+        }else if(a.verb==="textcolor" && !item.text && ["line","arrow","polyline","curve","chart"].includes(kind)){
+          warnings.push(`${at}: textcolor animation needs every element in ${describe(a.target)} to contain text`); a.invalid=true;
+        }else if(a.verb==="round" && !["rect","textbox"].includes(kind)){
+          warnings.push(`${at}: round animation is not supported for ${subject}`); a.invalid=true;
+        }
+      }
+    }
+
+    const gs=phase.anims.filter(a=>!a.invalid&&geometric.has(a.verb));
+    for(let i=0;i<gs.length;i++) for(let j=i+1;j<gs.length;j++){
+      const a=gs[i], b=gs[j], as=new Set(a.targetIds), bs=new Set(b.targetIds);
+      if(a.invalid||b.invalid) continue;
+      const overlap=a.targetIds.some(id=>bs.has(id)); if(!overlap) continue;
+      const same=as.size===bs.size&&a.targetIds.every(id=>bs.has(id));
+      if(!same){
+        const at=b.where||`slide ${slideIndex+1}`;
+        warnings.push(`${at}: overlapping geometric animations must target identical or disjoint element sets; separate “${a.target}” and “${b.target}” with >>>`);
+        b.invalid=true; continue;
+      }
+      if(a.target.startsWith("@")!==b.target.startsWith("@")){
+        const at=b.where||`slide ${slideIndex+1}`;
+        warnings.push(`${at}: simultaneous geometric animations cannot mix a label target with a tag selection; separate them with >>>`);
+        b.invalid=true; continue;
+      }
+      if(channel(a.verb)===channel(b.verb)){
+        const at=b.where||`slide ${slideIndex+1}`;
+        warnings.push(`${at}: simultaneous “${a.verb}” and “${b.verb}” animations both control ${channel(a.verb)}; separate them with >>>`);
+        b.invalid=true;
+      }
+    }
   }
 }
 </script>
@@ -1569,9 +1707,7 @@ function renderSlide(slideDef, opts){
   const flow=document.createElement("div"); flow.className="flow";
   if(slideDef.hasH1 && !slideDef.hasH3) flow.classList.add("title-slide");
   const absLayer=document.createElement("div"); absLayer.className="abs-layer";
-  const svg=document.createElementNS(SVGNS,"svg");
-  svg.setAttribute("class","overlay"); svg.setAttribute("viewBox",`0 0 ${SW} ${SH}`);
-  root.append(flow,absLayer,svg);
+  root.append(flow,absLayer);
 
 
   const items=new Map();       // id -> runtime item
@@ -1579,21 +1715,41 @@ function renderSlide(slideDef, opts){
 
   for(const def of slideDef.items){
     const it={def, el:null, shape:null, coords:def.coords?def.coords.map(c=>c.slice()):null,
-              r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false, scale:1, rot:0, rotOrigin:null};
+              r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false,
+              tags:new Set(def.tags||[]), scale:1, rot:0, rotOrigin:null,
+              layer:Number.isFinite(Number(def.style.z))?Number(def.style.z):0,
+              collectiveMatrix:[1,0,0,1,0,0], collectiveEl:null, layerEl:null};
+    let itemSvg=null;
+    if(def.kind==="chart"||!["h1","h2","h3","p","li","img","code","table","embed","video","audio"].includes(def.kind)){
+      itemSvg=document.createElementNS(SVGNS,"svg"); itemSvg.setAttribute("class","overlay scene-item-svg");
+      itemSvg.setAttribute("viewBox",`0 0 ${SW} ${SH}`); root.appendChild(itemSvg);
+    }
     if(["h1","h2","h3","p","li"].includes(def.kind))      buildText(it,flow,absLayer,palette);
     else if(def.kind==="img")                             buildImg(it,flow,absLayer);
     else if(def.kind==="code")                            buildCode(it,flow,absLayer,palette);
     else if(def.kind==="table")                           buildTable(it,flow,absLayer,palette);
     else if(def.kind==="embed")                           buildEmbed(it,flow,absLayer,opts);
     else if(def.kind==="video"||def.kind==="audio")       buildMedia(it,flow,absLayer,opts);
-    else if(def.kind==="chart")                           buildChart(it,svg,palette);
-    else                                                  buildShape(it,svg,palette);
+    else if(def.kind==="chart")                           buildChart(it,itemSvg,palette);
+    else                                                  buildShape(it,itemSvg,palette);
+    if(it.shape){
+      const outer=document.createElementNS(SVGNS,"g");
+      it.el.parentNode.insertBefore(outer,it.el); outer.appendChild(it.el); it.collectiveEl=outer;
+    }
+    it.layerEl=it.shape?itemSvg:it.el;
+    applyItemLayer(it);
     if(def.style.rotate!=null){ const rv=parseFloat(def.style.rotate); if(!isNaN(rv)){ it.rot=rv; applyTransform(it); } }
     setVisible(it,false);
     items.set(def.id,it);
     if(def.label) labels.set(def.label,it);
   }
-  return {root,flow,absLayer,svg,items,labels,def:slideDef};
+  return {root,flow,absLayer,svg:null,items,labels,def:slideDef};
+}
+
+function applyItemLayer(it){
+  if(!it.layerEl) return;
+  if(!it.shape && getComputedStyle(it.layerEl).position==="static") it.layerEl.style.position="relative";
+  it.layerEl.style.zIndex=String(Math.round(it.layer*100000)+(it.def.id||0));
 }
 
 function applyTextStyle(el,style,palette){
@@ -1728,7 +1884,7 @@ function buildShape(it,svg,palette){
   const d=it.def, st=d.style;
   const isBox = d.kind==="textbox";
   const pc=value=>resolvePaletteColor(value,palette);
-  const stroke = pc(st.color || st.stroke || st.border || (isBox ? "none" : "#232830"));
+  const stroke = pc(st.stroke || st.color || st.border || (isBox ? "none" : "#232830"));
   const thick  = st.thick!=null ? parseFloat(st.thick) : (isBox ? 0 : 4);
   const fill   = pc(st.fill || (isBox ? "rgba(31,111,107,0.12)" : "none"));
   const g=document.createElementNS(SVGNS,"g");
@@ -1927,6 +2083,75 @@ function setVisible(it,on){
   }
 }
 
+/* Affine transforms used by temporary tag selections. Matrices use the SVG/CSS
+   [a,b,c,d,e,f] convention and are retained on each member after the temporary
+   selection is discarded. */
+const MAT_ID=()=>[1,0,0,1,0,0];
+function matMul(A,B){ return [
+  A[0]*B[0]+A[2]*B[1], A[1]*B[0]+A[3]*B[1],
+  A[0]*B[2]+A[2]*B[3], A[1]*B[2]+A[3]*B[3],
+  A[0]*B[4]+A[2]*B[5]+A[4], A[1]*B[4]+A[3]*B[5]+A[5]
+]; }
+const matTranslate=(x,y)=>[1,0,0,1,x,y];
+const matScaleAt=(s,x,y)=>[s,0,0,s,x*(1-s),y*(1-s)];
+function matRotateAt(deg,x,y){
+  const r=deg*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
+  return [c,s,-s,c,x-c*x+s*y,y-s*x-c*y];
+}
+const matPoint=(M,x,y)=>({x:M[0]*x+M[2]*y+M[4],y:M[1]*x+M[3]*y+M[5]});
+function matInverse(M){
+  const d=M[0]*M[3]-M[1]*M[2]; if(Math.abs(d)<1e-12) return MAT_ID();
+  return [M[3]/d,-M[1]/d,-M[2]/d,M[0]/d,
+    (M[2]*M[5]-M[3]*M[4])/d,(M[1]*M[4]-M[0]*M[5])/d];
+}
+function transformedBounds(M,b){
+  const ps=[matPoint(M,b.x,b.y),matPoint(M,b.x+b.w,b.y),
+    matPoint(M,b.x+b.w,b.y+b.h),matPoint(M,b.x,b.y+b.h)];
+  const x=Math.min(...ps.map(p=>p.x)),y=Math.min(...ps.map(p=>p.y));
+  const right=Math.max(...ps.map(p=>p.x)),bottom=Math.max(...ps.map(p=>p.y));
+  return {x,y,w:right-x,h:bottom-y};
+}
+const matrixCss=M=>`matrix(${M.map(v=>Math.abs(v)<1e-12?0:v).join(",")})`;
+function ensureCollectiveWrapper(it,render){
+  if(it.collectiveEl) return;
+  const s=currentScale(render), sr=render.root.getBoundingClientRect();
+  let x=it.x,y=it.y,w,h;
+  if(!it.def.pos){
+    const oldTransform=it.el.style.transform, oldOrigin=it.el.style.transformOrigin;
+    it.el.style.transform=""; it.el.style.transformOrigin="";
+    const r=it.el.getBoundingClientRect();
+    x=(r.left-sr.left)/s; y=(r.top-sr.top)/s; w=r.width/s; h=r.height/s;
+    it.el.style.transform=oldTransform; it.el.style.transformOrigin=oldOrigin;
+  }
+  if(!it.def.pos && !it.lifted){
+    const ph=document.createElement("div"); ph.style.height=h+"px"; ph.style.width=w+"px"; ph.style.visibility="hidden";
+    it.el.parentNode.insertBefore(ph,it.el); it.lifted=true;
+  }
+  const outer=document.createElement("div"); outer.className="collective-item";
+  outer.style.cssText="position:absolute;left:0;top:0;width:0;height:0;overflow:visible;transform-origin:0 0";
+  render.absLayer.appendChild(outer); outer.appendChild(it.el);
+  if(!it.def.pos){
+    it.el.style.position="absolute"; it.el.style.left=x+"px"; it.el.style.top=y+"px";
+    it.el.style.width=w+"px"; it.el.style.margin="0"; it.x=x; it.y=y;
+  }
+  it.collectiveEl=outer; it.layerEl=outer; applyItemLayer(it); it.el.style.zIndex="";
+}
+function applyCollectiveMatrix(it,M,render){
+  ensureCollectiveWrapper(it,render); it.collectiveMatrix=M;
+  if(it.shape) it.collectiveEl.setAttribute("transform",matrixCss(M));
+  else it.collectiveEl.style.transform=matrixCss(M);
+}
+function itemVisualBounds(it,render){
+  const s=currentScale(render), r=it.el.getBoundingClientRect(), sr=render.root.getBoundingClientRect();
+  return {x:(r.left-sr.left)/s,y:(r.top-sr.top)/s,w:r.width/s,h:r.height/s};
+}
+function selectionBounds(items,render){
+  const bs=items.map(it=>itemVisualBounds(it,render));
+  const x=Math.min(...bs.map(b=>b.x)), y=Math.min(...bs.map(b=>b.y));
+  const right=Math.max(...bs.map(b=>b.x+b.w)), bottom=Math.max(...bs.map(b=>b.y+b.h));
+  return {x,y,w:right-x,h:bottom-y,cx:(x+right)/2,cy:(y+bottom)/2};
+}
+
 /* Composes an item's persistent scale + rotation into its transform.
    Rotation pivots on it.rotOrigin (absolute slide coords) when set,
    otherwise on the item's own center.
@@ -1997,9 +2222,8 @@ class Tween{
 const FX={ fade:[0,0,1,0], slideleft:[-120,0,1,0], slideright:[120,0,1,0],
            slideup:[0,120,1,0], slidedown:[0,-120,1,0],
            grow:[0,0,0.2,0], shrink:[0,0,0.2,0], drop:[0,-200,1,0], spin:[0,0,0.35,-180] };
-function makeAnim(a, render, warnings){
-  const it=render.labels.get(a.target);
-  if(!it){ warnings&&warnings.push(`animation targets unknown label “${a.target}”`); return null; }
+function makeItemAnim(a, render, warnings, it){
+  if(!it){ warnings&&warnings.push(`animation targets unavailable element for “${a.target}”`); return null; }
   const el=it.el;
   const EZ=EASINGS[a.ease] || (a.verb==="enter"&&a.effect==="drop" ? EASINGS.bounce : undefined);
   const T=(dur,fn)=>new Tween(dur,fn,EZ);
@@ -2032,40 +2256,56 @@ function makeAnim(a, render, warnings){
     }
     case "path":{
       const q=(p0,p1,p2,t)=>{ const u=1-t; return u*u*p0 + 2*u*t*p1 + t*t*p2; };
+      const inv=matInverse(it.collectiveMatrix||MAT_ID());
       if(it.shape){
         if(!it.coords) return null;              // charts have no vertex list
-        const start=it.coords.map(c=>c.slice()), p0=start[0];
+        const start=it.coords.map(c=>c.slice()), p0=matPoint(it.collectiveMatrix||MAT_ID(),start[0][0],start[0][1]);
         return T(a.dur,t=>{
-          const bx=q(p0[0],a.cxp,a.x,t), by=q(p0[1],a.cyp,a.y,t);
-          const dx=bx-p0[0], dy=by-p0[1];
+          const bx=q(p0.x,a.cxp,a.x,t), by=q(p0.y,a.cyp,a.y,t);
+          const local=matPoint(inv,bx,by), dx=local.x-start[0][0], dy=local.y-start[0][1];
           it.coords=start.map(c=>[c[0]+dx,c[1]+dy]); updateShape(it);
         });
       }
       liftOutOfFlow(it,render);
-      const x0=it.x, y0=it.y;
+      const x0=it.x, y0=it.y, p0=matPoint(it.collectiveMatrix||MAT_ID(),x0,y0);
       return T(a.dur,t=>{
-        it.x=q(x0,a.cxp,a.x,t); it.y=q(y0,a.cyp,a.y,t);
+        const local=matPoint(inv,q(p0.x,a.cxp,a.x,t),q(p0.y,a.cyp,a.y,t));
+        it.x=local.x; it.y=local.y;
         el.style.left=it.x+"px"; el.style.top=it.y+"px";
       });
     }
     case "hide": return T(a.dur,t=>{ el.style.opacity=String(1-t); if(t>=1){setVisible(it,false); el.style.opacity="";} });
     case "show": return T(a.dur,t=>{ if(!it.visible) setVisible(it,true); el.style.opacity=String(t); if(t>=1) el.style.opacity=""; });
     case "move":{
+      const inv=matInverse(it.collectiveMatrix||MAT_ID());
       if(it.shape){
         if(!it.coords) return null;              // charts have no vertex list
-        const start=it.coords.map(c=>c.slice());
-        const dx=a.x-start[0][0], dy=a.y-start[0][1];
+        const start=it.coords.map(c=>c.slice()), dest=matPoint(inv,a.x,a.y);
+        const dx=dest.x-start[0][0], dy=dest.y-start[0][1];
         return T(a.dur,t=>{ it.coords=start.map(c=>[c[0]+dx*t,c[1]+dy*t]); updateShape(it); });
       }
       liftOutOfFlow(it,render);
-      const x0=it.x,y0=it.y;
-      return T(a.dur,t=>{ it.x=x0+(a.x-x0)*t; it.y=y0+(a.y-y0)*t;
+      const x0=it.x,y0=it.y,dest=matPoint(inv,a.x,a.y);
+      return T(a.dur,t=>{ it.x=x0+(dest.x-x0)*t; it.y=y0+(dest.y-y0)*t;
+        el.style.left=it.x+"px"; el.style.top=it.y+"px"; });
+    }
+    case "translate":{
+      const M=it.collectiveMatrix||MAT_ID(),inv=matInverse(M);
+      if(it.shape){
+        if(!it.coords) return null;
+        const start=it.coords.map(c=>c.slice()), p0=matPoint(M,start[0][0],start[0][1]);
+        const dest=matPoint(inv,p0.x+a.x,p0.y+a.y),dx=dest.x-start[0][0],dy=dest.y-start[0][1];
+        return T(a.dur,t=>{ it.coords=start.map(c=>[c[0]+dx*t,c[1]+dy*t]); updateShape(it); });
+      }
+      liftOutOfFlow(it,render);
+      const x0=it.x,y0=it.y,p0=matPoint(M,x0,y0),dest=matPoint(inv,p0.x+a.x,p0.y+a.y);
+      return T(a.dur,t=>{ it.x=x0+(dest.x-x0)*t; it.y=y0+(dest.y-y0)*t;
         el.style.left=it.x+"px"; el.style.top=it.y+"px"; });
     }
     case "point":{
       if(!it.coords||a.n>it.coords.length) return null;
-      const i=a.n-1, s=it.coords[i].slice();
-      return T(a.dur,t=>{ it.coords[i]=[s[0]+(a.x-s[0])*t, s[1]+(a.y-s[1])*t]; updateShape(it); });
+      const i=a.n-1, s=it.coords[i].slice(),dest=matPoint(matInverse(it.collectiveMatrix||MAT_ID()),a.x,a.y);
+      return T(a.dur,t=>{ it.coords[i]=[s[0]+(dest.x-s[0])*t, s[1]+(dest.y-s[1])*t]; updateShape(it); });
     }
     case "size":{
       if(it.embedBox){                   // embedded app: scale box, keep aspect
@@ -2085,7 +2325,8 @@ function makeAnim(a, render, warnings){
     }
     case "rotate":{
       const r0=it.rot||0;
-      if(a.hasOrigin) it.rotOrigin={x:a.x,y:a.y}; else it.rotOrigin=null;
+      if(a.hasOrigin){ const p=matPoint(matInverse(it.collectiveMatrix||MAT_ID()),a.x,a.y); it.rotOrigin={x:p.x,y:p.y}; }
+      else it.rotOrigin=null;
       if(!it.shape && a.hasOrigin) liftOutOfFlow(it,render);
       return T(a.dur,t=>{ it.rot=r0+(a.deg-r0)*t; applyTransform(it); });
     }
@@ -2105,6 +2346,44 @@ function makeAnim(a, render, warnings){
       const tgt=it.inner||el, A=resolveColor(getComputedStyle(tgt).color);
       return T(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
     }
+    case "fill":{
+      if(!it.shapeEl) return null;
+      const A=resolveColor(it.shapeEl.getAttribute("fill")||"transparent"), B=resolveColor(a.color);
+      return T(a.dur,t=>{ it.shapeEl.setAttribute("fill",mixColor(A,B,t)); });
+    }
+    case "stroke":{
+      if(!it.shape) return null;
+      const source=(it.lineEl&&it.lineEl.getAttribute("stroke"))||(it.shapeEl&&it.shapeEl.getAttribute("stroke"))||it.stroke;
+      const A=resolveColor(source), B=resolveColor(a.color);
+      return T(a.dur,t=>{ const c=mixColor(A,B,t); if(t>=1) it.stroke=a.color;
+        it.lineEl&&it.lineEl.setAttribute("stroke",c);
+        it.headEl&&it.headEl.setAttribute("fill",c);
+        it.shapeEl&&it.shapeEl.setAttribute("stroke",c); });
+    }
+    case "textcolor":{
+      const tgt=it.foBody||(!it.shape&&(it.inner||el)); if(!tgt) return null;
+      const A=resolveColor(getComputedStyle(tgt).color), B=resolveColor(a.color);
+      return T(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
+    }
+    case "opacity":{
+      const source=it.shape?getComputedStyle(el).opacity:getComputedStyle(it.inner||el).opacity;
+      const v0=Number.isFinite(parseFloat(source))?parseFloat(source):1;
+      return T(a.dur,t=>{ const v=v0+(a.value-v0)*t; if(it.shape) el.setAttribute("opacity",v); else (it.inner||el).style.opacity=v; });
+    }
+    case "thick":{
+      if(!it.shape) return null;
+      const v0=it.thick||parseFloat((it.shapeEl&&it.shapeEl.getAttribute("stroke-width"))||0);
+      const v1=sizeToPx(a.size,SW); if(v1==null) return null;
+      return T(a.dur,t=>{ const v=v0+(v1-v0)*t; it.thick=v;
+        it.lineEl&&it.lineEl.setAttribute("stroke-width",v);
+        it.shapeEl&&it.shapeEl.setAttribute("stroke-width",v);
+        if(it.headEl) updateShape(it); });
+    }
+    case "round":{
+      if(!it.shapeEl||it.shapeEl.tagName.toLowerCase()!=="rect") return null;
+      const v0=parseFloat(it.shapeEl.getAttribute("rx"))||0, v1=sizeToPx(a.size,SW); if(v1==null) return null;
+      return T(a.dur,t=>{ it.shapeEl.setAttribute("rx",v0+(v1-v0)*t); });
+    }
     case "textsize":{
       const tgt=it.foBody||it.inner||el;
       const s0=parseFloat(getComputedStyle(tgt).fontSize);
@@ -2114,6 +2393,84 @@ function makeAnim(a, render, warnings){
     }
   }
   return null;
+}
+function makeSelectionTween(anims,render,warnings){
+  const items=(anims[0].targetIds||[]).map(id=>render.items.get(id)).filter(Boolean);
+  if(!items.length) return null;
+  items.forEach(it=>ensureCollectiveWrapper(it,render));
+  const bounds=selectionBounds(items,render), bases=new Map(items.map(it=>[it,it.collectiveMatrix.slice()]));
+  const maxDur=Math.max(...anims.map(a=>a.dur),0.01);
+  const progress=(a,elapsed)=>{
+    const raw=a.dur<=0?1:clamp(elapsed/a.dur,0,1);
+    const ease=EASINGS[a.ease]||(a.verb==="enter"&&a.effect==="drop"?EASINGS.bounce:easeInOut);
+    return ease(raw);
+  };
+  return new Tween(maxDur,t=>{
+    const elapsed=t*maxDur;
+    let scaleM=MAT_ID(), rotateM=MAT_ID(), positionAnim=null, positionProgress=0;
+    for(const a of anims){
+      const p=progress(a,elapsed);
+      if(a.verb==="scale") scaleM=matScaleAt(1+(a.f-1)*p,bounds.cx,bounds.cy);
+      else if(a.verb==="rotate") rotateM=matRotateAt(a.deg*p,a.hasOrigin?a.x:bounds.cx,a.hasOrigin?a.y:bounds.cy);
+      else if(["move","translate","path"].includes(a.verb)){ positionAnim=a; positionProgress=p; }
+    }
+    const rs=matMul(rotateM,scaleM); let positionM=MAT_ID();
+    if(positionAnim){
+      const a=positionAnim,p=positionProgress;
+      if(a.verb==="translate") positionM=matTranslate(a.x*p,a.y*p);
+      else{
+        let x,y;
+        if(a.verb==="move"){
+          x=bounds.x+(a.x-bounds.x)*p; y=bounds.y+(a.y-bounds.y)*p;
+        }else{
+          const q=(v0,v1,v2)=>{const u=1-p; return u*u*v0+2*u*p*v1+p*p*v2;};
+          x=q(bounds.x,a.cxp,a.x); y=q(bounds.y,a.cyp,a.y);
+        }
+        const rb=transformedBounds(rs,bounds); positionM=matTranslate(x-rb.x,y-rb.y);
+      }
+    }
+    const group=matMul(positionM,rs);
+    for(const it of items) applyCollectiveMatrix(it,matMul(group,bases.get(it)),render);
+  },EASINGS.linear);
+}
+function makeAnimList(a,render,warnings){
+  if(a.invalid) return [];
+  const targets=a.targetIds
+    ? a.targetIds.map(id=>render.items.get(id)).filter(Boolean)
+    : [render.labels.get(a.target)].filter(Boolean);
+  if(!targets.length){ warnings&&warnings.push(`animation targets unavailable selection “${a.target}”`); return []; }
+  if(["z","front","back","forward","backward"].includes(a.verb)){
+    const chosen=new Set(targets), others=[...render.items.values()].filter(it=>!chosen.has(it));
+    if(a.verb==="z") targets.forEach(it=>{it.layer=a.value; applyItemLayer(it);});
+    else if(a.verb==="forward"||a.verb==="backward"){
+      const d=a.verb==="forward"?1:-1; targets.forEach(it=>{it.layer+=d; applyItemLayer(it);});
+    }else if(a.verb==="front"){
+      const outside=others.length?Math.max(...others.map(it=>it.layer)):0;
+      const inside=Math.min(...targets.map(it=>it.layer)), d=outside+1-inside;
+      targets.forEach(it=>{it.layer+=d; applyItemLayer(it);});
+    }else{
+      const outside=others.length?Math.min(...others.map(it=>it.layer)):0;
+      const inside=Math.max(...targets.map(it=>it.layer)), d=outside-1-inside;
+      targets.forEach(it=>{it.layer+=d; applyItemLayer(it);});
+    }
+    return [];
+  }
+  return targets.map(it=>makeItemAnim(a,render,warnings,it)).filter(Boolean);
+}
+function makePhaseAnimList(ph,render,warnings){
+  const geometric=new Set(["move","path","translate","scale","rotate"]), groups=new Map(), consumed=new Set();
+  for(const a of ph.anims){
+    if(a.invalid||!a.target.startsWith("@")||!geometric.has(a.verb)) continue;
+    const key=(a.targetIds||[]).slice().sort((x,y)=>x-y).join(",");
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(a); consumed.add(a);
+  }
+  const out=[];
+  for(const anims of groups.values()){
+    const tw=makeSelectionTween(anims,render,warnings); if(tw) out.push(tw);
+  }
+  for(const a of ph.anims) if(!consumed.has(a)) out.push(...makeAnimList(a,render,warnings));
+  return out;
 }
 function currentScale(render){ const r=render.root.getBoundingClientRect(); return r.width/SW || 1; }
 function liftOutOfFlow(it,render){
@@ -2143,9 +2500,17 @@ class Player{
   }
   get stepCount(){ return this.def.steps.length; }
 
+  applyTagOps(ph){
+    for(const op of ph.tagOps||[]) for(const id of op.targetIds||[]){
+      const it=this.render.items.get(id); if(!it) continue;
+      for(const tag of op.tags){ if(op.action==="add") it.tags.add(tag); else it.tags.delete(tag); }
+    }
+  }
+
   applyPhaseInstant(ph){
+    this.applyTagOps(ph);
     for(const id of ph.reveals){ const it=this.render.items.get(id); it&&setVisible(it,true); }
-    for(const a of ph.anims){ const tw=makeAnim(a,this.render); tw&&tw.finish(); }
+    for(const tw of makePhaseAnimList(ph,this.render)) tw.finish();
   }
   jumpToStep(target){                      // instant, deterministic
     for(let s=this.step+1; s<=target && s<this.stepCount; s++)
@@ -2157,11 +2522,12 @@ class Player{
     this.busy=true; this.ff=false; this.step=s;
     for(const ph of this.def.steps[s]){
       if(this.ff){ this.applyPhaseInstant(ph); continue; }
+      this.applyTagOps(ph);
       for(const id of ph.reveals){
         const it=this.render.items.get(id);
         if(it){ setVisible(it,true); if(!it.shape){ it.el.animate([{opacity:0},{opacity:1}],{duration:220}); } }
       }
-      const tws=ph.anims.map(a=>makeAnim(a,this.render)).filter(Boolean);
+      const tws=makePhaseAnimList(ph,this.render);
       this.live=tws;
       await Promise.all(tws.map(t=>t.start()));
       this.live=[];
@@ -3466,6 +3832,20 @@ Each press of the spacebar reveals the next chunk:
 !anim dot path (0.45, 0.95) (0.15, 0.55) 1.2s
 !anim arr exit slidedown 0.6s
 !anim cap textsize 40px 0.7s
+---
+### Named styles and temporary tag groups
+!style process {fill=#0097eb, stroke=#14324a, thick=4, round=20, textcolor=white, size=25}
+[lex:front_end] {$process} !rect (120,230) (260,85) **Lexical Analyzer**
+[parser:front_end] {$process, fill=#e2a84b} !rect (440,230) (260,85) **Parser**
+[optimizer:front_end] {$process, fill=#8a5fbf} !rect (760,230) (260,85) **Optimizer**
+@(170,390) A tag selection moves and scales as one temporary unit.
+...
+!anim @front_end move (180,180) 0.7s
+!anim @front_end scale 1.15 0.7s
+>>>
+!tag optimizer remove front_end
+>>>
+!anim @front_end rotate 8 0.5s
 ---
 ### Image animations
 [pic] @(0.36, 0.22) {w=0.28} ![specimen](${DEMO_IMG})
