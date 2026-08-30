@@ -100,6 +100,26 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .dfield textarea{min-height:92px;resize:vertical;font-family:var(--mono)}
 .dfield input:focus,.dfield select:focus,.dfield textarea:focus{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
 .drow{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
+.color-card{width:min(610px,94vw)}
+.color-section+.color-section{margin-top:18px}
+.color-section h4{margin:0 0 9px;color:var(--chrome-dim);font:700 10px/1 var(--ui);letter-spacing:.08em;text-transform:uppercase}
+.color-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.color-choice{display:flex;align-items:center;gap:9px;min-width:0;padding:8px;border:1px solid var(--line);border-radius:7px;background:var(--ink);color:var(--chrome-text);font:12px var(--ui);text-align:left;cursor:pointer}
+.color-choice:hover,.color-choice:focus-visible{border-color:var(--amber);outline:none;background:var(--panel2)}
+.color-chip{width:24px;height:24px;flex:0 0 24px;border:1px solid rgba(255,255,255,.28);border-radius:5px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.16)}
+.color-choice-text{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.color-choice-name{display:block;font-weight:650}
+.color-choice-value{display:block;color:var(--chrome-dim);font:10px var(--mono)}
+.color-key{flex:0 0 auto;color:var(--amber);font:10px var(--mono)}
+.color-custom{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:8px;align-items:center}
+.color-custom input[type="color"]{width:42px;height:36px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--ink);cursor:pointer}
+.color-custom input[type="text"]{width:100%;height:36px;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--ink);color:var(--chrome-text);font:13px var(--mono);outline:none}
+.color-custom input[type="text"]:focus{border-color:var(--amber)}
+.color-error{min-height:16px;margin-top:5px;color:#e58383;font-size:11px}
+.color-tip{display:none;position:fixed;z-index:140;align-items:center;gap:8px;max-width:280px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--chrome-text);box-shadow:0 8px 24px rgba(0,0,0,.45);font:11px var(--mono);pointer-events:none}
+.color-tip.on{display:flex}
+.color-tip .color-chip{width:22px;height:22px;flex-basis:22px}
+@media (max-width:620px){.color-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* ---------- editor layout ---------- */
 .split{display:flex;flex:1;min-height:0;--edw:44%}
@@ -317,6 +337,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <button class="mitem" data-ins="video">Video…</button>
     <button class="mitem" data-ins="audio">Audio…</button>
     <button class="mitem" data-ins="link">Link…</button>
+    <button class="mitem" id="miTextColor">Text Color…</button>
     <button class="mitem" data-ins="table">Table…</button>
     <button class="mitem" data-ins="chart">Chart…</button>
     <div class="msep"></div>
@@ -392,6 +413,18 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 <div class="dlg" id="dlg"><div class="dcard"><h3 id="dlgTitle"></h3><div id="dlgBody"></div>
   <div class="drow"><button class="btn" id="dlgCancel">Cancel</button><button class="btn primary" id="dlgOk">Insert</button></div>
 </div></div>
+<div class="dlg" id="colorDlg" aria-hidden="true"><div class="dcard color-card" role="dialog" aria-modal="true" aria-labelledby="colorDlgTitle">
+  <h3 id="colorDlgTitle">Text color</h3>
+  <div class="color-section"><h4>Quick colors</h4><div class="color-grid" id="quickColors"></div></div>
+  <div class="color-section" id="paletteSection"><h4>Document palette</h4><div class="color-grid" id="paletteColors"></div></div>
+  <div class="color-section"><h4>Custom color</h4><div class="color-custom">
+    <input type="color" id="colorNative" value="#a0b3c9" aria-label="Choose custom color">
+    <input type="text" id="colorValue" value="#A0B3C9" aria-label="Custom CSS color" placeholder="#A0B3C9, crimson, rgb(…)" spellcheck="false">
+    <button class="btn primary" id="colorApply">Apply</button>
+  </div><div class="color-error" id="colorError" role="status"></div></div>
+  <div class="drow"><button class="btn" id="colorCancel">Cancel</button></div>
+</div></div>
+<div class="color-tip" id="colorTip" role="tooltip"><span class="color-chip"></span><span class="color-tip-text"></span></div>
 
 <div class="help" id="help">
   <div class="card">
@@ -404,6 +437,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>Cmd/Ctrl + B / I / U</td><td>Make the highlighted editor text bold, italic, or underlined.</td></tr>
       <tr><td>Cmd/Ctrl + S</td><td>Download the current presentation.</td></tr>
       <tr><td>Cmd/Ctrl + Z / Y</td><td>Undo or redo. Copy, cut, paste, and browser Find keep their standard shortcuts.</td></tr>
+      <tr><td>Cmd/Ctrl + 1…9</td><td>Apply the correspondingly numbered document-palette color while the editor has focus.</td></tr>
     </table>
 
     <h3>Structure</h3>
@@ -414,6 +448,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!import(theme.psl)</td><td>Splice a PSL template file in at this point — perfect for shared <code>!set</code>/<code>!all</code> house styles. Fetched relative to the page (CORS applies); imports may nest but cannot add slides.</td></tr>
       <tr><td>[shown text](https://…)<br>[](https://…)</td><td>Inline link, opens in a new tab. Leave the shown text blank to display the URL. Balanced parentheses are allowed inside the URL.</td></tr>
       <tr><td>first line{{br}}second line</td><td>Force a line break without starting a new text item or bullet. Other safe inline controls: <code>{{wbr}}</code>, <code>{{nbsp}}</code>, and <code>{{sub|text}}</code>, <code>{{sup|text}}</code>, <code>{{mark|text}}</code>, <code>{{u|text}}</code>, <code>{{s|text}}</code>, <code>{{small|text}}</code>, <code>{{nobr|text}}</code>.</td></tr>
+      <tr><td>{{color=#d33|red text}}<br>{{color=warning|named color}}</td><td>Color part of a line with any CSS color or a document-palette name. Use <b>Insert ▸ Text Color…</b> to apply a color to highlighted editor text.</td></tr>
       <tr><td>Normal {{size=44px|large}} normal</td><td>Change font size within a line. Units may be <code>px</code>, <code>pt</code>, <code>em</code>, <code>rem</code>, or <code>%</code>; a number without a unit means pixels. Other inline markup works inside the resized text.</td></tr>
       <tr><td>!foreach i 1 6 [step] … !endfor</td><td>Repeat the body once per value (inclusive; step may be fractional or negative; nestable). <code>\${i}</code> works everywhere in the body — labels, coordinates, durations — so one loop can build and animate a whole family of elements. Use <code>\${…}</code> for computed bounds.</td></tr>
       <tr><td># Title / ## Subtitle</td><td>Big centered title and subtitle (title slides).</td></tr>
@@ -430,6 +465,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <h3>Variables, expressions &amp; deck styling</h3>
     <table>
       <tr><td>!set test 5</td><td>Define any variable. Numeric values become numbers; anything else is a string. Reserved style names configure the deck: <code>bg</code> <code>dim</code> <code>tint</code> <code>color</code> <code>accent</code> <code>linkcolor</code> <code>visitedlinkcolor</code> <code>font</code> <code>headfont</code> (e.g. <code>!set font Georgia, serif</code>).</td></tr>
+      <tr><td>!set palette ocean #A0B3C9<br>!set palette warning #d33</td><td>Define reusable document colors. Names work anywhere a color is accepted; declaration order assigns Cmd/Ctrl+1 through 9 and fixes the palette colors at the front of the color picker.</td></tr>
       <tr><td>The value is \${test}</td><td><code>\${…}</code> anywhere in slide text substitutes an expression: variables, numbers, strings, <code>+ - * / % ( )</code>. <code>+</code> concatenates strings.</td></tr>
       <tr><td>\${test*2 + 1}</td><td>Math works, with normal precedence.</td></tr>
       <tr><td>\${test = test + 1}</td><td>Assignment: prints the new value <i>and</i> updates the variable. Expressions run at parse time, top to bottom, so results are deterministic.</td></tr>
@@ -588,10 +624,29 @@ function renderInlineLinks(h){
   return out+h.slice(copiedThrough);
 }
 
+function isCssColor(value){
+  const v=String(value||"").trim();
+  if(!v) return false;
+  if(typeof CSS!=="undefined"&&CSS.supports) return CSS.supports("color",v);
+  return /^(?:#[0-9a-f]{3,8}|[a-z][\w-]*|(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color)\([^)]*\))$/i.test(v);
+}
+const PALETTE_MAP_CACHE=new WeakMap();
+function paletteColorMap(palette){
+  if(palette&&PALETTE_MAP_CACHE.has(palette)) return PALETTE_MAP_CACHE.get(palette);
+  const map={};
+  for(const entry of palette||[]) map[String(entry.name).toLowerCase()]=entry.value;
+  if(palette&&typeof palette==="object") PALETTE_MAP_CACHE.set(palette,map);
+  return map;
+}
+function resolvePaletteColor(value,palette){
+  const v=String(value||"").trim(), mapped=paletteColorMap(palette)[v.toLowerCase()];
+  return mapped||v;
+}
+
 /* Render a small, explicit allowlist of inline controls. The scanner skips
    generated HTML tags, so control-like text inside a link URL cannot alter an
    attribute. Paired controls may contain links, emphasis, or other controls. */
-function renderInlineControls(h){
+function renderInlineControls(h,palette){
   const tags={sub:"sub",sup:"sup",mark:"mark",u:"u",s:"s",small:"small"};
   let out="";
   for(let i=0;i<h.length;){
@@ -632,11 +687,15 @@ function renderInlineControls(h){
     if(close<0){ out+=h.slice(i); break; }
 
     const name=h.slice(i+2,sep).trim().toLowerCase();
-    const content=renderInlineControls(h.slice(sep+1,close));
+    const content=renderInlineControls(h.slice(sep+1,close),palette);
     const size=/^size\s*=\s*((?:\d+(?:\.\d*)?|\.\d+)(?:px|pt|em|rem|%)?)$/i.exec(name);
+    const color=/^color\s*=\s*(.+)$/i.exec(name);
     if(size){
       const value=/[a-z%]$/i.test(size[1])?size[1]:size[1]+"px";
       out+='<span class="inline-size" style="font-size:'+value+'">'+content+"</span>";
+    }else if(color){
+      const value=resolvePaletteColor(color[1],palette);
+      out+=isCssColor(value)?'<span class="inline-color" style="color:'+escapeAttr(value)+'">'+content+"</span>":h.slice(i,close+2);
     }else if(tags[name]){
       out+="<"+tags[name]+">"+content+"</"+tags[name]+">";
     }else if(name==="nobr"){
@@ -670,7 +729,7 @@ function renderMath(tex, display){
    is not followed by whitespace, the closing $ is not preceded by
    whitespace, and the closing $ is not immediately followed by a digit
    (so "$5 and $10" or "from $3 to $8" never turn into math). */
-function inlineMd(s){
+function inlineMd(s,palette){
   const stash=[];
   const keep=html=>{ stash.push(html); return "\u0000"+(stash.length-1)+"\u0000"; };
   let raw=s;
@@ -682,7 +741,7 @@ function inlineMd(s){
   // entities stay usable: &nbsp; &mdash; &rarr; &#8594; &#x1F600; ... (never tags)
   h = h.replace(/&amp;(#\d{1,7}|#x[0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,30});/g,"&$1;");
   h = renderInlineLinks(h);
-  h = renderInlineControls(h);
+  h = renderInlineControls(h,palette);
   h = h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
   h = h.replace(/\*([^*]+)\*/g,"<i>$1</i>");
   h = h.replace(/\u0000(\d+)\u0000/g,(_,i)=>stash[+i]);
@@ -787,9 +846,33 @@ function expandImports(bodyText, warnings, slideIndex, depth){
   return out.join("\n");
 }
 
+function readDocumentPalette(text,warnings=[]){
+  const entries=[], byName=new Map();
+  let inFence=false;
+  text.replace(/\r\n?/g,"\n").split("\n").forEach((raw,i)=>{
+    const line=raw.trim();
+    if(inFence){ if(line.startsWith("```")) inFence=false; return; }
+    if(FENCE_OPEN.test(line)){ inFence=true; return; }
+    if(!line||line.startsWith("%")||!/^!set\s+palette\b/i.test(line)) return;
+    const m=line.match(/^!set\s+palette\s+([A-Za-z_]\w*)\s+(.+)$/i);
+    if(!m){ warnings.push(`line ${i+1}: !set palette needs a name and color`); return; }
+    const name=m[1], value=m[2].trim().replace(/^(["'])(.*)\1$/,"$2");
+    if(!isCssColor(value)){ warnings.push(`line ${i+1}: invalid palette color “${value}”`); return; }
+    const key=name.toLowerCase();
+    if(byName.has(key)){
+      warnings.push(`line ${i+1}: duplicate palette name “${name}” — the later value is used`);
+      byName.get(key).value=value;
+    }else{
+      const entry={name,value}; entries.push(entry); byName.set(key,entry);
+    }
+  });
+  return entries;
+}
+
 function parseScript(text){
   const warnings=[];
-  const vars={ __labels:{}, slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI, nbsp:"\u00A0" };
+  const vars={ __labels:{}, __palette:readDocumentPalette(text,warnings),
+    slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI, nbsp:"\u00A0" };
   // Hidden (!---) "pocket" slides ARE parsed and executed — their variable
   // math affects later slides — but presentation skips them when advancing.
   const slabs=splitSlides(text);
@@ -985,7 +1068,7 @@ const NUM_PATTERN=String.raw`[+-]?(?:\d+(?:\.\d*)?|\.\d+)`;
 const STRICT_NUMBER=new RegExp(`^${NUM_PATTERN}$`);
 const RE_POS   = new RegExp(`^@\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\)\\s*`);
 const RE_LABEL = /^\[([A-Za-z_][\w-]*)\](?!\()\s*/;   // (?!\() so [text](url) links survive
-const RE_STYLE = /^\{([^}]*)\}\s*/;
+const RE_STYLE = /^\{(?!\{)([^}]*)\}\s*/;
 const RE_PAIR  = new RegExp(`\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\)`,"g");
 const RE_DUR   = /(?:^|\s)(\S+)\s*s\s*$/i;
 
@@ -1162,6 +1245,9 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       addItem({id:nextId++, kind:"table", head, aligns, rows, label, style, pos});
       continue;
     }
+
+    // Palette declarations are collected document-wide before slide parsing.
+    if(/^!set\s+palette\b/i.test(line)) continue;
 
     // --- variables: !set name value (value already ${}-substituted) ---
     if((m=line.match(/^!set\s+([A-Za-z_]\w*)\s*(.*)$/i))){
@@ -1392,7 +1478,7 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
       return rm[2]!=null
         ? {target,verb,dur,deg,hasOrigin:true,x:cvx(parseFloat(rm[2]),vars),y:cvy(parseFloat(rm[3]),vars)}
         : {target,verb,dur,deg,hasOrigin:false}; }
-    case "color": return args ? {target,verb,dur,color:args} : bad("color needs a value");
+    case "color": return args ? {target,verb,dur,color:resolvePaletteColor(args,vars.__palette)} : bad("color needs a value");
     case "textsize": return args ? {target,verb,dur,size:args} : bad("textsize needs a size");
     default: return bad(`unknown animation “${verb}”`);
   }
@@ -1446,18 +1532,19 @@ const SVGNS="http://www.w3.org/2000/svg";
 
 function renderSlide(slideDef, opts){
   opts = opts || {};
-  const st = opts.settings || {};
+  const st = opts.settings || {}, palette=st.__palette||[];
+  const pc=value=>resolvePaletteColor(value,palette);
   const root=document.createElement("div"); root.className="slide";
 
   // deck-wide typography & colors (per-slide styles still override per element)
   if(st.font)     root.style.fontFamily=st.font;
   if(st.headfont) root.style.setProperty("--slide-display", st.headfont);
-  if(st.accent)   root.style.setProperty("--slide-accent", st.accent);
-  if(st.linkcolor) root.style.setProperty("--slide-link-color", st.linkcolor);
-  if(st.visitedlinkcolor) root.style.setProperty("--slide-visited-link-color", st.visitedlinkcolor);
+  if(st.accent)   root.style.setProperty("--slide-accent", pc(st.accent));
+  if(st.linkcolor) root.style.setProperty("--slide-link-color", pc(st.linkcolor));
+  if(st.visitedlinkcolor) root.style.setProperty("--slide-visited-link-color", pc(st.visitedlinkcolor));
   if(st.color){
-    root.style.color=st.color;
-    root.style.setProperty("--h2c", `color-mix(in srgb, ${st.color} 72%, transparent)`);
+    const color=pc(st.color); root.style.color=color;
+    root.style.setProperty("--h2c", `color-mix(in srgb, ${color} 72%, transparent)`);
   }
 
   // background: a slide's own !bg fully overrides the deck default
@@ -1469,11 +1556,11 @@ function renderSlide(slideDef, opts){
     if(st.tint)      bg.tint = st.tint;
   }
   if(bg){
-    if(bg.color) root.style.background=bg.color;
+    if(bg.color) root.style.background=pc(bg.color);
     if(bg.image) root.style.backgroundImage=`url("${bg.image.replace(/"/g,'%22')}")`;
     if(bg.dim>0){
       const scrim=document.createElement("div"); scrim.className="bg-scrim";
-      scrim.style.background=bg.tint||"#000";
+      scrim.style.background=bg.tint?pc(bg.tint):"#000";
       scrim.style.opacity=String(bg.dim);
       root.appendChild(scrim);
     }
@@ -1493,14 +1580,14 @@ function renderSlide(slideDef, opts){
   for(const def of slideDef.items){
     const it={def, el:null, shape:null, coords:def.coords?def.coords.map(c=>c.slice()):null,
               r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false, scale:1, rot:0, rotOrigin:null};
-    if(["h1","h2","h3","p","li"].includes(def.kind))      buildText(it,flow,absLayer);
+    if(["h1","h2","h3","p","li"].includes(def.kind))      buildText(it,flow,absLayer,palette);
     else if(def.kind==="img")                             buildImg(it,flow,absLayer);
-    else if(def.kind==="code")                            buildCode(it,flow,absLayer);
-    else if(def.kind==="table")                           buildTable(it,flow,absLayer);
+    else if(def.kind==="code")                            buildCode(it,flow,absLayer,palette);
+    else if(def.kind==="table")                           buildTable(it,flow,absLayer,palette);
     else if(def.kind==="embed")                           buildEmbed(it,flow,absLayer,opts);
     else if(def.kind==="video"||def.kind==="audio")       buildMedia(it,flow,absLayer,opts);
-    else if(def.kind==="chart")                           buildChart(it,svg);
-    else                                                  buildShape(it,svg);
+    else if(def.kind==="chart")                           buildChart(it,svg,palette);
+    else                                                  buildShape(it,svg,palette);
     if(def.style.rotate!=null){ const rv=parseFloat(def.style.rotate); if(!isNaN(rv)){ it.rot=rv; applyTransform(it); } }
     setVisible(it,false);
     items.set(def.id,it);
@@ -1509,16 +1596,16 @@ function renderSlide(slideDef, opts){
   return {root,flow,absLayer,svg,items,labels,def:slideDef};
 }
 
-function applyTextStyle(el,style){
+function applyTextStyle(el,style,palette){
   if(style.size)  el.style.fontSize=sizeToPx(style.size,SW)+"px";
-  if(style.color) el.style.color=style.color;
+  if(style.color) el.style.color=resolvePaletteColor(style.color,palette);
   if(style.font)  el.style.fontFamily=style.font;
   if(style.align) el.style.textAlign=style.align;
   if(style.w)     el.style.width=sizeToPx(style.w,SW)+"px";
   if(style.opacity) el.style.opacity=style.opacity;
 }
 const LANG_ALIASES={"c++":"cpp","h":"cpp","hpp":"cpp","py":"python","js":"javascript","ts":"typescript","sh":"bash","shell":"bash"};
-function buildCode(it,flow,absLayer){
+function buildCode(it,flow,absLayer,palette){
   const d=it.def, pre=document.createElement("pre"); pre.className="s-code";
   const codeEl=document.createElement("code"); codeEl.className="hljs";
   let html=null;
@@ -1529,16 +1616,16 @@ function buildCode(it,flow,absLayer){
   if(html!=null) codeEl.innerHTML=html;
   else codeEl.textContent=d.code;          // no hljs / unknown language -> plain
   pre.appendChild(codeEl);
-  applyTextStyle(pre,d.style);
+  applyTextStyle(pre,d.style,palette);
   placeItem(it,flow,absLayer,pre);
 }
-function buildTable(it,flow,absLayer){
+function buildTable(it,flow,absLayer,palette){
   const d=it.def, tb=document.createElement("table"); tb.className="s-table";
   const mkRow=(tag,cells)=>{
     const tr=document.createElement("tr");
     cells.forEach((c,ci)=>{
       const el=document.createElement(tag);
-      el.innerHTML=inlineMd(c);
+      el.innerHTML=inlineMd(c,palette);
       const al=d.aligns&&d.aligns[ci]; if(al) el.style.textAlign=al;
       tr.appendChild(el);
     });
@@ -1548,7 +1635,7 @@ function buildTable(it,flow,absLayer){
   const tbody=document.createElement("tbody");
   d.rows.forEach(r=>tbody.appendChild(mkRow("td",r)));
   tb.appendChild(tbody);
-  applyTextStyle(tb,d.style);
+  applyTextStyle(tb,d.style,palette);
   placeItem(it,flow,absLayer,tb);
 }
 function placeItem(it,flow,absLayer,el){
@@ -1562,16 +1649,16 @@ function placeItem(it,flow,absLayer,el){
     flow.appendChild(el); it.el=el; it.inner=el;
   }
 }
-function buildText(it,flow,absLayer){
+function buildText(it,flow,absLayer,palette){
   const d=it.def, el=document.createElement("div");
   if(d.kind==="li"){
     el.className=`s-li lv${d.lv}`;
-    el.innerHTML=`<span class="mk">${d.lv===0?"▸":"–"}</span><span class="tx">${inlineMd(d.text)}</span>`;
+    el.innerHTML=`<span class="mk">${d.lv===0?"▸":"–"}</span><span class="tx">${inlineMd(d.text,palette)}</span>`;
   }else{
     el.className={h1:"s-h1",h2:"s-h2",h3:"s-h3",p:"s-p"}[d.kind];
-    el.innerHTML=inlineMd(d.text);
+    el.innerHTML=inlineMd(d.text,palette);
   }
-  applyTextStyle(el,d.style);
+  applyTextStyle(el,d.style,palette);
   placeItem(it,flow,absLayer,el);
 }
 function buildImg(it,flow,absLayer){
@@ -1637,12 +1724,13 @@ function buildMedia(it,flow,absLayer,opts){
   }
   placeItem(it,flow,absLayer,box);
 }
-function buildShape(it,svg){
+function buildShape(it,svg,palette){
   const d=it.def, st=d.style;
   const isBox = d.kind==="textbox";
-  const stroke = st.color || st.stroke || st.border || (isBox ? "none" : "#232830");
+  const pc=value=>resolvePaletteColor(value,palette);
+  const stroke = pc(st.color || st.stroke || st.border || (isBox ? "none" : "#232830"));
   const thick  = st.thick!=null ? parseFloat(st.thick) : (isBox ? 0 : 4);
-  const fill   = st.fill || (isBox ? "rgba(31,111,107,0.12)" : "none");
+  const fill   = pc(st.fill || (isBox ? "rgba(31,111,107,0.12)" : "none"));
   const g=document.createElementNS(SVGNS,"g");
   it.stroke=stroke; it.thick=thick;
   if(d.kind==="line"||d.kind==="arrow"){
@@ -1653,13 +1741,13 @@ function buildShape(it,svg){
   }else if(d.kind==="polygon"||d.kind==="polyline"){
     const sh=document.createElementNS(SVGNS,d.kind);
     sh.setAttribute("stroke",stroke); sh.setAttribute("stroke-width",thick);
-    sh.setAttribute("fill", d.kind==="polyline" ? (st.fill||"none") : fill);
+    sh.setAttribute("fill", d.kind==="polyline" ? pc(st.fill||"none") : fill);
     sh.setAttribute("stroke-linejoin","round");
     g.appendChild(sh); it.shapeEl=sh;
   }else if(d.kind==="curve"){
     const sh=document.createElementNS(SVGNS,"path");
     sh.setAttribute("stroke",stroke); sh.setAttribute("stroke-width",thick);
-    sh.setAttribute("fill",st.fill||"none"); sh.setAttribute("stroke-linecap","round");
+    sh.setAttribute("fill",pc(st.fill||"none")); sh.setAttribute("stroke-linecap","round");
     g.appendChild(sh); it.shapeEl=sh;
   }else{
     const tag = isBox ? "rect" : {circle:"circle",ellipse:"ellipse",rect:"rect"}[d.kind];
@@ -1673,9 +1761,9 @@ function buildShape(it,svg){
     const fo=document.createElementNS(SVGNS,"foreignObject");
     const body=document.createElement("div"); body.className="box-text";
     const span=document.createElement("span"); span.className="box-inner";
-    span.innerHTML=inlineMd(d.text);
+    span.innerHTML=inlineMd(d.text,palette);
     body.appendChild(span);
-    body.style.color = st.textcolor || st.color2 || (isBox ? "#233" : "#232830");
+    body.style.color = pc(st.textcolor || st.color2 || (isBox ? "#233" : "#232830"));
     if(st.size)  body.style.fontSize=sizeToPx(st.size,SW)+"px";
     body.style.textAlign = st.align||"center";
     body.style.alignItems = {top:"flex-start",middle:"center",bottom:"flex-end"}[st.valign]||"center";
@@ -1693,12 +1781,13 @@ function buildShape(it,svg){
    palette), size= (label text size), thick= (line-chart stroke), values=0
    (hide numeric value labels). */
 const CHART_PALETTE=["#1f6f6b","#d97b4a","#4a6fb3","#c9a227","#8a5fbf","#3f985c","#c05a76","#6b7b8c"];
-function buildChart(it,svg){
+function buildChart(it,svg,documentPalette){
   const d=it.def, st=d.style, data=d.data, n=data.length;
+  const pc=value=>resolvePaletteColor(value,documentPalette);
   const g=document.createElementNS(SVGNS,"g");
-  const ink = st.color || "#232830";
-  const palette = st.colors ? String(st.colors).replace(/^\(|\)$/g,"").split(",").map(s=>s.trim()).filter(Boolean)
-                : st.fill   ? [st.fill]
+  const ink = pc(st.color || "#232830");
+  const palette = st.colors ? String(st.colors).replace(/^\(|\)$/g,"").split(",").map(s=>pc(s.trim())).filter(Boolean)
+                : st.fill   ? [pc(st.fill)]
                 : CHART_PALETTE;
   const col=i=>palette[i%palette.length];
   const fs = st.size ? sizeToPx(st.size,SH) : 20;
@@ -2125,10 +2214,110 @@ function formatEditorSelection(open,close){
   const selected=srcEl.value.slice(a,b);
   replaceEditorRange(a,b,open+selected+close,a+open.length,a+open.length+selected.length);
 }
+const COLOR_VALUE_SOURCE=String.raw`(?:#[0-9a-fA-F]{3,8}\b|(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color)\([^)]*\)|[A-Za-z_][\w-]*)`;
+const STANDARD_QUICK_COLORS=["#000000","#ffffff","#d32f2f","#f57c00","#fbc02d","#388e3c","#1976d2","#7b1fa2","#757575"];
+const COLOR_CANONICAL_CACHE=new Map();
+let editorColorOccurrences=[], quickEditorColors=[], pickerSelection=null, colorMoveFrame=null;
+function canonicalCssColor(value){
+  const raw=String(value||"").trim().toLowerCase();
+  if(COLOR_CANONICAL_CACHE.has(raw)) return COLOR_CANONICAL_CACHE.get(raw);
+  let canonical=null;
+  if(isCssColor(value)){
+    const c=resolveColor(value);
+    canonical=`${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${Number(c.a).toFixed(4)}`;
+  }
+  COLOR_CANONICAL_CACHE.set(raw,canonical); return canonical;
+}
+function collectDocumentColors(text,palette){
+  const found=[], seenRanges=new Set(), pmap=paletteColorMap(palette);
+  const add=(raw,start,source)=>{
+    let value=String(raw||""), lead=value.match(/^\s*/)[0].length;
+    value=value.trim().replace(/^(["'])(.*)\1$/,"$2"); start+=lead;
+    const resolved=resolvePaletteColor(value,palette), canonical=canonicalCssColor(resolved);
+    if(!canonical) return;
+    const end=start+value.length, range=start+":"+end;
+    if(seenRanges.has(range)) return; seenRanges.add(range);
+    found.push({raw:value,value:resolved,canonical,start,end,source,
+      paletteAlias:Object.prototype.hasOwnProperty.call(pmap,value.toLowerCase())});
+  };
+  let offset=0, inFence=false;
+  for(const rawLine of text.replace(/\r\n?/g,"\n").split("\n")){
+    const trimmed=rawLine.trim();
+    if(inFence){ if(trimmed.startsWith("```")) inFence=false; offset+=rawLine.length+1; continue; }
+    if(FENCE_OPEN.test(trimmed)){ inFence=true; offset+=rawLine.length+1; continue; }
+    if(!trimmed.startsWith("%")){
+      const patterns=[
+        {source:"inline",re:new RegExp(String.raw`\{\{color\s*=\s*(${COLOR_VALUE_SOURCE})\s*\|`,"gi")},
+        {source:"style",re:new RegExp(String.raw`\b(?:color|fill|textcolor|color2|stroke|border|tint)\s*=\s*(${COLOR_VALUE_SOURCE})`,"gi")},
+      ];
+      for(const {source,re} of patterns){ let m; while((m=re.exec(rawLine))){ const rel=m.index+m[0].indexOf(m[1]); add(m[1],offset+rel,source); } }
+      let m;
+      const many=/\bcolors\s*=\s*\(([^)]*)\)/gi;
+      while((m=many.exec(rawLine))){
+        let part, re=new RegExp(COLOR_VALUE_SOURCE,"gi");
+        while((part=re.exec(m[1]))) add(part[0],offset+m.index+m[0].indexOf(m[1])+part.index,"style");
+      }
+      const pal=rawLine.match(/^\s*!set\s+palette\s+[A-Za-z_]\w*\s+(.+)$/i);
+      if(pal) add(pal[1],offset+rawLine.indexOf(pal[1]),"palette");
+      const setting=rawLine.match(/^\s*!set\s+(?:bg|color|accent|linkcolor|visitedlinkcolor|tint)\s+(.+)$/i);
+      if(setting) add(setting[1],offset+rawLine.indexOf(setting[1]),"setting");
+      const bg=rawLine.match(/!bg\(\s*([^)]*)\s*\)/i);
+      if(bg) add(bg[1],offset+rawLine.indexOf(bg[1]),"background");
+      const anim=rawLine.match(/!anim\s+\S+\s+color\s+(.+?)(?:\s+[0-9.]+s)?\s*$/i);
+      if(anim) add(anim[1],offset+rawLine.indexOf(anim[1]),"animation");
+      // Standalone hex colors get hover previews but do not influence the
+      // picker's frequency-ranked document colors.
+      let hex, hexRe=/#[0-9a-f]{3,8}\b/gi;
+      while((hex=hexRe.exec(rawLine))) add(hex[0],offset+hex.index,"literal");
+    }
+    offset+=rawLine.length+1;
+  }
+  return found.sort((a,b)=>a.start-b.start);
+}
+function buildQuickColors(text,palette,occurrences){
+  const choices=[], used=new Set();
+  const push=choice=>{ const key=canonicalCssColor(choice.value); if(!key||used.has(key)) return false;
+    used.add(key); choices.push({...choice,canonical:key}); return true; };
+  palette.forEach((entry,i)=>push({name:entry.name,value:entry.value,insert:entry.name,palette:true,shortcut:i<9?i+1:null}));
+  const counts=new Map();
+  for(const o of occurrences){
+    if(o.source==="palette"||o.source==="literal"||o.paletteAlias||used.has(o.canonical)) continue;
+    const rec=counts.get(o.canonical);
+    if(rec) rec.count++;
+    else counts.set(o.canonical,{name:o.raw,value:o.value,insert:o.raw,count:1,first:o.start});
+  }
+  [...counts.values()].sort((a,b)=>b.count-a.count||a.first-b.first).forEach(c=>{ if(choices.length<9) push(c); });
+  STANDARD_QUICK_COLORS.forEach(value=>{ if(choices.length<9) push({name:value,value,insert:value,standard:true}); });
+  return choices.slice(0,9);
+}
+function refreshEditorColorTools(){
+  const palette=deck.settings?.__palette||[];
+  editorColorOccurrences=collectDocumentColors(srcEl.value,palette);
+  quickEditorColors=buildQuickColors(srcEl.value,palette,editorColorOccurrences);
+}
+function colorOccurrenceAt(pos){
+  return editorColorOccurrences.find(o=>pos>=o.start&&pos<=o.end)||null;
+}
+function applyEditorColor(color,start=srcEl.selectionStart,end=srcEl.selectionEnd){
+  const occurrence=editorColorOccurrences.find(o=>(start===end&&start>=o.start&&start<=o.end)||(start===o.start&&end===o.end));
+  if(occurrence){ replaceEditorRange(occurrence.start,occurrence.end,color,occurrence.start,occurrence.start+color.length); return; }
+  if(start!==end){
+    const selected=srcEl.value.slice(start,end), open=`{{color=${color}|`;
+    replaceEditorRange(start,end,open+selected+"}}",start+open.length,start+open.length+selected.length);
+  }else{
+    const open=`{{color=${color}|`;
+    replaceEditorRange(start,end,open+"}}",start+open.length,start+open.length);
+  }
+}
 srcEl.addEventListener("keydown",e=>{
   if((e.metaKey||e.ctrlKey)&&!e.altKey){
     const key=e.key.toLowerCase();
     // Copy, cut, paste, undo, and find retain their native browser behavior.
+    if(!e.shiftKey&&/^[1-9]$/.test(key)){
+      const entry=(deck.settings?.__palette||[])[Number(key)-1];
+      if(entry){ e.preventDefault(); applyEditorColor(entry.name); }
+      return;
+    }
     if(key==="b"||key==="i"||key==="u"){
       e.preventDefault();
       if(key==="b") formatEditorSelection("**","**");
@@ -2171,6 +2360,7 @@ function slideIndexAt(pos){
 function refresh(){
   deck=parseScript(srcEl.value);
   slideRanges=computeSlideRanges(srcEl.value);
+  refreshEditorColorTools();
   selected=clamp(selected,0,deck.slides.length-1);
   warnbar.className="warnbar"+(deck.warnings.length?" on":"");
   warnbar.innerHTML=deck.warnings.map(w=>"⚠ "+escapeHtml(w)).join("<br>");
@@ -2452,7 +2642,7 @@ function previewKey(i){
   // Key the resolved slide, not merely its local source slab: !all, imports,
   // earlier variables, and deck render settings can all change its output.
   const renderSettings={};
-  for(const k of ["font","headfont","accent","linkcolor","visitedlinkcolor","color","bg","dim","tint"])
+  for(const k of ["font","headfont","accent","linkcolor","visitedlinkcolor","color","bg","dim","tint","__palette"])
     if(deck.settings&&deck.settings[k]!=null) renderSettings[k]=deck.settings[k];
   return JSON.stringify([i,renderSettings,deck.slides[i]]);
 }
@@ -2890,6 +3080,108 @@ pnavBack.addEventListener("click",backStep);
 pnavForward.addEventListener("click",advance);
 $("#btnPresenterQ").addEventListener("click",openPresenterView);
 $("#miPresenter").addEventListener("click",openPresenterView);
+
+/* ---------- document-aware text color picker & editor color previews ---------- */
+const shortcutLabel=n=>(/Mac|iPhone|iPad|iPod/.test(navigator.platform)?"⌘":"Ctrl+")+n;
+function colorChoiceButton(choice,index){
+  const button=document.createElement("button"); button.type="button"; button.className="color-choice";
+  button.dataset.color=choice.insert; if(choice.palette) button.dataset.paletteName=choice.name;
+  const chip=document.createElement("span"); chip.className="color-chip"; chip.style.background=choice.value;
+  const text=document.createElement("span"); text.className="color-choice-text";
+  const name=document.createElement("span"); name.className="color-choice-name"; name.textContent=choice.name;
+  const value=document.createElement("span"); value.className="color-choice-value"; value.textContent=choice.value;
+  text.append(name,value); button.append(chip,text);
+  if(choice.palette&&index<9){ const key=document.createElement("span"); key.className="color-key"; key.textContent=shortcutLabel(index+1); button.appendChild(key); }
+  button.title=`Apply ${choice.name} (${choice.value})`;
+  button.addEventListener("click",()=>{ const sel=pickerSelection; closeColorPicker(false); applyEditorColor(choice.insert,sel.start,sel.end); });
+  return button;
+}
+function renderColorPicker(){
+  refreshEditorColorTools();
+  const quick=$("#quickColors"), paletteBox=$("#paletteColors"), palette=deck.settings?.__palette||[];
+  quick.innerHTML=""; quickEditorColors.forEach((choice,i)=>quick.appendChild(colorChoiceButton(choice,choice.shortcut?choice.shortcut-1:99)));
+  paletteBox.innerHTML=""; palette.forEach((entry,i)=>paletteBox.appendChild(colorChoiceButton(
+    {name:entry.name,value:entry.value,insert:entry.name,palette:true},i)));
+  $("#paletteSection").style.display=palette.length?"":"none";
+}
+function openColorPicker(){
+  pickerSelection={start:srcEl.selectionStart,end:srcEl.selectionEnd}; renderColorPicker();
+  const dlg=$("#colorDlg"); dlg.classList.add("on"); dlg.setAttribute("aria-hidden","false");
+  $("#colorError").textContent="";
+  (dlg.querySelector(".color-choice")||$("#colorValue")).focus();
+}
+function closeColorPicker(restore=true){
+  const dlg=$("#colorDlg"); if(!dlg.classList.contains("on")) return;
+  dlg.classList.remove("on"); dlg.setAttribute("aria-hidden","true");
+  if(restore&&pickerSelection){ srcEl.focus(); srcEl.setSelectionRange(pickerSelection.start,pickerSelection.end); }
+}
+function applyCustomColor(){
+  const raw=$("#colorValue").value.trim(), resolved=resolvePaletteColor(raw,deck.settings?.__palette);
+  if(!isCssColor(resolved)){ $("#colorError").textContent="Enter a valid CSS color or document-palette name."; return; }
+  const sel=pickerSelection; closeColorPicker(false); applyEditorColor(raw,sel.start,sel.end);
+}
+$("#miTextColor").addEventListener("click",openColorPicker);
+$("#colorCancel").addEventListener("click",()=>closeColorPicker(true));
+$("#colorApply").addEventListener("click",applyCustomColor);
+$("#colorDlg").addEventListener("click",e=>{ if(e.target===$("#colorDlg")) closeColorPicker(true); });
+$("#colorNative").addEventListener("input",e=>{ $("#colorValue").value=e.target.value.toUpperCase(); $("#colorError").textContent=""; });
+$("#colorValue").addEventListener("input",e=>{
+  const v=e.target.value.trim(); if(/^#[0-9a-f]{6}$/i.test(v)) $("#colorNative").value=v;
+  $("#colorError").textContent="";
+});
+$("#colorValue").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){ e.preventDefault(); applyCustomColor(); }
+  else if(e.key==="Escape"){ e.preventDefault(); closeColorPicker(true); }
+});
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&$("#colorDlg").classList.contains("on")){ e.stopPropagation(); closeColorPicker(true); } },true);
+
+function editorTextMetrics(){
+  const cs=getComputedStyle(srcEl), canvas=editorTextMetrics.canvas||(editorTextMetrics.canvas=document.createElement("canvas"));
+  const ctx=canvas.getContext("2d"); ctx.font=cs.font;
+  return {cs,charWidth:ctx.measureText("M").width||8,lineHeight:parseFloat(cs.lineHeight)||20,tabSize:parseInt(cs.tabSize)||2};
+}
+function editorOffsetAtPoint(clientX,clientY){
+  const rect=srcEl.getBoundingClientRect(), {cs,charWidth,lineHeight,tabSize}=editorTextMetrics();
+  const x=clientX-rect.left+srcEl.scrollLeft-parseFloat(cs.paddingLeft),
+    y=clientY-rect.top+srcEl.scrollTop-parseFloat(cs.paddingTop);
+  if(x<0||y<0) return -1;
+  const lines=srcEl.value.split("\n"), row=Math.floor(y/lineHeight); if(row<0||row>=lines.length) return -1;
+  const target=x/charWidth, line=lines[row]; let col=0,i=0;
+  for(;i<line.length;i++){ const next=line[i]==="\t"?col+(tabSize-col%tabSize):col+1; if(target<(col+next)/2) break; col=next; }
+  let start=0; for(let r=0;r<row;r++) start+=lines[r].length+1;
+  return start+i;
+}
+function editorPointAtOffset(pos){
+  const rect=srcEl.getBoundingClientRect(), {cs,charWidth,lineHeight,tabSize}=editorTextMetrics();
+  const before=srcEl.value.slice(0,pos), row=(before.match(/\n/g)||[]).length, line=before.slice(before.lastIndexOf("\n")+1);
+  let col=0; for(const ch of line) col=ch==="\t"?col+(tabSize-col%tabSize):col+1;
+  return {x:rect.left+parseFloat(cs.paddingLeft)+col*charWidth-srcEl.scrollLeft,
+    y:rect.top+parseFloat(cs.paddingTop)+(row+1)*lineHeight-srcEl.scrollTop};
+}
+function hideColorTip(){ $("#colorTip").classList.remove("on"); }
+function showColorTip(occurrence,x,y){
+  const tip=$("#colorTip"), chip=tip.querySelector(".color-chip"), text=tip.querySelector(".color-tip-text");
+  chip.style.background=occurrence.value; text.textContent=occurrence.raw===occurrence.value?occurrence.raw:`${occurrence.raw} → ${occurrence.value}`;
+  tip.classList.add("on");
+  const w=tip.offsetWidth||180,h=tip.offsetHeight||40;
+  tip.style.left=Math.max(8,Math.min(innerWidth-w-8,x+13))+"px";
+  tip.style.top=Math.max(8,Math.min(innerHeight-h-8,y+16))+"px";
+}
+function showCaretColorTip(){
+  if(document.activeElement!==srcEl||srcEl.selectionStart!==srcEl.selectionEnd||$("#colorDlg").classList.contains("on")) return;
+  const occurrence=colorOccurrenceAt(srcEl.selectionStart); if(!occurrence){ hideColorTip(); return; }
+  const point=editorPointAtOffset(srcEl.selectionStart), rect=srcEl.getBoundingClientRect();
+  if(point.x<rect.left||point.x>rect.right||point.y<rect.top||point.y>rect.bottom){ hideColorTip(); return; }
+  showColorTip(occurrence,point.x,point.y);
+}
+srcEl.addEventListener("mousemove",e=>{
+  if(colorMoveFrame) cancelAnimationFrame(colorMoveFrame);
+  colorMoveFrame=requestAnimationFrame(()=>{ colorMoveFrame=null; const pos=editorOffsetAtPoint(e.clientX,e.clientY), occurrence=colorOccurrenceAt(pos);
+    occurrence?showColorTip(occurrence,e.clientX,e.clientY):hideColorTip(); });
+});
+srcEl.addEventListener("mouseleave",hideColorTip);
+srcEl.addEventListener("input",hideColorTip);
+document.addEventListener("selectionchange",showCaretColorTip);
 
 /* ---------- menubar behavior ---------- */
 document.querySelectorAll(".menu>.mbtn").forEach(b=>{
