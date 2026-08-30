@@ -35,10 +35,15 @@ button{font-family:var(--ui)}
 
 /* ---------- top bar ---------- */
 .topbar{display:flex;align-items:center;gap:10px;flex:0 0 52px;height:52px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--panel)}
-.brand{display:flex;align-items:baseline;gap:8px;margin-right:8px;user-select:none}
+.brand{display:flex;align-items:center;gap:9px;margin-right:8px;min-width:0}
 .brand b{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.02em;color:var(--chrome-text)}
 .brand b em{font-style:normal;color:var(--amber)}
-.brand span{color:var(--chrome-dim);font-size:11.5px}
+.doc-title-wrap{display:flex;align-items:center;min-width:0;max-width:250px}
+.doc-title{max-width:230px;padding:3px 6px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--chrome-dim);font-size:12px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text}
+.doc-title:hover,.doc-title:focus-visible{border-color:var(--line);background:var(--panel2);color:var(--chrome-text);outline:none}
+.doc-title-input{display:none;width:190px;padding:3px 6px;border:1px solid var(--amber);border-radius:5px;background:var(--ink);color:var(--chrome-text);font:12px/1.4 var(--ui);outline:none}
+.doc-title-wrap.editing .doc-title{display:none}
+.doc-title-wrap.editing .doc-title-input{display:block}
 .btn{background:var(--panel2);border:1px solid var(--line);color:var(--chrome-text);border-radius:7px;padding:7px 12px;font-size:13px;cursor:pointer;transition:border-color .15s,background .15s}
 .btn:hover{border-color:var(--amber-dim)}
 .btn:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
@@ -47,6 +52,15 @@ button{font-family:var(--ui)}
 .spacer{flex:1}
 .kbd-hint{color:var(--chrome-dim);font-size:12px}
 kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--chrome-text)}
+@media (max-width:950px){.kbd-hint{display:none}}
+@media (max-width:680px){
+  .topbar{gap:5px;padding:0 8px}
+  .brand{gap:5px;margin-right:2px}
+  .brand b{font-size:17px}
+  .doc-title-wrap{max-width:130px}
+  .doc-title{max-width:125px}
+  .mbtn{padding:0 7px}
+}
 
 
 /* ---------- application menus ---------- */
@@ -59,6 +73,20 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .mitem{display:block;width:100%;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:var(--chrome-text);font-family:var(--ui);font-size:13px;text-align:left;white-space:nowrap;cursor:pointer}
 .mitem:hover,.mitem:focus-visible{background:var(--panel2);outline:none}
 .msep{height:1px;margin:5px 4px;background:var(--line)}
+.msection{padding:5px 10px 3px;color:var(--chrome-dim);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.recent-list{display:flex;flex-direction:column;max-height:260px;overflow:auto}
+.recent-row{display:flex;align-items:center;min-width:275px;border-radius:5px}
+.recent-row:hover{background:var(--panel2)}
+.recent-open{display:flex;align-items:center;gap:8px;min-width:0;flex:1;padding:7px 7px 7px 10px;border:0;background:transparent;color:var(--chrome-text);font:13px var(--ui);text-align:left;cursor:pointer}
+.recent-open:focus-visible,.recent-delete:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+.recent-status{width:14px;flex:0 0 14px;text-align:center;font-weight:800}
+.recent-status.downloaded{color:#62bf75}
+.recent-status.local{color:#e0ad49;font-size:18px;line-height:10px}
+.recent-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-current .recent-name{font-weight:700}
+.recent-delete{flex:0 0 29px;width:29px;height:29px;padding:0;border:0;border-radius:5px;background:transparent;color:#d36565;font:700 13px var(--ui);cursor:pointer;opacity:.8}
+.recent-delete:hover{background:rgba(190,72,72,.17);color:#ef7b7b;opacity:1}
+.recent-empty{padding:7px 10px;color:var(--chrome-dim);font-size:12px}
 .btn.icon{min-width:34px;padding:7px 9px;font-size:15px;line-height:1}
 
 /* ---------- insertion dialogs ---------- */
@@ -261,12 +289,15 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 <body>
 
 <div class="topbar">
-  <div class="brand"><b>Slide<em>Down</em></b><span>Portable Slide Language</span></div>
+  <div class="brand"><b>Slide<em>Down</em></b><div class="doc-title-wrap" id="docTitleWrap">
+    <button class="doc-title" id="docTitle" title="Rename this presentation">Presentation</button>
+    <input class="doc-title-input" id="docTitleInput" maxlength="120" aria-label="Presentation name">
+  </div></div>
 
   <div class="menu" id="mFile"><button class="mbtn">File</button><div class="mlist">
-    <button class="mitem" id="miNew">New Script</button>
-    <button class="mitem" id="miOpen">Open Script…</button>
-    <button class="mitem" id="miSave">Save Script</button>
+    <button class="mitem" id="miNew">New Presentation</button>
+    <button class="mitem" id="miOpen">Open File…</button>
+    <button class="mitem" id="miSave">Download “Presentation.psl”</button>
     <div class="msep"></div>
     <button class="mitem" id="miCheckpoint">Save Checkpoint…</button>
     <button class="mitem" id="miHistory">Version History…</button>
@@ -276,6 +307,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <button class="mitem" id="miPptx">Import PowerPoint…</button>
     <div class="msep"></div>
     <button class="mitem" id="miPrint">Print / Save as PDF…</button>
+    <div class="msep"></div>
+    <div class="msection">Recent Presentations</div>
+    <div class="recent-list" id="recentDocs"><div class="recent-empty">Loading…</div></div>
   </div></div>
 
   <div class="menu" id="mInsert"><button class="mbtn">Insert</button><div class="mlist">
@@ -2099,36 +2133,144 @@ function refresh(){
 }
 
 /* ============================================================
-   AUTOSAVE, CRASH RECOVERY & VERSION HISTORY
-   Everything here is local to the browser (localStorage) — no
-   network calls, keeping SlideDown a single self-contained file.
+   LOCAL DOCUMENT LIBRARY, AUTOSAVE, RECOVERY & VERSION HISTORY
+   Decks live in IndexedDB; downloading creates the external copy.
    ============================================================ */
-const AUTOSAVE_KEY="slidedown.autosave", HISTORY_KEY="slidedown.history";
-const AUTOSAVE_DEBOUNCE_MS=2000, AUTO_SNAPSHOT_INTERVAL_MS=5*60*1000, HISTORY_MAX=40;
-let savedBaseline=null;          // last text considered "saved" (open/save/sample/checkpoint/new)
-let autosaveTimer=null, autosaveDisabled=false, quotaWarned=false;
+const LEGACY_AUTOSAVE_KEY="slidedown.autosave", LEGACY_HISTORY_KEY="slidedown.history";
+const LIBRARY_DB="slidedown.library", LIBRARY_DB_VERSION=1;
+const AUTOSAVE_DEBOUNCE_MS=700, AUTO_SNAPSHOT_INTERVAL_MS=5*60*1000, HISTORY_MAX=40;
+const NEW_DECK_TEXT="# Untitled\n## \n---\n### First slide\n- \n";
+let libraryDB=null, currentDoc=null, autosaveTimer=null, autosaveDisabled=false, quotaWarned=false;
 let lastAutoSnapshotText=null, lastAutoSnapshotTime=0;
+let lastStorageCheck=0, storageWarningShown=false;
 
-function isDirty(){ return savedBaseline!==null && srcEl.value!==savedBaseline; }
-function markSaved(){ savedBaseline=srcEl.value; persistAutosave(); }
-
-function readAutosave(){
-  try{ const raw=localStorage.getItem(AUTOSAVE_KEY); return raw?JSON.parse(raw):null; }catch(_){ return null; }
+function idbRequest(req){ return new Promise((resolve,reject)=>{ req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error); }); }
+function idbTransactionDone(tx){ return new Promise((resolve,reject)=>{ tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); tx.onabort=()=>reject(tx.error||new Error("Storage transaction aborted")); }); }
+function makeId(prefix="d"){ return prefix+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2)); }
+function openLibrary(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(LIBRARY_DB,LIBRARY_DB_VERSION);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains("docs")){
+        const docs=db.createObjectStore("docs",{keyPath:"id"});
+        docs.createIndex("lastOpenedAt","lastOpenedAt");
+      }
+      if(!db.objectStoreNames.contains("versions")){
+        const versions=db.createObjectStore("versions",{keyPath:"id"});
+        versions.createIndex("docId","docId");
+      }
+      if(!db.objectStoreNames.contains("settings")) db.createObjectStore("settings",{keyPath:"key"});
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
 }
-function persistAutosave(){
-  if(autosaveDisabled) return;
-  try{ localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({text:srcEl.value, ts:Date.now(), selected, dirty:isDirty()})); }
-  catch(e){
+async function dbGet(store,key){ return idbRequest(libraryDB.transaction(store).objectStore(store).get(key)); }
+async function dbGetAll(store){ return idbRequest(libraryDB.transaction(store).objectStore(store).getAll()); }
+async function dbPut(store,value){
+  const tx=libraryDB.transaction(store,"readwrite"); tx.objectStore(store).put(value); await idbTransactionDone(tx); return value;
+}
+async function dbDelete(store,key){
+  const tx=libraryDB.transaction(store,"readwrite"); tx.objectStore(store).delete(key); await idbTransactionDone(tx);
+}
+async function versionsForDoc(docId){
+  const tx=libraryDB.transaction("versions");
+  return idbRequest(tx.objectStore("versions").index("docId").getAll(IDBKeyRange.only(docId)));
+}
+async function purgeAutomaticHistory(limit=25){
+  const [docs,versions]=await Promise.all([dbGetAll("docs"),dbGetAll("versions")]);
+  const byId=new Map(docs.map(d=>[d.id,d])), keep=new Map();
+  for(const v of versions.filter(v=>!v.label).sort((a,b)=>b.ts-a.ts)){
+    const n=keep.get(v.docId)||0; keep.set(v.docId,n+1); v.keep=n<3;
+  }
+  const candidates=versions.filter(v=>!v.label&&!v.keep).sort((a,b)=>{
+    const da=byId.get(a.docId), db=byId.get(b.docId);
+    const aDownloaded=da&&isDownloaded(da,da.text), bDownloaded=db&&isDownloaded(db,db.text);
+    if(aDownloaded!==bDownloaded) return aDownloaded?-1:1;
+    const opened=(da?.lastOpenedAt||0)-(db?.lastOpenedAt||0); return opened||a.ts-b.ts;
+  }).slice(0,limit);
+  if(!candidates.length) return 0;
+  const tx=libraryDB.transaction("versions","readwrite"), store=tx.objectStore("versions");
+  candidates.forEach(v=>store.delete(v.id)); await idbTransactionDone(tx); return candidates.length;
+}
+async function checkStoragePressure(force=false){
+  if(!navigator.storage?.estimate||!libraryDB) return;
+  if(!force&&Date.now()-lastStorageCheck<30000) return;
+  lastStorageCheck=Date.now();
+  try{
+    let estimate=await navigator.storage.estimate();
+    if(!estimate.quota||estimate.usage/estimate.quota<.85) return;
+    const removed=await purgeAutomaticHistory(25);
+    if(removed) estimate=await navigator.storage.estimate();
+    if(estimate.quota&&estimate.usage/estimate.quota>=.85&&!storageWarningShown){
+      storageWarningShown=true;
+      showNotice({text:"Browser storage is running low. SlideDown reduced old automatic history; no presentations were removed. Download browser-only work for safekeeping.",
+        actions:[{label:"Download Current",primary:true,onClick:downloadCurrentDocument}]});
+    }
+  }catch(_){}
+}
+async function requestDurableStorage(){
+  if(!navigator.storage?.persist) return false;
+  try{ return await navigator.storage.persisted()||await navigator.storage.persist(); }catch(_){ return false; }
+}
+function readLegacy(key){ try{ const raw=localStorage.getItem(key); return raw?JSON.parse(raw):null; }catch(_){ return null; } }
+function contentFingerprint(text){
+  let h=2166136261;
+  for(let i=0;i<text.length;i++){ h^=text.charCodeAt(i); h=Math.imul(h,16777619); }
+  return (h>>>0).toString(36)+":"+text.length;
+}
+function isDownloaded(doc=currentDoc,text=srcEl.value){ return !!(doc&&doc.downloadedFingerprint&&doc.downloadedFingerprint===contentFingerprint(text)); }
+function isDirty(){ return !!currentDoc&&!isDownloaded(currentDoc,srcEl.value); }
+function cleanedTitle(value){ return String(value||"").replace(/\s+/g," ").trim().slice(0,120)||"Presentation"; }
+function downloadFilename(title){
+  const stem=cleanedTitle(title).replace(/[<>:"/\\|?*\x00-\x1f]/g,"_").replace(/[. ]+$/g,"")||"Presentation";
+  return stem.toLowerCase().endsWith(".psl")?stem:stem+".psl";
+}
+async function uniqueTitle(wanted,excludeId=null){
+  const base=cleanedTitle(wanted), docs=await dbGetAll("docs");
+  const used=new Set(docs.filter(d=>d.id!==excludeId).map(d=>d.title.toLocaleLowerCase()));
+  if(!used.has(base.toLocaleLowerCase())) return base;
+  let n=2; while(used.has((base+" "+n).toLocaleLowerCase())) n++;
+  return base+" "+n;
+}
+async function nextPresentationTitle(){
+  const docs=await dbGetAll("docs"), used=new Set(docs.map(d=>d.title.toLocaleLowerCase()));
+  if(!used.has("presentation")) return "Presentation";
+  let n=2; while(used.has(("presentation "+n).toLocaleLowerCase())) n++;
+  return "Presentation "+n;
+}
+function newDocument(title,text=NEW_DECK_TEXT){
+  const now=Date.now();
+  return {id:makeId(),title,text,createdAt:now,updatedAt:now,lastOpenedAt:now,selected:0,
+    downloadedFingerprint:null,lastDownloadedAt:null,lastDownloadedFilename:null};
+}
+async function persistCurrentDocument(){
+  clearTimeout(autosaveTimer); autosaveTimer=null;
+  if(!currentDoc||autosaveDisabled) return false;
+  if(currentDoc.text!==srcEl.value) currentDoc.updatedAt=Date.now();
+  currentDoc.text=srcEl.value; currentDoc.selected=selected;
+  try{
+    await dbPut("docs",currentDoc); quotaWarned=false; updateDocumentChrome(); await renderRecentDocuments(); checkStoragePressure(); return true;
+  }catch(e){
+    try{
+      const removed=await purgeAutomaticHistory(25);
+      if(removed){ await dbPut("docs",currentDoc); updateDocumentChrome(); await renderRecentDocuments(); return true; }
+    }catch(_){}
     autosaveDisabled=true;
     if(!quotaWarned){ quotaWarned=true;
-      showNotice({text:"Autosave isn't available for this deck (probably too large for local storage) — remember to save your script to a file.", timeout:8000}); }
+      showNotice({text:"SlideDown couldn't save this presentation in the browser. Download it now to protect your changes.",
+        actions:[{label:"Download",primary:true,onClick:downloadCurrentDocument}]}); }
+    return false;
   }
 }
 function scheduleAutosave(){
   clearTimeout(autosaveTimer);
-  autosaveTimer=setTimeout(()=>{ persistAutosave(); maybeSnapshotHistory(); }, AUTOSAVE_DEBOUNCE_MS);
+  updateDocumentChrome(); renderRecentDocuments();
+  autosaveTimer=setTimeout(async()=>{ await persistCurrentDocument(); await maybeSnapshotHistory(); },AUTOSAVE_DEBOUNCE_MS);
 }
-window.addEventListener("beforeunload",e=>{ if(isDirty()){ e.preventDefault(); e.returnValue=""; } });
+window.addEventListener("beforeunload",e=>{ if(autosaveTimer||autosaveDisabled){ e.preventDefault(); e.returnValue=""; } });
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden"&&autosaveTimer) persistCurrentDocument(); });
 
 function relTime(ts){
   const s=Math.max(1, Math.round((Date.now()-ts)/1000));
@@ -2156,39 +2298,32 @@ function showNotice({text, actions=[], timeout=null}){
 function hideNotice(){ $("#notice").classList.remove("on"); }
 $("#noticeClose").addEventListener("click",hideNotice);
 
-function offerDraftRestore(rec){
-  showNotice({ text:"Found an unsaved draft from "+relTime(rec.ts)+".",
-    actions:[
-      {label:"Restore", primary:true, onClick:()=>{
-        srcEl.value=rec.text; selected=clamp(rec.selected||0,0,Infinity); refresh(); persistAutosave(); hideNotice(); }},
-      {label:"Discard", onClick:()=>{ markSaved(); hideNotice(); }},
-    ] });
-}
-
-/* ---------- local version history: periodic auto-snapshots + named checkpoints ---------- */
-function readHistory(){ try{ return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]"); }catch(_){ return []; } }
-function pushHistorySnapshot(text, label){
-  let hist=readHistory();
-  hist.push({id:"h"+Date.now()+Math.random().toString(36).slice(2,7), ts:Date.now(), text, label:label||null});
-  while(hist.length>HISTORY_MAX){                       // drop oldest unlabeled first; named checkpoints are protected
-    let idx=hist.findIndex(h=>!h.label); if(idx===-1) idx=0;
-    hist.splice(idx,1);
-  }
-  try{ localStorage.setItem(HISTORY_KEY, JSON.stringify(hist)); return true; }
-  catch(e){
-    if(label) alert("Couldn't save that checkpoint — local storage is full. Try deleting old versions from File ▸ Version History, or save this deck to a file.");
+/* ---------- per-presentation version history ---------- */
+async function pushHistorySnapshot(text,label){
+  if(!currentDoc) return false;
+  const hist=await versionsForDoc(currentDoc.id);
+  const rec={id:makeId("h"),docId:currentDoc.id,ts:Date.now(),text,label:label||null};
+  try{
+    await dbPut("versions",rec); hist.push(rec);
+    while(hist.length>HISTORY_MAX){
+      let idx=hist.findIndex(h=>!h.label); if(idx===-1) idx=0;
+      await dbDelete("versions",hist[idx].id); hist.splice(idx,1);
+    }
+    return true;
+  }catch(e){
+    if(label) alert("Couldn't save that checkpoint — browser storage is full. Delete old versions or download this presentation.");
     return false;
   }
 }
-function maybeSnapshotHistory(){
+async function maybeSnapshotHistory(){
   const text=srcEl.value;
   if(!text.trim() || text===lastAutoSnapshotText) return;
   if(lastAutoSnapshotText!==null && Date.now()-lastAutoSnapshotTime<AUTO_SNAPSHOT_INTERVAL_MS) return;
-  if(pushHistorySnapshot(text,null)){ lastAutoSnapshotText=text; lastAutoSnapshotTime=Date.now(); }
+  if(await pushHistorySnapshot(text,null)){ lastAutoSnapshotText=text; lastAutoSnapshotTime=Date.now(); }
 }
-function openVersionHistory(){
-  const hist=readHistory().slice().reverse();           // newest first
-  $("#dlgTitle").textContent="Version History";
+async function openVersionHistory(){
+  const hist=(await versionsForDoc(currentDoc.id)).sort((a,b)=>b.ts-a.ts);
+  $("#dlgTitle").textContent="Version History — "+currentDoc.title;
   const body=$("#dlgBody"); body.innerHTML="";
   if(!hist.length){
     body.innerHTML=`<p class="sub" style="margin:0">No saved versions yet. SlideDown quietly checkpoints your work every few minutes while you edit, or use <b>File ▸ Save Checkpoint…</b> to save one by hand.</p>`;
@@ -2217,15 +2352,15 @@ function openVersionHistory(){
   const escHandler=e=>{ if(e.key==="Escape"){ e.stopPropagation(); close(); } };
   document.addEventListener("keydown",escHandler,true);
   $("#dlgOk").onclick=close;
-  body.onclick=e=>{
+  body.onclick=async e=>{
     const id=e.target.dataset.id; if(!id) return;
     const rec=hist.find(h=>h.id===id); if(!rec) return;
     if(e.target.classList.contains("histRestore")){
-      if(isDirty() && !confirm("Restore this version? Your current unsaved edits will be replaced (this won't affect any other saved checkpoints).")) return;
-      srcEl.value=rec.text; selected=0; refresh(); markSaved(); close();
+      if(srcEl.value!==currentDoc.text && !confirm("Restore this version? Your current browser edits will be replaced (this won't affect saved checkpoints).")) return;
+      srcEl.value=rec.text; selected=0; refresh(); await persistCurrentDocument(); close();
     }else if(e.target.classList.contains("histDelete")){
       if(!confirm("Delete this saved version? This can't be undone.")) return;
-      try{ localStorage.setItem(HISTORY_KEY, JSON.stringify(readHistory().filter(x=>x.id!==id))); }catch(_){}
+      await dbDelete("versions",id);
       close(); openVersionHistory();
     }
   };
@@ -2233,7 +2368,7 @@ function openVersionHistory(){
 $("#miCheckpoint").addEventListener("click", async ()=>{
   const v=await showDialog("Save checkpoint",[{key:"label",label:"Name",placeholder:"e.g. Before restructuring the demo"}],"Save");
   if(!v) return;
-  if(pushHistorySnapshot(srcEl.value, v.label||("Checkpoint "+new Date().toLocaleString()))){
+  if(await pushHistorySnapshot(srcEl.value, v.label||("Checkpoint "+new Date().toLocaleString()))){
     lastAutoSnapshotText=srcEl.value; lastAutoSnapshotTime=Date.now();
     showNotice({text:"Checkpoint saved.", timeout:2500});
   }
@@ -2579,6 +2714,113 @@ presentEl.addEventListener("click",e=>{
 });
 
 /* ---------- files, buttons ---------- */
+function updateDocumentChrome(){
+  if(!currentDoc) return;
+  const localOnly=!isDownloaded(currentDoc,srcEl.value);
+  $("#docTitle").textContent=currentDoc.title;
+  $("#docTitle").title=(localOnly?"Saved only in this browser — ":"Downloaded — ")+"click to rename";
+  $("#miSave").textContent="Download “"+downloadFilename(currentDoc.title)+"”";
+  document.title=(localOnly?"• ":"")+currentDoc.title+" — SlideDown";
+}
+async function renderRecentDocuments(){
+  if(!libraryDB) return;
+  const docs=(await dbGetAll("docs")).sort((a,b)=>(b.lastOpenedAt||0)-(a.lastOpenedAt||0)).slice(0,10);
+  const list=$("#recentDocs"); list.innerHTML="";
+  if(!docs.length){ list.innerHTML='<div class="recent-empty">No presentations yet</div>'; return; }
+  for(const doc of docs){
+    const active=doc.id===currentDoc?.id, text=active?srcEl.value:doc.text;
+    const downloaded=isDownloaded(doc,text);
+    const row=document.createElement("div"); row.className="recent-row"+(active?" recent-current":"");
+    const open=document.createElement("button"); open.className="recent-open"; open.dataset.id=doc.id;
+    const status=document.createElement("span");
+    status.className="recent-status "+(downloaded?"downloaded":"local");
+    status.textContent=downloaded?"✓":"•";
+    status.title=downloaded
+      ?"Current version downloaded"+(doc.lastDownloadedFilename?" as "+doc.lastDownloadedFilename:"")
+      :(doc.downloadedFingerprint?"Changed since the last download":"Saved only in this browser");
+    const name=document.createElement("span"); name.className="recent-name"; name.textContent=doc.title;
+    open.append(status,name); open.title=(active?"Current presentation: ":"Open ")+doc.title;
+    open.addEventListener("click",async()=>{ closeMenus(); if(!active) await switchDocument(doc.id); });
+    const del=document.createElement("button"); del.className="recent-delete"; del.textContent="X";
+    del.title="Remove “"+doc.title+"” from browser storage"; del.setAttribute("aria-label",del.title);
+    del.addEventListener("click",async e=>{ e.stopPropagation(); await removeLocalDocument(doc.id); });
+    row.append(open,del); list.appendChild(row);
+  }
+}
+function closeMenus(){ document.querySelectorAll(".menu.open").forEach(m=>m.classList.remove("open")); }
+async function setCurrentDocumentId(id){ await dbPut("settings",{key:"currentDocId",value:id}); }
+async function switchDocument(id){
+  if(currentDoc?.id===id) return true;
+  if(currentDoc&&!(await persistCurrentDocument())) return false;
+  const doc=await dbGet("docs",id); if(!doc) return false;
+  currentDoc=doc; currentDoc.lastOpenedAt=Date.now(); autosaveDisabled=false;
+  srcEl.value=currentDoc.text||""; selected=clamp(currentDoc.selected||0,0,Infinity); refresh();
+  await dbPut("docs",currentDoc); await setCurrentDocumentId(currentDoc.id);
+  const hist=(await versionsForDoc(currentDoc.id)).sort((a,b)=>a.ts-b.ts);
+  const last=hist[hist.length-1]; lastAutoSnapshotText=last?.text||null; lastAutoSnapshotTime=last?.ts||0;
+  updateDocumentChrome(); await renderRecentDocuments(); hideNotice(); return true;
+}
+async function deleteVersionsForDoc(docId){
+  const versions=await versionsForDoc(docId);
+  if(!versions.length) return;
+  const tx=libraryDB.transaction("versions","readwrite"), store=tx.objectStore("versions");
+  versions.forEach(v=>store.delete(v.id)); await idbTransactionDone(tx);
+}
+async function removeLocalDocument(id){
+  const doc=await dbGet("docs",id); if(!doc) return;
+  const active=doc.id===currentDoc?.id, text=active?srcEl.value:doc.text;
+  if(!isDownloaded(doc,text)){
+    const detail=doc.downloadedFingerprint?"It has changes made since its last download.":"It has never been downloaded.";
+    if(!confirm("Remove “"+doc.title+"” from this browser? "+detail+" This cannot be undone.")) return;
+  }
+  await dbDelete("docs",id); await deleteVersionsForDoc(id);
+  if(active){
+    currentDoc=null;
+    const remaining=(await dbGetAll("docs")).sort((a,b)=>(b.lastOpenedAt||0)-(a.lastOpenedAt||0));
+    if(remaining.length) await switchDocument(remaining[0].id);
+    else{
+      const doc2=newDocument(await nextPresentationTitle()); await dbPut("docs",doc2); await switchDocument(doc2.id);
+    }
+  }else await renderRecentDocuments();
+}
+async function createPresentation(text=NEW_DECK_TEXT,wantedTitle=null,downloadedFilename=null){
+  if(currentDoc&&!(await persistCurrentDocument())) return null;
+  const title=wantedTitle?await uniqueTitle(wantedTitle):await nextPresentationTitle();
+  const doc=newDocument(title,text);
+  if(downloadedFilename){
+    doc.downloadedFingerprint=contentFingerprint(text); doc.lastDownloadedAt=Date.now(); doc.lastDownloadedFilename=downloadedFilename;
+  }
+  await dbPut("docs",doc); await switchDocument(doc.id); return doc;
+}
+async function renameCurrentDocument(value){
+  if(!currentDoc) return;
+  currentDoc.title=await uniqueTitle(value,currentDoc.id); currentDoc.updatedAt=Date.now();
+  await dbPut("docs",currentDoc); updateDocumentChrome(); await renderRecentDocuments();
+}
+async function downloadCurrentDocument(){
+  if(!currentDoc) return;
+  const filename=downloadFilename(currentDoc.title), blob=new Blob([srcEl.value],{type:"text/plain"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  currentDoc.downloadedFingerprint=contentFingerprint(srcEl.value); currentDoc.lastDownloadedAt=Date.now();
+  currentDoc.lastDownloadedFilename=filename; await persistCurrentDocument();
+}
+function beginTitleEdit(){
+  if(!currentDoc) return;
+  const wrap=$("#docTitleWrap"), input=$("#docTitleInput");
+  wrap.classList.add("editing"); input.value=currentDoc.title; input.focus(); input.select();
+}
+async function finishTitleEdit(save=true){
+  const wrap=$("#docTitleWrap"); if(!wrap.classList.contains("editing")) return;
+  wrap.classList.remove("editing"); if(save) await renameCurrentDocument($("#docTitleInput").value);
+}
+$("#docTitle").addEventListener("click",beginTitleEdit);
+$("#docTitleInput").addEventListener("blur",()=>finishTitleEdit(true));
+$("#docTitleInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){ e.preventDefault(); finishTitleEdit(true); }
+  else if(e.key==="Escape"){ e.preventDefault(); finishTitleEdit(false); }
+});
+
 $("#btnPresentQ").addEventListener("click",()=>startPresent(selected,{fs:true,exact:true}));
 $("#miPresent").addEventListener("click",()=>startPresent(selected,{fs:true,exact:true}));
 $("#miPresentBeginning").addEventListener("click",()=>startPresent(0,{fs:true}));
@@ -2686,26 +2928,16 @@ if(window.screen && "isExtended" in screen){
 $("#miOpen").addEventListener("click",()=>$("#fileIn").click());
 $("#fileIn").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
-  if(isDirty() && !confirm("Opening this file will replace the current script. Unsaved changes will be lost — continue?")){ e.target.value=""; return; }
   const rd=new FileReader();
-  rd.onload=()=>{ srcEl.value=rd.result; selected=0; refresh(); markSaved(); };
+  rd.onload=async()=>{
+    const stem=f.name.replace(/\.(psl|sd|txt|md|slides)$/i,"")||"Presentation";
+    await createPresentation(String(rd.result),stem,f.name);
+  };
   rd.readAsText(f); e.target.value="";
 });
-$("#miSave").addEventListener("click",()=>{
-  const blob=new Blob([srcEl.value],{type:"text/plain"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download="presentation.psl"; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-  markSaved();
-});
-$("#miSample").addEventListener("click",()=>{
-  if(isDirty() && !confirm("Load the sample deck? Unsaved changes will be lost.")) return;
-  srcEl.value=SAMPLE; selected=0; refresh(); markSaved();
-});
-$("#miNew").addEventListener("click",()=>{
-  if(isDirty() && !confirm("Replace the current script with a new one? Unsaved changes will be lost.")) return;
-  srcEl.value="# Untitled\n## \n---\n### First slide\n- \n"; selected=0; refresh(); markSaved();
-});
+$("#miSave").addEventListener("click",downloadCurrentDocument);
+$("#miSample").addEventListener("click",async()=>{ await createPresentation(SAMPLE,"SlideDown Sample"); });
+$("#miNew").addEventListener("click",async()=>{ await createPresentation(); });
 $("#miPptx").addEventListener("click",()=>$("#pptxIn").click());
 $("#miPrint").addEventListener("click",()=>{ buildPrintLayout(); setTimeout(()=>window.print(),30); });
 window.addEventListener("beforeprint",()=>{ if(!$("#printRoot").children.length) buildPrintLayout(); });   // Ctrl/Cmd-P path; menu path already built
@@ -3224,8 +3456,8 @@ $("#pptxIn").addEventListener("change",async e=>{
   if(!window.JSZip){ alert("The zip library (JSZip) did not load — check your connection."); return; }
   try{
     const psl=await pptxToPsl(f);
-    if(srcEl.value.trim() && !confirm("Replace the current script with the imported presentation?")) return;
-    srcEl.value=psl; selected=0; refresh(); markSaved();
+    const stem=f.name.replace(/\.pptx$/i,"")||"Imported PowerPoint";
+    await createPresentation(psl,stem);
   }catch(err){ alert("PowerPoint import failed: "+err.message); }
 });
 
@@ -3602,7 +3834,35 @@ async function pptxToPsl(file){
   return out.join("\n").replace(/\n{3,}/g,"\n\n")+"\n";
 }
 
- /* ---------- boot: viewer mode via URL, else the sample deck ----------
+async function initializeLocalLibrary(){
+  libraryDB=await openLibrary();
+  let docs=await dbGetAll("docs"), recovered=null;
+  if(!docs.length){
+    recovered=readLegacy(LEGACY_AUTOSAVE_KEY);
+    const doc=newDocument("Presentation",recovered?.text||SAMPLE);
+    doc.selected=clamp(recovered?.selected||0,0,Infinity);
+    await dbPut("docs",doc);
+    const oldHistory=readLegacy(LEGACY_HISTORY_KEY);
+    if(Array.isArray(oldHistory)){
+      for(const h of oldHistory) await dbPut("versions",{
+        id:h.id||makeId("h"),docId:doc.id,ts:h.ts||Date.now(),text:h.text||"",label:h.label||null
+      });
+    }
+    try{ localStorage.removeItem(LEGACY_AUTOSAVE_KEY); localStorage.removeItem(LEGACY_HISTORY_KEY); }catch(_){}
+    docs=[doc];
+  }
+  const setting=await dbGet("settings","currentDocId");
+  let id=setting?.value;
+  if(!docs.some(d=>d.id===id)) id=docs.sort((a,b)=>(b.lastOpenedAt||0)-(a.lastOpenedAt||0))[0].id;
+  await switchDocument(id);
+  requestDurableStorage(); checkStoragePressure(true);
+  if(recovered?.dirty){
+    showNotice({text:"Recovered browser-only changes to “"+currentDoc.title+"” from "+relTime(recovered.ts||Date.now())+".",
+      actions:[{label:"Download",primary:true,onClick:downloadCurrentDocument}]});
+  }
+}
+
+ /* ---------- boot: viewer mode via URL, else the local library ----------
     Post slidedown.html + your .psl script online, then share:
       slidedown.html?present=my_talk.psl        (relative or absolute URL)
       slidedown.html?present=...&slide=5        (start on slide 5)          */
@@ -3610,20 +3870,23 @@ async function pptxToPsl(file){
   const q=new URLSearchParams(location.search);
   const remote=q.get("present")||q.get("script");
   if(!remote){
-    const rec=readAutosave();
-    srcEl.value=SAMPLE; selected=0; refresh();
-    savedBaseline=SAMPLE;
-    if(rec && rec.dirty && rec.text && rec.text.trim() && rec.text!==SAMPLE) offerDraftRestore(rec);
-    else persistAutosave();
-    const h=readHistory();                     // keep the auto-snapshot cadence continuous across reloads
-    if(h.length){ const last=h[h.length-1]; lastAutoSnapshotText=last.text; lastAutoSnapshotTime=last.ts; }
+    srcEl.value="% Opening your SlideDown presentations …"; refresh();
+    window.slidedownReady=initializeLocalLibrary().catch(err=>{
+      console.error("SlideDown library unavailable",err);
+      const rec=readLegacy(LEGACY_AUTOSAVE_KEY);
+      currentDoc=newDocument("Presentation",rec?.text||SAMPLE); currentDoc.selected=rec?.selected||0;
+      srcEl.value=currentDoc.text; selected=currentDoc.selected; autosaveDisabled=true; refresh(); updateDocumentChrome();
+      showNotice({text:"Browser storage is unavailable. Download your work before closing this page.",
+        actions:[{label:"Download",primary:true,onClick:downloadCurrentDocument}]});
+    });
     return;
   }
+  $("#docTitle").textContent=remote.split("/").pop().replace(/\.[^.]+$/,"")||"Remote Presentation";
   srcEl.value="% Loading "+remote+" …"; refresh();
-  fetch(remote)
+  window.slidedownReady=fetch(remote)
     .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
     .then(txt=>{
-      srcEl.value=txt; selected=0; refresh(); savedBaseline=txt;
+      srcEl.value=txt; selected=0; refresh();
       const s=parseInt(q.get("slide"),10);
       startPresent(isNaN(s)?0:s-1,{exact:!isNaN(s)});   // fullscreen needs a gesture: press f or ⛶
     })
@@ -3633,7 +3896,7 @@ async function pptxToPsl(file){
         +"{color=#b03030} "+String(err).replace(/\n/g," ")+"\n"
         +"Check the address, and that the host allows cross-origin requests.\n"
         +"---\n"+SAMPLE;
-      selected=0; refresh(); savedBaseline=srcEl.value;
+      selected=0; refresh();
     });
 })();
 </script>
