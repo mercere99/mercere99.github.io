@@ -526,6 +526,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!anim word color #cc2244 0.5s</td><td>Animate text color / shape stroke.</td></tr>
       <tr><td>!anim @nodes fill white 0.5s<br>!anim @nodes stroke black 0.5s</td><td>Animate <code>fill</code>, <code>stroke</code>, <code>textcolor</code>, <code>opacity</code>, <code>thick</code>, or <code>round</code> across a selection.</td></tr>
       <tr><td>!anim word textsize 54px 0.7s</td><td>Animate font size.</td></tr>
+      <tr><td>!anim box text **New label**<br>!anim box text **New label** 0.4s</td><td>Replace an element's Markdown text immediately, or crossfade it when a duration is supplied. Works on headings, paragraphs, bullets, and shapes that already contain text.</td></tr>
       <tr><td>!tag parser remove front_end<br>!tag optimizer add front_end</td><td>Change later tag membership. Put <code>&gt;&gt;&gt;</code> or <code>...</code> between membership changes and dependent animations.</td></tr>
       <tr><td>!anim @nodes front<br>!anim node z 20</td><td>Discrete layering: <code>z</code>, <code>front</code>, <code>back</code>, <code>forward</code>, and <code>backward</code>. Tag selections move as a layer block and retain internal source order.</td></tr>
     </table>
@@ -1548,6 +1549,7 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
     case "opacity":{ const v=Number(args); return args&&Number.isFinite(v)&&v>=0&&v<=1
       ? {target,verb,dur,value:v} : bad("opacity needs a number from 0 to 1"); }
     case "thick": case "round": return args ? {target,verb,dur,size:args} : bad(`${verb} needs a size`);
+    case "text": return args ? {target,verb,dur:hadDuration?dur:0,text:args} : bad("text needs replacement content");
     case "z":{ const v=Number(args); return args&&!hadDuration&&Number.isInteger(v)
       ? {target,verb,dur:0,value:v} : bad("z needs an integer layer"); }
     case "front": case "back": case "forward": case "backward":
@@ -1620,6 +1622,8 @@ function validateSlideAnimations(slide, warnings, slideIndex){
           warnings.push(`${at}: fill animation is not supported for ${subject}`); a.invalid=true;
         }else if(a.verb==="textcolor" && !item.text && ["line","arrow","polyline","curve","chart"].includes(kind)){
           warnings.push(`${at}: textcolor animation needs every element in ${describe(a.target)} to contain text`); a.invalid=true;
+        }else if(a.verb==="text" && !["h1","h2","h3","p","li"].includes(kind) && !item.text){
+          warnings.push(`${at}: text animation needs every element in ${describe(a.target)} to contain editable text`); a.invalid=true;
         }else if(a.verb==="round" && !["rect","textbox"].includes(kind)){
           warnings.push(`${at}: round animation is not supported for ${subject}`); a.invalid=true;
         }
@@ -1743,7 +1747,7 @@ function renderSlide(slideDef, opts){
     items.set(def.id,it);
     if(def.label) labels.set(def.label,it);
   }
-  return {root,flow,absLayer,svg:null,items,labels,def:slideDef};
+  return {root,flow,absLayer,svg:null,items,labels,palette,def:slideDef};
 }
 
 function applyItemLayer(it){
@@ -2222,6 +2226,15 @@ class Tween{
 const FX={ fade:[0,0,1,0], slideleft:[-120,0,1,0], slideright:[120,0,1,0],
            slideup:[0,120,1,0], slidedown:[0,-120,1,0],
            grow:[0,0,0.2,0], shrink:[0,0,0.2,0], drop:[0,-200,1,0], spin:[0,0,0.35,-180] };
+function itemTextElement(it){
+  if(it.foBody) return it.foBody.querySelector(".box-inner");
+  const root=it.inner||it.el;
+  return it.def.kind==="li" ? root.querySelector(".tx") : root;
+}
+function replaceItemText(it,text,render){
+  const target=itemTextElement(it); if(!target) return false;
+  target.innerHTML=inlineMd(text,render.palette); it.currentText=text; return true;
+}
 function makeItemAnim(a, render, warnings, it){
   if(!it){ warnings&&warnings.push(`animation targets unavailable element for “${a.target}”`); return null; }
   const el=it.el;
@@ -2383,6 +2396,17 @@ function makeItemAnim(a, render, warnings, it){
       if(!it.shapeEl||it.shapeEl.tagName.toLowerCase()!=="rect") return null;
       const v0=parseFloat(it.shapeEl.getAttribute("rx"))||0, v1=sizeToPx(a.size,SW); if(v1==null) return null;
       return T(a.dur,t=>{ it.shapeEl.setAttribute("rx",v0+(v1-v0)*t); });
+    }
+    case "text":{
+      const tgt=itemTextElement(it); if(!tgt) return null;
+      if(a.dur<=0){ replaceItemText(it,a.text,render); return null; }
+      const oldInline=tgt.style.opacity, computed=parseFloat(getComputedStyle(tgt).opacity);
+      const opacity=Number.isFinite(computed)?computed:1; let swapped=false;
+      return T(a.dur,t=>{
+        if(t>=0.5&&!swapped){ replaceItemText(it,a.text,render); swapped=true; }
+        tgt.style.opacity=String(t<0.5?opacity*(1-t*2):opacity*(t*2-1));
+        if(t>=1) tgt.style.opacity=oldInline;
+      });
     }
     case "textsize":{
       const tgt=it.foBody||it.inner||el;
@@ -3846,6 +3870,8 @@ Each press of the spacebar reveals the next chunk:
 !tag optimizer remove front_end
 >>>
 !anim @front_end rotate 8 0.5s
+>>>
+!anim lex text **Tokenizer** 0.5s
 ---
 ### Image animations
 [pic] @(0.36, 0.22) {w=0.28} ![specimen](${DEMO_IMG})
