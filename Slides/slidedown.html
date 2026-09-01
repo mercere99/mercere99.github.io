@@ -458,7 +458,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>$e^{i\pi} + 1 = 0$ &nbsp;·&nbsp; $$\frac{dN}{dt} = rN$$</td><td>LaTeX math (KaTeX) in any text — headings, bullets, table cells, shape text. <code>$…$</code> is inline, <code>$$…$$</code> is display (centered, on its own line). Currency is left alone (<code>$5 and $10</code> stays text); write <code>\$</code> for a literal dollar sign next to math. <code>\${…}</code> variables substitute first, so computed values work inside formulas. Invalid LaTeX shows its source in red with the error as a tooltip.</td></tr>
       <tr><td>% a comment</td><td>Ignored.</td></tr>
       <tr><td>...</td><td>Pause point — wait for spacebar before revealing what follows.</td></tr>
-      <tr><td>&gt;&gt;&gt;</td><td>Chain — run what follows automatically when the previous animations finish.</td></tr>
+      <tr><td>&gt;&gt;&gt;<br>&gt;&gt;&gt; 1.5s</td><td>Chain — run what follows automatically when the previous animations finish. Add a duration to wait before starting the next group.</td></tr>
       <tr><td>```cpp … ```</td><td>Fenced code block with syntax highlighting (cpp, python, javascript, bash, and other common languages; omit the language for plain code). A <code>---</code> inside a fence does <i>not</i> start a new slide. Size with <code>{w=…, size=…}</code>.</td></tr>
       <tr><td>| a | b |<br>|:--|--:|<br>| 1 | 2 |</td><td>Markdown table. The <code>|---|</code> row makes the first row a header; <code>:--</code>/<code>--:</code>/<code>:-:</code> set column alignment. Cells take inline markdown and <code>\${…}</code>.</td></tr>
     </table>
@@ -1169,12 +1169,22 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     if(!raw.trim()) continue;
     const indent=(raw.match(/^ */)[0].length);
     let line=raw.trim();
+    let m;
     if(line.startsWith("%")) continue;
 
     if(line==="..."){ step++; phase=0; slide.steps[step]=[newPhase()]; continue; }
-    if(line===">>>"){ phase++; slide.steps[step][phase]=newPhase(); continue; }
+    if((m=line.match(/^>>>(?:\s+(.*))?$/))){
+      let delay=0;
+      if(m[1]){
+        const spec=substVars(m[1].trim(),vars,warnings,where(lnNo));
+        const [rest,dur,error]=takeDur(spec);
+        if(error) warnings.push(`${where(lnNo)}: ${error}`);
+        else if(rest) warnings.push(`${where(lnNo)}: timed chain needs a duration such as “>>> 1.5s”`);
+        else delay=dur;
+      }
+      phase++; slide.steps[step][phase]=newPhase(delay); continue;
+    }
 
-    let m;
     if(/^!all\b/i.test(line)) continue;   // handled by parseScript's extraction
 
     // --- control flow: !if <expr> … [!else …] !endif ---
@@ -1492,7 +1502,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
   }
   }
 }
-function newPhase(){ return {reveals:[], tagOps:[], anims:[]}; }
+function newPhase(delay=0){ return {reveals:[], tagOps:[], anims:[], delay}; }
 
 function extractPrefixes(line,namedStyles,warnings,whereStr){
   let pos=null, label=null, tags=[], style={}, moved=true;
@@ -2543,6 +2553,11 @@ class Player{
     this.busy=true; this.ff=false; this.step=s;
     for(const ph of this.def.steps[s]){
       if(this.ff){ this.applyPhaseInstant(ph); continue; }
+      if(ph.delay>0){
+        const pause=new Tween(ph.delay,()=>{},EASINGS.linear);
+        this.live=[pause]; await pause.start(); this.live=[];
+        if(this.ff){ this.applyPhaseInstant(ph); continue; }
+      }
       this.applyTagOps(ph);
       for(const id of ph.reveals){
         const it=this.render.items.get(id);
