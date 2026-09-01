@@ -72,6 +72,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .menu.open>.mlist{display:block}
 .mitem{display:block;width:100%;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:var(--chrome-text);font-family:var(--ui);font-size:13px;text-align:left;white-space:nowrap;cursor:pointer}
 .mitem:hover,.mitem:focus-visible{background:var(--panel2);outline:none}
+.msubmenu{position:relative}
+.msubmenu-trigger{display:flex;align-items:center;justify-content:space-between;gap:28px}
+.msubmenu-arrow{color:var(--chrome-dim);font-size:16px;line-height:1}
+.msubmenu>.msubmenu-list{left:calc(100% - 2px);top:-6px}
+.msubmenu:hover>.msubmenu-list,.msubmenu.open>.msubmenu-list{display:block}
 .msep{height:1px;margin:5px 4px;background:var(--line)}
 .msection{padding:5px 10px 3px;color:var(--chrome-dim);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .recent-list{display:flex;flex-direction:column;max-height:260px;overflow:auto}
@@ -342,18 +347,25 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <button class="mitem" data-ins="table">Table…</button>
     <button class="mitem" data-ins="chart">Chart…</button>
     <div class="msep"></div>
-    <button class="mitem" data-ins="line">Line…</button>
-    <button class="mitem" data-ins="arrow">Arrow…</button>
-    <button class="mitem" data-ins="rect">Rectangle…</button>
-    <button class="mitem" data-ins="textbox">Text Box…</button>
-    <button class="mitem" data-ins="circle">Circle…</button>
-    <button class="mitem" data-ins="ellipse">Ellipse…</button>
-    <button class="mitem" data-ins="triangle">Triangle…</button>
-    <button class="mitem" data-ins="polygon">Polygon…</button>
-    <button class="mitem" data-ins="polyline">Polyline…</button>
-    <button class="mitem" data-ins="diamond">Diamond…</button>
-    <button class="mitem" data-ins="star">Star…</button>
-    <button class="mitem" data-ins="curve">Curve…</button>
+    <div class="msubmenu" id="shapeSubmenu">
+      <button class="mitem msubmenu-trigger" id="shapeMenuTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="shapeMenu">
+        <span>Shape</span><span class="msubmenu-arrow" aria-hidden="true">›</span>
+      </button>
+      <div class="mlist msubmenu-list" id="shapeMenu" role="menu" aria-label="Shape">
+        <button class="mitem" data-ins="line">Line…</button>
+        <button class="mitem" data-ins="arrow">Arrow…</button>
+        <button class="mitem" data-ins="rect">Rectangle…</button>
+        <button class="mitem" data-ins="textbox">Text Box…</button>
+        <button class="mitem" data-ins="circle">Circle…</button>
+        <button class="mitem" data-ins="ellipse">Ellipse…</button>
+        <button class="mitem" data-ins="triangle">Triangle…</button>
+        <button class="mitem" data-ins="polygon">Polygon…</button>
+        <button class="mitem" data-ins="polyline">Polyline…</button>
+        <button class="mitem" data-ins="diamond">Diamond…</button>
+        <button class="mitem" data-ins="star">Star…</button>
+        <button class="mitem" data-ins="curve">Curve…</button>
+      </div>
+    </div>
     <div class="msep"></div>
     <button class="mitem" data-ins="anim">Animation…</button>
   </div></div>
@@ -3392,7 +3404,11 @@ async function renderRecentDocuments(){
     row.append(open,del); list.appendChild(row);
   }
 }
-function closeMenus(){ document.querySelectorAll(".menu.open").forEach(m=>m.classList.remove("open")); }
+function closeSubmenus(){
+  document.querySelectorAll(".msubmenu.open").forEach(m=>m.classList.remove("open"));
+  document.querySelectorAll(".msubmenu-trigger[aria-expanded=true]").forEach(b=>b.setAttribute("aria-expanded","false"));
+}
+function closeMenus(){ document.querySelectorAll(".menu.open").forEach(m=>m.classList.remove("open")); closeSubmenus(); }
 async function setCurrentDocumentId(id){ await dbPut("settings",{key:"currentDocId",value:id}); }
 async function switchDocument(id){
   if(currentDoc?.id===id) return true;
@@ -3589,24 +3605,41 @@ document.addEventListener("selectionchange",showCaretColorTip);
 document.querySelectorAll(".menu>.mbtn").forEach(b=>{
   b.addEventListener("click",e=>{
     const menu=b.parentElement, was=menu.classList.contains("open");
-    document.querySelectorAll(".menu.open").forEach(m2=>m2.classList.remove("open"));
+    closeMenus();
     if(!was) menu.classList.add("open");
     e.stopPropagation();
   });
   // slide between open menus on hover, like native menubars
   b.addEventListener("mouseenter",()=>{
     if(document.querySelector(".menu.open") && !b.parentElement.classList.contains("open")){
-      document.querySelectorAll(".menu.open").forEach(m2=>m2.classList.remove("open"));
+      closeMenus();
       b.parentElement.classList.add("open");
     }
   });
 });
 document.addEventListener("click",e=>{
-  if(!e.target.closest(".menu")) document.querySelectorAll(".menu.open").forEach(m2=>m2.classList.remove("open"));
+  if(!e.target.closest(".menu")) closeMenus();
 });
-document.querySelectorAll(".mitem").forEach(it=>it.addEventListener("click",()=>{
-  document.querySelectorAll(".menu.open").forEach(m2=>m2.classList.remove("open"));
-}));
+document.querySelectorAll(".mitem:not(.msubmenu-trigger)").forEach(it=>it.addEventListener("click",closeMenus));
+document.querySelectorAll(".msubmenu").forEach(submenu=>{
+  const trigger=submenu.querySelector(":scope>.msubmenu-trigger"), list=submenu.querySelector(":scope>.msubmenu-list");
+  const setOpen=open=>{ submenu.classList.toggle("open",open); trigger.setAttribute("aria-expanded",String(open)); };
+  trigger.addEventListener("click",e=>{ setOpen(!submenu.classList.contains("open")); e.stopPropagation(); });
+  trigger.addEventListener("keydown",e=>{
+    if(e.key==="ArrowRight"||e.key==="ArrowDown"){
+      e.preventDefault(); setOpen(true); list.querySelector(".mitem")?.focus();
+    }else if(e.key==="Escape"){
+      e.preventDefault(); setOpen(false);
+    }
+  });
+  list.addEventListener("keydown",e=>{
+    if(e.key==="ArrowLeft"||e.key==="Escape"){
+      e.preventDefault(); e.stopPropagation(); setOpen(false); trigger.focus();
+    }
+  });
+  submenu.addEventListener("mouseenter",()=>trigger.setAttribute("aria-expanded","true"));
+  submenu.addEventListener("mouseleave",()=>{ if(!submenu.classList.contains("open")) trigger.setAttribute("aria-expanded","false"); });
+});
 
 /* ---------- presenter view: slides in a popup, notes (the script) here ----------
    The popup is scripted directly by this window (no channels needed), so it
