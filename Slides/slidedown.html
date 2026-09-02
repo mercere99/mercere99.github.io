@@ -405,7 +405,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <button class="rail-toggle" id="railToggle" title="Hide thumbnails">‹</button>
     <div class="stage-wrap">
       <div class="stage"><div class="stage-holder" id="stageHolder"></div></div>
-      <div class="stage-note">Preview shows the selected slide fully advanced. Double-click a thumbnail to present from it.</div>
+      <div class="stage-note">Preview advances through the cursor's current section. Click a thumbnail for the full slide; double-click to present from it.</div>
     </div>
   </div>
 </div>
@@ -565,7 +565,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <p class="sub" style="margin:6px 0 0"><b>File ▸ Print / Save as PDF</b> lays out one slide per page, fully advanced (all reveal steps shown), with pocket slides omitted and embeds shown as placeholders. The print stylesheet requests full-bleed 16:9 landscape pages. Enable “background graphics” if slide backgrounds look washed out; for physical paper, use “Fit to printable area” if your printer cannot print borderlessly.</p>
     <h3>Publishing a deck online</h3>
     <p class="sub" style="margin:6px 0 0">Host this HTML file and your <code>.psl</code> script anywhere (e.g. GitHub Pages), then share a link like <code>slidedown.html?present=my_talk.psl</code> — visitors land directly in the slideshow and can step through with space. Add <code>&amp;slide=5</code> to start on a specific slide. Cross-origin script URLs work if the host sends CORS headers; same-site files always work.</p>
-    <p class="sub" style="margin-top:14px"><b>Editor ↔ preview.</b> Moving the caret in the script selects the slide you're editing; clicking a thumbnail jumps the caret to that slide. Drag the divider between the panes to resize them; the ◂/▸ buttons on it collapse one side, and double-clicking it (or <code>Ctrl/Cmd + \</code>) toggles a full-width editor. The thin strip beside the thumbnails hides the rail. The layout is remembered between sessions.</p>
+    <p class="sub" style="margin-top:14px"><b>Editor ↔ preview.</b> Moving the caret in the script selects the slide you're editing and advances its preview through the current <code>...</code> section. Clicking a thumbnail moves the caret to that slide's end so its full state is shown. Drag the divider between the panes to resize them; the ◂/▸ buttons on it collapse one side, and double-clicking it (or <code>Ctrl/Cmd + \</code>) toggles a full-width editor. The thin strip beside the thumbnails hides the rail. The layout is remembered between sessions.</p>
   </div>
 </div>
 
@@ -803,6 +803,27 @@ function splitSlides(text){
   }
   slabs.push({start:slabStart, end:Math.max(slabStart,off-1), body:buf.join("\n"), hidden});
   return slabs;
+}
+
+/* Return the source offset where the caret's current click/reveal section
+   ends. A caret on the `...` delimiter still belongs to the preceding
+   section; the following section starts after that delimiter's newline.
+   Fenced code uses the same recognition rules as slide splitting. */
+function slideSectionEndAt(text, slideIndex, pos){
+  const slabs=splitSlides(text), slab=slabs[slideIndex];
+  if(!slab) return 0;
+  const caret=clamp(pos,slab.start,slab.end), body=text.slice(slab.start,slab.end);
+  let off=slab.start, inFence=false;
+  for(const raw of body.split("\n")){
+    const lineStart=off, lineEnd=lineStart+raw.length;
+    const after=Math.min(slab.end,lineEnd+(lineEnd<slab.end?1:0));
+    const line=raw.trim();
+    if(inFence){ if(line.startsWith("```")) inFence=false; }
+    else if(FENCE_OPEN.test(line)) inFence=true;
+    else if(line==="..." && caret<after) return lineStart;
+    off=after;
+  }
+  return slab.end;
 }
 
 /* ---------- coordinates ----------
@@ -2773,13 +2794,14 @@ function slideIndexAt(pos){
 
 function refresh(){
   deck=parseScript(srcEl.value);
+  previewStepCache=null;  // imports and resolved control flow may change step numbering without changing source
   slideRanges=computeSlideRanges(srcEl.value);
   refreshEditorColorTools();
   selected=clamp(selected,0,deck.slides.length-1);
   warnbar.className="warnbar"+(deck.warnings.length?" on":"");
   warnbar.innerHTML=deck.warnings.map(w=>"⚠ "+escapeHtml(w)).join("<br>");
   rebuildEditorThumbs();
-  showPreview();          // rebuilds only if the selected slide's source changed
+  showPreview();          // rebuilds when the selected slide model or caret section changed
 }
 
 /* ============================================================
@@ -3048,24 +3070,45 @@ function buildThumbs(container,onPick,markSelected){
   });
   container.scrollTop=keepScroll;
 }
-/* Rebuild the big preview only when the selected slide's own source text changes.
-   This keeps a live-embed preview from reloading its iframe on every keystroke
-   elsewhere in the script. Resize just re-fits the existing render. */
+/* Rebuild the big preview only when the resolved slide or caret section changes.
+   This keeps a live-embed preview from reloading its iframe for caret movement
+   within one section or edits elsewhere in the script. Resize just re-fits the
+   existing render. */
 let lastPreviewKey=null;
-function previewKey(i){
+let previewStepCache=null;
+function previewStepAtCaret(i){
+  const sd=deck.slides[i], finalStep=Math.max(0,(sd?.steps.length||1)-1);
+  const range=slideRanges[i]; if(!range) return finalStep;
+  const caret=srcEl.selectionDirection==="backward"?srcEl.selectionStart:srcEl.selectionEnd;
+  if(slideIndexAt(caret)!==i) return finalStep;
+  const sectionEnd=slideSectionEndAt(srcEl.value,i,caret);
+  if(sectionEnd>=range[1]) return finalStep;
+  if(previewStepCache && previewStepCache.source===srcEl.value && previewStepCache.index===i && previewStepCache.end===sectionEnd)
+    return Math.min(previewStepCache.step,finalStep);
+  // Parse only through the current source section to obtain its exact Player
+  // step, including >>> phases, conditionals, !all content, and imports. The
+  // complete parsed slide is still rendered below so later declarations keep
+  // their normal validation, palette, and model semantics.
+  const scopedSource=srcEl.value.slice(0,sectionEnd)+srcEl.value.slice(range[1]);
+  const scoped=parseScript(scopedSource);
+  const step=Math.max(0,(scoped.slides[i]?.steps.length||1)-1);
+  previewStepCache={source:srcEl.value,index:i,end:sectionEnd,step};
+  return Math.min(step,finalStep);
+}
+function previewKey(i,step){
   // Key the resolved slide, not merely its local source slab: !all, imports,
   // earlier variables, and deck render settings can all change its output.
   const renderSettings={};
   for(const k of ["font","headfont","accent","linkcolor","visitedlinkcolor","color","bg","dim","tint","__palette"])
     if(deck.settings&&deck.settings[k]!=null) renderSettings[k]=deck.settings[k];
-  return JSON.stringify([i,renderSettings,deck.slides[i]]);
+  return JSON.stringify([i,step,renderSettings,deck.slides[i]]);
 }
 function showPreview(){
   if(!deck.slides.length){ stageHolder.innerHTML=""; lastPreviewKey=null; return; }
-  const key=previewKey(selected);
+  const step=previewStepAtCaret(selected), key=previewKey(selected,step);
   if(key!==lastPreviewKey){
     const sd=deck.slides[selected];
-    const p=new Player(sd,stageHolder,{settings:deck.settings,index:selected,total:deck.slides.length}); p.jumpToStep(sd.steps.length-1);
+    const p=new Player(sd,stageHolder,{settings:deck.settings,index:selected,total:deck.slides.length}); p.jumpToStep(step);
     lastPreviewKey=key;
   }
   const stage=stageHolder.parentElement, r=stage.getBoundingClientRect();
@@ -3088,14 +3131,15 @@ function rebuildEditorThumbs(){ buildThumbs(thumbRail,i=>jumpEditorToSlide(i),tr
    (in presenter mode it also drives the show — thumbnails are the overview) */
 function jumpEditorToSlide(i){
   if(presenterMode){ gotoSlide(i,{animate:true}); return; }   // updateHud syncs the editor
-  selected=i; showPreview();
+  selected=i;
   const r=slideRanges[i]; if(!r) return;
-  let caret=r[0];
+  let caret=r[1];
   const v=srcEl.value;
-  while(caret<r[1] && (v[caret]==="\n"||v[caret]===" ")) caret++;   // skip to first content
+  while(caret>r[0] && /\s/.test(v[caret-1])) caret--;       // end of the last content line
   srcEl.focus();
   srcEl.setSelectionRange(caret,caret);
   scrollCaretIntoView(caret);
+  showPreview();
 }
 function scrollCaretIntoView(pos){
   const before=srcEl.value.slice(0,pos);
@@ -3112,8 +3156,7 @@ function syncFromCaret(){
   // the preview jump to the wrong slide while typing. Recompute — it's cheap.
   slideRanges=computeSlideRanges(srcEl.value);
   const i=Math.min(slideIndexAt(srcEl.selectionStart), deck.slides.length-1);
-  if(i!==selected && i>=0){ selected=i; showPreview(); }
-  else { markSelectedThumb(); }
+  if(i>=0){ selected=i; showPreview(); }
 }
 document.addEventListener("selectionchange",()=>{ if(document.activeElement===srcEl) syncFromCaret(); });
 srcEl.addEventListener("click",syncFromCaret);
