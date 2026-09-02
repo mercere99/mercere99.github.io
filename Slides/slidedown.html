@@ -477,7 +477,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
     <h3>Variables, expressions &amp; deck styling</h3>
     <table>
-      <tr><td>!set test 5</td><td>Define any variable. Numeric values become numbers; anything else is a string. Reserved style names configure the deck: <code>bg</code> <code>dim</code> <code>tint</code> <code>color</code> <code>accent</code> <code>linkcolor</code> <code>visitedlinkcolor</code> <code>font</code> <code>headfont</code> (e.g. <code>!set font Georgia, serif</code>).</td></tr>
+      <tr><td>!set test 5</td><td>Define any variable. Numeric values become numbers; anything else is a string. Reserved style names configure the deck: <code>bg</code> <code>dim</code> <code>tint</code> <code>color</code> <code>accent</code> <code>linkcolor</code> <code>visitedlinkcolor</code> <code>font</code> <code>headfont</code> <code>size</code> <code>size1</code> <code>size2</code> <code>size3</code> <code>headsize</code> <code>headsize1</code> <code>headsize2</code> <code>headsize3</code>. <code>size</code> is the shared body default; <code>size1</code> targets body text and top-level bullets, while <code>size2</code>/<code>size3</code> target nested bullet levels. <code>headsize</code> is the shared heading default; <code>headsize1</code>/<code>2</code>/<code>3</code> target <code>#</code>/<code>##</code>/<code>###</code>. Specific settings and an element's <code>{size=…}</code> win in that order.</td></tr>
       <tr><td>!set palette ocean #A0B3C9<br>!set palette warning #d33</td><td>Define reusable document colors. Names work anywhere a color is accepted; declaration order assigns Cmd/Ctrl+1 through 9 and fixes the palette colors at the front of the color picker.</td></tr>
       <tr><td>The value is \${test}</td><td><code>\${…}</code> anywhere in slide text substitutes an expression: variables, numbers, strings, <code>+ - * / % ( )</code>. <code>+</code> concatenates strings.</td></tr>
       <tr><td>\${test*2 + 1}</td><td>Math works, with normal precedence.</td></tr>
@@ -1538,15 +1538,18 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
 function newPhase(delay=0){ return {reveals:[], tagOps:[], anims:[], delay}; }
 
 function extractPrefixes(line,namedStyles,warnings,whereStr){
-  let pos=null, label=null, tags=[], style={}, moved=true;
+  let pos=null, label=null, tags=[], style={}, moved=true, identitySeen=false;
   while(moved){
     moved=false; let m;
     if((m=line.match(RE_POS)))  { pos={x:parseFloat(m[1]),y:parseFloat(m[2])}; line=line.slice(m[0].length); moved=true; }
-    if((m=line.match(RE_LABEL))){
+    // An element has one identity prefix. Once it has been consumed, a later
+    // bracketed token is content (notably a regular-expression character
+    // class such as `[a-zA-Z0-9_]+`).
+    if(!identitySeen && (m=line.match(RE_LABEL))){
       if(!m[1]&&!m[2]) break;
       label=m[1]||null;
       if(m[2]) tags.push(...m[2].split(",").map(t=>t.trim()));
-      tags=[...new Set(tags)]; line=line.slice(m[0].length); moved=true;
+      tags=[...new Set(tags)]; line=line.slice(m[0].length); moved=true; identitySeen=true;
     }
     if((m=line.match(RE_STYLE))){ Object.assign(style,parseStyle(m[1],namedStyles,warnings,whereStr)); line=line.slice(m[0].length); moved=true; }
   }
@@ -1719,6 +1722,33 @@ function sizeToPx(v, span, abs){     // "44px" | "2em" | "0.4" | "512"
 }
 const SVGNS="http://www.w3.org/2000/svg";
 
+/* Apply deck-wide text-size settings as fallback element styles. Keeping the
+   value on each runtime definition lets every existing builder honor it via
+   its normal `size` path, while explicit per-element styles still win. */
+function withDeckTextSize(def,settings){
+  if(def.style.size!=null) return def;
+  const headingLevel={h1:1,h2:2,h3:3}[def.kind];
+  let size=null;
+  if(headingLevel){
+    size=settings["headsize"+headingLevel] ?? settings.headsize;
+  } else {
+    const bodyText=["p","li","code","table","chart"].includes(def.kind)||!!def.text;
+    if(!bodyText) return def;
+    const level=def.kind==="li" ? def.lv+1 : 1;
+    size=settings["size"+level];
+    if(size==null){
+      const base=settings.size1 ?? settings.size;
+      size=base;
+      if(base!=null && def.kind==="li" && def.lv>0){
+        const px=sizeToPx(base,SW,def.abs);
+        if(Number.isFinite(px)) size=(px*(def.lv===1?0.9:5/6))+"px";
+      }
+    }
+  }
+  if(size==null) return def;
+  return {...def,style:{...def.style,size}};
+}
+
 function renderSlide(slideDef, opts){
   opts = opts || {};
   const st = opts.settings || {}, palette=st.__palette||[];
@@ -1764,7 +1794,8 @@ function renderSlide(slideDef, opts){
   const items=new Map();       // id -> runtime item
   const labels=new Map();      // label -> runtime item
 
-  for(const def of slideDef.items){
+  for(const sourceDef of slideDef.items){
+    const def=withDeckTextSize(sourceDef,st);
     const it={def, el:null, shape:null, coords:def.coords?def.coords.map(c=>c.slice()):null,
               r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false,
               tags:new Set(def.tags||[]), scale:1, rot:0, rotOrigin:null,
@@ -3099,7 +3130,7 @@ function previewKey(i,step){
   // Key the resolved slide, not merely its local source slab: !all, imports,
   // earlier variables, and deck render settings can all change its output.
   const renderSettings={};
-  for(const k of ["font","headfont","accent","linkcolor","visitedlinkcolor","color","bg","dim","tint","__palette"])
+  for(const k of ["font","headfont","size","size1","size2","size3","headsize","headsize1","headsize2","headsize3","accent","linkcolor","visitedlinkcolor","color","bg","dim","tint","__palette"])
     if(deck.settings&&deck.settings[k]!=null) renderSettings[k]=deck.settings[k];
   return JSON.stringify([i,step,renderSettings,deck.slides[i]]);
 }
@@ -4097,6 +4128,8 @@ Markdown pipe tables, with optional alignment markers:
 - \`!set bg\` / \`!set color\` / \`!set accent\` — default background & colors
 - \`!set linkcolor\` / \`!set visitedlinkcolor\` — unvisited and visited link colors
 - \`!set font\` and \`!set headfont\` — change every slide's fonts
+- \`!set size 34px\` and \`!set headsize 54px\` — body and heading defaults
+- \`!set size1/size2/size3\` and \`!set headsize1/headsize2/headsize3\` — per-level overrides
 - {font=Courier New, monospace} …or per element: {font=Courier New, monospace}
 
 % Everything after !all is pasted onto EVERY slide (evaluated per slide):
