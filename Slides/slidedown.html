@@ -72,7 +72,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .mlist{display:none;position:absolute;left:0;top:calc(100% - 5px);z-index:100;min-width:210px;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
 .menu.open>.mlist{display:block}
 .mitem{display:block;width:100%;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:var(--chrome-text);font-family:var(--ui);font-size:13px;text-align:left;white-space:nowrap;cursor:pointer}
-.mitem:hover,.mitem:focus-visible{background:var(--panel2);outline:none}
+.mitem:disabled{opacity:.45;cursor:default}
+.mitem:not(:disabled):hover,.mitem:not(:disabled):focus-visible{background:var(--panel2);outline:none}
 .msubmenu{position:relative}
 .msubmenu-trigger{display:flex;align-items:center;justify-content:space-between;gap:28px}
 .msubmenu-arrow{color:var(--chrome-dim);font-size:16px;line-height:1}
@@ -3050,10 +3051,11 @@ function contentFingerprint(text){
   return (h>>>0).toString(36)+":"+text.length;
 }
 function isDownloaded(doc=currentDoc,text=srcEl.value){ return !!(doc&&doc.downloadedFingerprint&&doc.downloadedFingerprint===contentFingerprint(text)); }
+function isDropboxSaved(doc=currentDoc,text=srcEl.value){ return !!(doc?.dropbox?.id&&doc.dropbox.rev&&doc.dropbox.savedText===text); }
 function isDirty(){
   if(!currentDoc) return false;
   if(currentDoc.transient&&srcEl.value===currentDoc.text) return false;
-  return !isDownloaded(currentDoc,srcEl.value)&&currentDoc.dropbox?.savedText!==srcEl.value;
+  return !isDownloaded(currentDoc,srcEl.value)&&!isDropboxSaved(currentDoc,srcEl.value);
 }
 function cleanedTitle(value){ return String(value||"").replace(/\s+/g," ").trim().slice(0,120)||"Presentation"; }
 function downloadFilename(title){
@@ -3619,7 +3621,7 @@ function updateDocumentChrome(){
   if(!currentDoc) return;
   const localOnly=isDirty();
   $("#docTitle").textContent=currentDoc.title;
-  $("#docTitle").title=(currentDoc.transient?"Starter presentation — ":localOnly?"Saved only in this browser — ":"Downloaded — ")+"click to rename";
+  $("#docTitle").title=(currentDoc.transient?"Starter presentation — ":isDropboxSaved()?"Saved to Dropbox — ":localOnly?"Saved only in this browser — ":"Downloaded — ")+"click to rename";
   $("#miSave").textContent="Download “"+downloadFilename(currentDoc.title)+"”";
   document.title=(localOnly?"• ":"")+currentDoc.title+" — SlideDown";
   updateStorageStatus();
@@ -3630,13 +3632,13 @@ async function renderRecentDocuments(){
   if(!docs.length){ list.innerHTML='<div class="recent-empty">No presentations yet</div>'; return; }
   for(const doc of docs){
     const active=doc.id===currentDoc?.id, text=active?srcEl.value:doc.text;
-    const downloaded=isDownloaded(doc,text);
+    const downloaded=isDownloaded(doc,text), cloudSaved=isDropboxSaved(doc,text);
     const row=document.createElement("div"); row.className="recent-row"+(active?" recent-current":"");
     const open=document.createElement("button"); open.className="recent-open"; open.dataset.id=doc.id;
     const status=document.createElement("span");
-    status.className="recent-status "+(downloaded?"downloaded":"local");
-    status.textContent=downloaded?"✓":"•";
-    status.title=downloaded
+    status.className="recent-status "+(downloaded||cloudSaved?"downloaded":"local");
+    status.textContent=downloaded||cloudSaved?"✓":"•";
+    status.title=cloudSaved?"Current version saved to Dropbox (inside the app folder): "+doc.dropbox.path:downloaded
       ?"Current version downloaded"+(doc.lastDownloadedFilename?" as "+doc.lastDownloadedFilename:"")
       :(doc.downloadedFingerprint?"Changed since the last download":"Saved only in this browser");
     const name=document.createElement("span"); name.className="recent-name"; name.textContent=doc.title;
@@ -3852,6 +3854,7 @@ document.addEventListener("selectionchange",showCaretColorTip);
 /* ---------- menubar behavior ---------- */
 document.querySelectorAll(".menu>.mbtn").forEach(b=>{
   b.addEventListener("click",e=>{
+    updateStorageStatus();
     const menu=b.parentElement, was=menu.classList.contains("open");
     closeMenus();
     if(!was) menu.classList.add("open");
@@ -3859,6 +3862,7 @@ document.querySelectorAll(".menu>.mbtn").forEach(b=>{
   });
   // slide between open menus on hover, like native menubars
   b.addEventListener("mouseenter",()=>{
+    updateStorageStatus();
     if(document.querySelector(".menu.open") && !b.parentElement.classList.contains("open")){
       closeMenus();
       b.parentElement.classList.add("open");
@@ -4941,7 +4945,7 @@ async function pptxToPsl(file){
    Required scopes: files.metadata.read files.content.read files.content.write.
    Tokens live only in this tab's sessionStorage; reconnect after expiration.
    ============================================================ */
-const DROPBOX_APP_KEY="";
+const DROPBOX_APP_KEY="z2tjsaay6vpj3nq";
 const DBX_SESSION_KEY="slidedown.dropbox.session.v1", DBX_APP_KEY="slidedown.dropbox.appKey";
 let dbxSession=null, dbxPending=null;
 const cloudTimers=new Map(), cloudWrites=new Map(), cloudProblems=new Map();
@@ -5126,6 +5130,7 @@ async function syncDropboxDocument(doc){
       if(doc.dropbox===binding){
         doc.dropbox={...binding,id:metadata.id,path:metadata.path_display||binding.path,rev:metadata.rev,savedText:text};
         await saveLocalSnapshot(doc);
+        await renderRecentDocuments();
       }
       return true;
     }catch(error){
@@ -5150,7 +5155,7 @@ async function saveToDropbox(copy=false,doc=currentDoc){
   if(cloudWrites.has(doc.id)) await cloudWrites.get(doc.id);
   if(copy||!doc.dropbox){
     const values=await showDialog(copy?"Save a copy to Dropbox":"Save to Dropbox",[
-      {type:"note",text:"Choose a filename in the app’s Dropbox folder. Linked files autosave while Dropbox is connected. Existing files will never be overwritten by this operation. For portable images, use Insert → Image from File; relative media paths must also exist beside the Dropbox file."},
+      {type:"note",text:"Destination: Dropbox → Apps → your app folder (the folder name configured in the Dropbox App Console). Paths shown here are relative to that folder, not the top level of Dropbox. Choose a filename. Linked files autosave while Dropbox is connected. Existing files will never be overwritten by this operation. For portable images, use Insert → Image from File; relative media paths must also exist beside the Dropbox file."},
       {key:"filename",label:"Filename",value:downloadFilename(doc.title+(copy?" copy":""))}
     ],"Save");
     if(!values) return;
@@ -5183,7 +5188,7 @@ async function openDropboxBrowser(){
     if(!page.has_more) break;
     page=await dropboxRequest("files/list_folder/continue",{cursor:page.cursor});
   }
-  await showFileBrowser("Dropbox presentations",entries.sort((a,b)=>a.name.localeCompare(b.name)),e=>openDropboxPath(e.id));
+  await showFileBrowser("Dropbox presentations — inside Apps / your app folder",entries.sort((a,b)=>a.name.localeCompare(b.name)),e=>openDropboxPath(e.id));
 }
 async function openDropboxHistory(){
   const doc=currentDoc,binding=doc?.dropbox;
@@ -5208,14 +5213,21 @@ function updateStorageStatus(){
   if(doc?.dropbox){
     if(cloudWrites.has(doc.id)) cloud="Saving to Dropbox…";
     else if(cloudProblems.get(doc.id)?.conflict) cloud="Dropbox conflict — both versions preserved";
-    else if(doc.dropbox.savedText===srcEl.value) cloud="Saved to Dropbox";
+    else if(isDropboxSaved(doc,srcEl.value)) cloud="Saved to Dropbox";
     else if(!cloudBindingMatches(doc.dropbox)) cloud="Dropbox changes pending — reconnect";
     else if(navigator.onLine===false) cloud="Dropbox changes pending — offline";
     else if(cloudProblems.has(doc.id)) cloud="Dropbox save failed — retry";
     else cloud="Dropbox changes pending";
-    cloud+=" · "+doc.dropbox.path;
+    cloud+=" · App folder: "+doc.dropbox.path;
   }
-  el.textContent=local+" · "+cloud; el.title=el.textContent;
+  el.textContent=local+" · "+cloud; el.title=el.textContent+(doc?.dropbox?". Find this file in Dropbox → Apps → your app folder, in the account you connected.":"");
+  const connected=dropboxConnected();
+  for(const id of ["miCloudSave","miCloudCopy","miCloudOpen","miCloudHistory"]){
+    const button=$("#"+id);
+    button.disabled=!connected||(id!=="miCloudOpen"&&!doc)||(id==="miCloudHistory"&&(!doc?.dropbox?.rev||!cloudBindingMatches(doc.dropbox)));
+    button.title=!connected?"Connect Dropbox first":id==="miCloudHistory"&&button.disabled?"Open or save a presentation in the connected Dropbox account first":"";
+  }
+  $("#miCloudConnect").disabled=connected;
   $("#miCloudDisconnect").hidden=!dbxSession;
   $("#miCloudConnect").textContent=dropboxConnected()?"Dropbox Connected":"Connect Dropbox…";
 }
