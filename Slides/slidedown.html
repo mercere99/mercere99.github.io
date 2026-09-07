@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
 <title>SlideDown — Portable Slide Language</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -310,6 +311,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   .pslide .slide{position:absolute;left:0;top:0;transform:none!important}
 }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+#mFile>.mlist{max-height:calc(100vh - 65px);overflow-y:auto}
+[hidden]{display:none!important}
+.storage-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto;padding:5px 14px;background:var(--panel);border-top:1px solid var(--line);color:var(--chrome-dim);font-size:12px}
+.warn-link{background:none;border:0;padding:0;color:inherit;cursor:pointer;font:inherit;text-align:left;text-decoration:underline}
+.file-browser-row{display:block;width:100%;text-align:left;white-space:normal;margin:5px 0}
+.file-browser-search{width:100%;margin-bottom:12px;padding:9px;background:var(--ink);color:var(--chrome-text);border:1px solid var(--line);border-radius:5px}
 </style>
 </head>
 <body>
@@ -323,6 +330,14 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   <div class="menu" id="mFile"><button class="mbtn">File</button><div class="mlist">
     <button class="mitem" id="miNew">New Presentation</button>
     <button class="mitem" id="miOpen">Open File…</button>
+    <button class="mitem" id="miCloudSave">Save to Dropbox…</button>
+    <button class="mitem" id="miCloudOpen">Open from Dropbox…</button>
+    <button class="mitem" id="miCloudHistory">Dropbox Version History…</button>
+    <button class="mitem" id="miCloudCopy">Save a Copy to Dropbox…</button>
+    <button class="mitem" id="miCloudConnect">Connect Dropbox…</button>
+    <button class="mitem" id="miCloudDisconnect" hidden>Disconnect Dropbox</button>
+    <button class="mitem" id="miCloudSetup">Dropbox Settings…</button>
+    <div class="msep"></div>
     <button class="mitem" id="miSave">Download “Presentation.psl”</button>
     <div class="msep"></div>
     <button class="mitem" id="miCheckpoint">Save Checkpoint…</button>
@@ -334,12 +349,15 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <div class="msep"></div>
     <button class="mitem" id="miPrint">Print / Save as PDF…</button>
     <div class="msep"></div>
+    <button class="mitem" id="miAllDocuments">All Browser Presentations…</button>
+    <button class="mitem" id="miStorageRetry">Retry Browser Storage</button>
     <div class="msection">Recent Presentations</div>
     <div class="recent-list" id="recentDocs"><div class="recent-empty">Loading…</div></div>
   </div></div>
 
   <div class="menu" id="mInsert"><button class="mbtn">Insert</button><div class="mlist">
-    <button class="mitem" data-ins="image">Image…</button>
+    <button class="mitem" data-ins="image">Image from URL…</button>
+    <button class="mitem" id="miImageFile">Image from File…</button>
     <button class="mitem" data-ins="video">Video…</button>
     <button class="mitem" data-ins="audio">Audio…</button>
     <button class="mitem" data-ins="link">Link…</button>
@@ -423,6 +441,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
 <div class="pconsole" id="pconsole"></div>
 <div id="printRoot"></div>
+<input type="file" id="imageFileIn" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden>
+<div class="storage-status" id="storageStatus" role="status" aria-live="polite"></div>
 <div class="dlg" id="dlg"><div class="dcard"><h3 id="dlgTitle"></h3><div id="dlgBody"></div>
   <div class="drow"><button class="btn" id="dlgCancel">Cancel</button><button class="btn primary" id="dlgOk">Insert</button></div>
 </div></div>
@@ -577,6 +597,14 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
    ============================================================ */
 const SW = 1280, SH = 720;
 const DEFAULT_DUR = 0.7;
+let documentBaseUrl=null, documentImportScope="";
+function resolveDocumentUrl(raw){
+  if(!documentBaseUrl) return raw;
+  try{
+    const url=new URL(raw,documentBaseUrl);
+    return url.protocol==="dropbox:"?dropboxResourceUrl(url.href):url.href;
+  }catch(_){ return raw; }
+}
 
 /* ---------- tiny helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -594,7 +622,7 @@ function escapeAttr(s){return escapeHtml(String(s)).replace(/"/g,"&quot;").repla
 function urlScheme(raw){
   const s=String(raw||"")
     .replace(/&#(\d{1,7});/g,(_,n)=>String.fromCodePoint(Math.min(Number(n),0x10ffff)))
-    .replace(/&#x([0-9a-f]{1,6});/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)))
+    .replace(/&#x([0-9a-f]{1,6});/gi,(_,n)=>String.fromCodePoint(Math.min(parseInt(n,16),0x10ffff)))
     .trim().replace(/[\u0000-\u001f\u007f]/g,"");
   const m=/^([a-z][a-z0-9+.-]*):/i.exec(s);
   return m?m[1].toLowerCase():null;
@@ -611,7 +639,7 @@ function isSafeEmbedUrl(raw){
 /* Replace Markdown links after the source has been HTML-escaped. A scanner is
    used instead of a URL regex so nested, balanced parentheses remain part of
    the destination. An empty label displays the URL itself. */
-function renderInlineLinks(h){
+function renderInlineLinks(h, keepLink=x=>x, renderLabel=x=>x){
   const opener=/\[([^\]]*)\]\(/g;
   let out="", copiedThrough=0, match;
   while((match=opener.exec(h))){
@@ -631,13 +659,14 @@ function renderInlineLinks(h){
     }
     const url=h.slice(urlStart,close);
     const normalized=url.replace(/&amp;/g,"&");
+    if(/[\u0000-\u001f]/.test(normalized)){ opener.lastIndex=close+1; continue; }
     if(!isSafeLinkUrl(normalized)){
       opener.lastIndex=close+1;
       continue;
     }
     const text=match[1] || escapeHtml(normalized);
     out+=h.slice(copiedThrough,linkStart)
-      +'<a href="'+escapeAttr(normalized)+'" target="_blank" rel="noopener noreferrer">'+text+"</a>";
+      +keepLink('<a href="'+escapeAttr(resolveDocumentUrl(normalized))+'" target="_blank" rel="noopener noreferrer">'+renderLabel(text)+"</a>");
     copiedThrough=close+1;
     opener.lastIndex=copiedThrough;
   }
@@ -653,7 +682,7 @@ function isCssColor(value){
 const PALETTE_MAP_CACHE=new WeakMap();
 function paletteColorMap(palette){
   if(palette&&PALETTE_MAP_CACHE.has(palette)) return PALETTE_MAP_CACHE.get(palette);
-  const map={};
+  const map=Object.create(null);
   for(const entry of palette||[]) map[String(entry.name).toLowerCase()]=entry.value;
   if(palette&&typeof palette==="object") PALETTE_MAP_CACHE.set(palette,map);
   return map;
@@ -666,7 +695,8 @@ function resolvePaletteColor(value,palette){
 /* Render a small, explicit allowlist of inline controls. The scanner skips
    generated HTML tags, so control-like text inside a link URL cannot alter an
    attribute. Paired controls may contain links, emphasis, or other controls. */
-function renderInlineControls(h,palette){
+function renderInlineControls(h,palette,depthLimit=0){
+  if(depthLimit>32) return h;
   const tags={sub:"sub",sup:"sup",mark:"mark",u:"u",s:"s",small:"small"};
   let out="";
   for(let i=0;i<h.length;){
@@ -685,8 +715,8 @@ function renderInlineControls(h,palette){
 
     if(sep<0 || shortEnd<sep){
       const name=h.slice(i+2,shortEnd).trim().toLowerCase();
-      const simple={br:"<br>",wbr:"<wbr>",nbsp:"&nbsp;"}[name];
-      out+=simple||h.slice(i,shortEnd+2);
+      const simple=Object.hasOwn({br:1,wbr:1,nbsp:1},name)?({br:"<br>",wbr:"<wbr>",nbsp:"&nbsp;"})[name]:null;
+      out+=(typeof simple==="string"?simple:null)||h.slice(i,shortEnd+2);
       i=shortEnd+2;
       continue;
     }
@@ -707,7 +737,7 @@ function renderInlineControls(h,palette){
     if(close<0){ out+=h.slice(i); break; }
 
     const name=h.slice(i+2,sep).trim().toLowerCase();
-    const content=renderInlineControls(h.slice(sep+1,close),palette);
+    const content=renderInlineControls(h.slice(sep+1,close),palette,depthLimit+1);
     const size=/^size\s*=\s*((?:\d+(?:\.\d*)?|\.\d+)(?:px|pt|em|rem|%)?)$/i.exec(name);
     const color=/^color\s*=\s*(.+)$/i.exec(name);
     if(size){
@@ -716,7 +746,7 @@ function renderInlineControls(h,palette){
     }else if(color){
       const value=resolvePaletteColor(color[1],palette);
       out+=isCssColor(value)?'<span class="inline-color" style="color:'+escapeAttr(value)+'">'+content+"</span>":h.slice(i,close+2);
-    }else if(tags[name]){
+    }else if(Object.hasOwn(tags,name)){
       out+="<"+tags[name]+">"+content+"</"+tags[name]+">";
     }else if(name==="nobr"){
       out+='<span class="inline-nobr">'+content+"</span>";
@@ -752,7 +782,7 @@ function renderMath(tex, display){
 function inlineMd(s,palette){
   const stash=[];
   const keep=html=>{ stash.push(html); return "\u0000"+(stash.length-1)+"\u0000"; };
-  let raw=s;
+  let raw=String(s).replace(/\u0000/g,"\uFFFD");
   raw=raw.replace(/`([^`]+)`/g,(_,c)=>keep("<code>"+escapeHtml(c)+"</code>"));
   raw=raw.replace(/\\\$/g,()=>keep("$"));
   raw=raw.replace(/\$\$([^$]+)\$\$/g,(_,tex)=>keep(renderMath(tex,true)));
@@ -760,11 +790,11 @@ function inlineMd(s,palette){
   let h = escapeHtml(raw);
   // entities stay usable: &nbsp; &mdash; &rarr; &#8594; &#x1F600; ... (never tags)
   h = h.replace(/&amp;(#\d{1,7}|#x[0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,30});/g,"&$1;");
-  h = renderInlineLinks(h);
-  h = renderInlineControls(h,palette);
-  h = h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
-  h = h.replace(/\*([^*]+)\*/g,"<i>$1</i>");
-  h = h.replace(/\u0000(\d+)\u0000/g,(_,i)=>stash[+i]);
+  const restore=t=>t.replace(/\u0000(\d+)\u0000/g,(_,i)=>stash[+i]||"");
+  const format=t=>renderInlineControls(t,palette).split(/(<[^>]*>)/g).map((part,i)=>i%2?part:
+    part.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\*([^*]+)\*/g,"<i>$1</i>")).join("");
+  h = renderInlineLinks(h,keep,t=>restore(format(t)));
+  h = restore(format(h));
   return h;
 }
 let _colorProbe=null;
@@ -855,7 +885,7 @@ function styleLen(v, span, vars){
    editor's caret->slide mapping stays exact. */
 const PSL_IMPORTS={cache:new Map(), onUpdate:null, fetcher:null};
 const RE_IMPORT=/^!import\s*\(?\s*([^)\s]+)\s*\)?\s*$/i;
-function expandImports(bodyText, warnings, slideIndex, depth){
+function expandImports(bodyText, warnings, slideIndex, depth, base=documentBaseUrl){
   if(depth>4){ warnings.push(`slide ${slideIndex+1}: !import nesting too deep`); return bodyText; }
   const out=[]; let inF=false;
   for(const L of bodyText.split("\n")){
@@ -864,19 +894,25 @@ function expandImports(bodyText, warnings, slideIndex, depth){
     if(FENCE_OPEN.test(t)){ inF=true; out.push(L); continue; }
     const m=t.match(RE_IMPORT);
     if(!m){ out.push(L); continue; }
-    const url=m[1], entry=PSL_IMPORTS.cache.get(url);
+    let url=m[1]; try{if(base) url=new URL(url,base).href;}catch(_){}
+    const cacheKey=url.startsWith("dropbox:")?url+"|"+documentImportScope:url;
+    const entry=PSL_IMPORTS.cache.get(cacheKey);
     if(!entry){
-      PSL_IMPORTS.cache.set(url,{pending:true});
-      if(PSL_IMPORTS.fetcher) PSL_IMPORTS.fetcher(url);
+      PSL_IMPORTS.cache.set(cacheKey,{pending:true});
+      if(PSL_IMPORTS.fetcher) PSL_IMPORTS.fetcher(url,cacheKey);
       warnings.push(`slide ${slideIndex+1}: importing ${url} …`);
     }else if(entry.pending){
       warnings.push(`slide ${slideIndex+1}: importing ${url} …`);
     }else if(entry.error){
       warnings.push(`slide ${slideIndex+1}: !import ${url} failed — ${entry.error}`);
     }else{
-      let txt=expandImports(entry.text, warnings, slideIndex, depth+1);
+      let txt=expandImports(entry.text, warnings, slideIndex, depth+1,url);
+      let importedFence=false;
       for(const IL of txt.split("\n")){
-        if(IL.trim()==="---"||IL.trim()==="!---"){
+        const t=IL.trim();
+        if(importedFence){ out.push(IL); if(t.startsWith("```")) importedFence=false; continue; }
+        if(FENCE_OPEN.test(t)) importedFence=true;
+        if(t==="---"||t==="!---"){
           warnings.push(`slide ${slideIndex+1}: !import cannot add slides — “---” in ${url} ignored`);
           continue;
         }
@@ -912,7 +948,7 @@ function readDocumentPalette(text,warnings=[]){
 
 function parseScript(text){
   const warnings=[];
-  const vars={ __labels:{}, __styles:{}, __palette:readDocumentPalette(text,warnings),
+  const vars={ __labels:Object.create(null), __styles:Object.create(null), __palette:readDocumentPalette(text,warnings),
     slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI, nbsp:"\u00A0" };
   // Hidden (!---) "pocket" slides ARE parsed and executed — their variable
   // math affects later slides — but presentation skips them when advancing.
@@ -989,7 +1025,7 @@ function evalExpr(src, vars){
       const name=m[0]; i+=name.length;
       ws();
       if(src[i]==="("){                                    // function call
-        if(!(name in EXPR_FNS)) throw new Error(`unknown function “${name}”`);
+        if(!Object.hasOwn(EXPR_FNS,name)) throw new Error(`unknown function “${name}”`);
         i++; const args=[];
         ws();
         if(src[i]!==")"){ for(;;){ args.push(num(comparison(),name+"()")); ws();
@@ -1007,7 +1043,7 @@ function evalExpr(src, vars){
         if(val===undefined) throw new Error(`“${name}” has no member “${mm[0]}”`);
         return val;
       }
-      if(!(name in vars)) throw new Error(`unknown variable “${name}”`);
+      if(!Object.hasOwn(vars,name)) throw new Error(`unknown variable “${name}”`);
       return vars[name];
     }
     m=/^(\d+(\.\d*)?|\.\d+)/.exec(src.slice(i));
@@ -1043,12 +1079,14 @@ function evalExpr(src, vars){
   ws();
   const asn=/^([A-Za-z_]\w*)\s*=(?![=<>])/.exec(src.slice(i));
   let value;
-  if(asn){ i+=asn[0].length; value=comparison(); vars[asn[1]]=value; }
+  if(asn){ if(isReservedVariable(asn[1])) throw new Error("reserved variable name"); i+=asn[0].length; value=comparison(); }
   else value=comparison();
   ws();
   if(i<src.length) throw new Error(`unexpected “${src.slice(i)}”`);
+  if(asn) vars[asn[1]]=value;
   return value;
 }
+function isReservedVariable(name){ return name.startsWith("__")||["constructor","prototype"].includes(name); }
 
 /* Members of a labeled element, computed from its declared geometry (px).
    Values are parse-time — i.e. as written in the script up to this point;
@@ -1154,6 +1192,23 @@ function leadingNumber(s){
   return new RegExp(`^\\s*(${NUM_PATTERN})(?=\\s|$)`).exec(s);
 }
 
+function splitTableRow(t){
+  const cells=[]; let cell="", depth=0, code=false;
+  t=t.replace(/^\|/,"").replace(/\|\s*$/,"");
+  for(let i=0;i<t.length;i++){
+    if(t[i]==="\\"&&t[i+1]==="|"){ cell+="|"; i++; continue; }
+    if(t[i]==="`") code=!code;
+    if(!code&&t.slice(i,i+2)==="{{"){ depth++; cell+="{{"; i++; continue; }
+    if(!code&&depth&&t.slice(i,i+2)==="}}"){ depth--; cell+="}}"; i++; continue; }
+    if(t[i]==="|"&&!code&&!depth){ cells.push(cell.trim()); cell=""; }
+    else cell+=t[i];
+  }
+  cells.push(cell.trim()); return cells;
+}
+function backgroundDef(value,palette){
+  return isCssColor(resolvePaletteColor(value,palette))?{color:value}:{image:value};
+}
+
 function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
   const slide={items:[], steps:[[newPhase()]], bg:null, hasH1:false, hasH3:false};
   let step=0, phase=0, nextId=0;
@@ -1235,12 +1290,13 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     }
     // --- control flow: !foreach var start end [step] … !endfor ---
     if((m=line.match(/^!for(?:each)?\s+([A-Za-z_]\w*)\s+(.*)$/i))){
+      if(isReservedVariable(m[1])){ warnings.push(`${where(lnNo)}: reserved loop variable`); continue; }
       const {endIdx}=findBlockEnd(L,k,/^!for(?:each)?\b/i,/^!endfor(?:each)?\b/i,null);
       const end = endIdx<0 ? L.length : endIdx;
       if(endIdx<0) warnings.push(`${where(lnNo)}: !foreach without !endfor (block runs to end of slide)`);
       const args=substVars(m[2].trim(),vars,warnings,where(lnNo)).split(/\s+/).map(Number);
       const [start,stop]=args; const stp = args.length>2 ? args[2] : 1;
-      if(args.length<2 || args.some(Number.isNaN))
+      if(args.length<2 || args.some(v=>!Number.isFinite(v)))
         warnings.push(`${where(lnNo)}: !foreach needs numeric “start end [step]” (use \${…} for expressions)`);
       else if(stp===0)
         warnings.push(`${where(lnNo)}: !foreach step of 0 would never end`);
@@ -1293,7 +1349,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       for(; j<L.length && L[j].text.trim().startsWith("|"); j++)
         rowsRaw.push(substVars(L[j].text.trim(), vars, warnings, where(L[j].n)));
       k=j-1;
-      const splitRow=t=>t.replace(/^\|/,"").replace(/\|\s*$/,"").split("|").map(c=>c.trim());
+      const splitRow=splitTableRow;
       const all=rowsRaw.map(splitRow);
       const isSep=r=>r.length>0 && r.every(c=>/^:?-{2,}:?$/.test(c));
       let head=null, aligns=[], rows=all;
@@ -1333,6 +1389,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
 
     // --- variables: !set name value (value already ${}-substituted) ---
     if((m=line.match(/^!set\s+([A-Za-z_]\w*)\s*(.*)$/i))){
+      if(isReservedVariable(m[1])){ warnings.push(`${where(lnNo)}: reserved variable name “${m[1]}”`); continue; }
       const val=m[2].trim().replace(/^["']|["']$/g,"");
       vars[m[1]] = /^-?\d+(\.\d+)?$/.test(val) ? parseFloat(val) : val;
       continue;
@@ -1374,7 +1431,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     // --- background (optional {dim=..,tint=..} via style prefix) ---
     if((m=line.match(/^!bg\((.+)\)\s*$/i))){
       const v=m[1].trim(), prev=slide.bg;
-      slide.bg = (/[./\\]|^data:|^https?:/i.test(v)) ? {image:v} : {color:v};
+      slide.bg = backgroundDef(v,vars.__palette);
       if(style.dim!=null)       slide.bg.dim  = clamp(parseFloat(style.dim),0,1);
       else if(prev&&prev.dim!=null) slide.bg.dim = prev.dim;
       if(style.tint!=null)      slide.bg.tint = style.tint;
@@ -1489,7 +1546,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
           const tm=tail.match(new RegExp(`^\\s*(${NUM_PATTERN})\\s+(${NUM_PATTERN})(?:\\s+(${NUM_PATTERN}))?`));
           const nums=tm?[Number(tm[1]),Number(tm[2]),...(tm[3]!=null?[Number(tm[3])]:[])]:[];
           if(nums.length<2){ok=false;} else {
-            const [cx0,cy0]=P(0), pts=Math.max(3,Math.round(nums[0]));
+            const [cx0,cy0]=P(0), pts=clamp(Math.round(nums[0]),3,1000);
             const rOut=cvlen(nums[1],vars,SH), rIn=nums.length>2?cvlen(nums[2],vars,SH):rOut*0.45;
             item.coords=[];
             for(let j2=0;j2<2*pts;j2++){
@@ -1769,14 +1826,14 @@ function renderSlide(slideDef, opts){
   // background: a slide's own !bg fully overrides the deck default
   let bg=slideDef.bg;
   if(!bg && (st.bg || st.dim!=null)){
-    if(st.bg) bg = (/[./\\]|^data:|^https?:/i.test(st.bg)) ? {image:st.bg} : {color:st.bg};
+    if(st.bg) bg = backgroundDef(st.bg,palette);
     bg = bg || {color:null};
     if(st.dim!=null) bg.dim = clamp(parseFloat(st.dim),0,1);
     if(st.tint)      bg.tint = st.tint;
   }
   if(bg){
     if(bg.color) root.style.background=pc(bg.color);
-    if(bg.image) root.style.backgroundImage=`url("${bg.image.replace(/"/g,'%22')}")`;
+    if(bg.image) root.style.backgroundImage=`url("${resolveDocumentUrl(bg.image).replace(/"/g,'%22')}")`;
     if(bg.dim>0){
       const scrim=document.createElement("div"); scrim.className="bg-scrim";
       scrim.style.background=bg.tint?pc(bg.tint):"#000";
@@ -1821,6 +1878,7 @@ function renderSlide(slideDef, opts){
     it.layerEl=it.shape?itemSvg:it.el;
     applyItemLayer(it);
     if(def.style.rotate!=null){ const rv=parseFloat(def.style.rotate); if(!isNaN(rv)){ it.rot=rv; applyTransform(it); } }
+    it.allowAutoplay=!!opts.live;
     setVisible(it,false);
     items.set(def.id,it);
     if(def.label) labels.set(def.label,it);
@@ -1834,12 +1892,12 @@ function applyItemLayer(it){
   it.layerEl.style.zIndex=String(Math.round(it.layer*100000)+(it.def.id||0));
 }
 
-function applyTextStyle(el,style,palette){
-  if(style.size)  el.style.fontSize=sizeToPx(style.size,SW)+"px";
+function applyTextStyle(el,style,palette,abs=false){
+  if(style.size)  el.style.fontSize=sizeToPx(style.size,SW,abs)+"px";
   if(style.color) el.style.color=resolvePaletteColor(style.color,palette);
   if(style.font)  el.style.fontFamily=style.font;
   if(style.align) el.style.textAlign=style.align;
-  if(style.w)     el.style.width=sizeToPx(style.w,SW)+"px";
+  if(style.w)     el.style.width=sizeToPx(style.w,SW,abs)+"px";
   if(style.opacity) el.style.opacity=style.opacity;
 }
 const LANG_ALIASES={"c++":"cpp","h":"cpp","hpp":"cpp","py":"python","js":"javascript","ts":"typescript","sh":"bash","shell":"bash"};
@@ -1854,7 +1912,7 @@ function buildCode(it,flow,absLayer,palette){
   if(html!=null) codeEl.innerHTML=html;
   else codeEl.textContent=d.code;          // no hljs / unknown language -> plain
   pre.appendChild(codeEl);
-  applyTextStyle(pre,d.style,palette);
+  applyTextStyle(pre,d.style,palette,d.abs);
   placeItem(it,flow,absLayer,pre);
 }
 function buildTable(it,flow,absLayer,palette){
@@ -1873,7 +1931,7 @@ function buildTable(it,flow,absLayer,palette){
   const tbody=document.createElement("tbody");
   d.rows.forEach(r=>tbody.appendChild(mkRow("td",r)));
   tb.appendChild(tbody);
-  applyTextStyle(tb,d.style,palette);
+  applyTextStyle(tb,d.style,palette,d.abs);
   placeItem(it,flow,absLayer,tb);
 }
 function placeItem(it,flow,absLayer,el){
@@ -1896,12 +1954,12 @@ function buildText(it,flow,absLayer,palette){
     el.className={h1:"s-h1",h2:"s-h2",h3:"s-h3",p:"s-p"}[d.kind];
     el.innerHTML=inlineMd(d.text,palette);
   }
-  applyTextStyle(el,d.style,palette);
+  applyTextStyle(el,d.style,palette,d.abs);
   placeItem(it,flow,absLayer,el);
 }
 function buildImg(it,flow,absLayer){
   const d=it.def, box=document.createElement("div"); box.className="s-img";
-  const img=document.createElement("img"); img.src=d.src; img.alt=d.alt||"";
+  const img=document.createElement("img"); img.src=resolveDocumentUrl(d.src); img.alt=d.alt||"";
   const w=d.style.w?sizeToPx(d.style.w,SW,d.abs):null, h=d.style.h?sizeToPx(d.style.h,SH,d.abs):null;
   if(w) img.style.width=w+"px"; else if(!h) img.style.width="500px";
   if(h) img.style.height=h+"px";
@@ -1923,7 +1981,7 @@ function buildEmbed(it,flow,absLayer,opts){
     box.innerHTML=`<span>${d.blocked?"⚠ blocked embed":"▷ "+escapeHtml(host||"embedded app")}</span>`;
   }else{
     const fr=document.createElement("iframe");
-    fr.src=d.src; fr.loading="lazy";
+    fr.src=resolveDocumentUrl(d.src); fr.loading="lazy";
     fr.setAttribute("allow","fullscreen; autoplay");
     fr.setAttribute("sandbox","allow-scripts allow-forms allow-popups allow-presentation allow-downloads");
     fr.setAttribute("referrerpolicy","no-referrer");
@@ -1946,18 +2004,19 @@ function buildMedia(it,flow,absLayer,opts){
   if(isVid){ it.embedW=w; it.embedH=h; it.embedBox=box; }     // lets `!anim … size` resize videos
   if(opts.thumb){                       // rail thumbnails & print pages: poster or placeholder
     box.classList.add("embed-ph");
-    if(isVid&&d.style.poster){ const im=document.createElement("img"); im.src=d.style.poster; im.alt=""; box.appendChild(im); }
+    if(isVid&&d.style.poster){ const im=document.createElement("img"); im.src=resolveDocumentUrl(d.style.poster); im.alt=""; box.appendChild(im); }
     else{
       let host=""; try{ host=new URL(d.src,location.href).host; }catch(e){ host=d.src; }
       box.innerHTML=`<span>${isVid?"▶":"♪"} ${escapeHtml(host||d.kind)}</span>`;
     }
   }else{
     const md=document.createElement(isVid?"video":"audio");
-    md.src=d.src; md.preload="metadata"; md.playsInline=true;
+    md.src=resolveDocumentUrl(d.src); md.preload="metadata"; md.playsInline=true;
+    md.addEventListener("loadedmetadata",()=>{ if(it.visible&&it.allowAutoplay&&d.style.autoplay)md.play().catch(()=>{}); });
     md.controls = !(d.style.controls==="0"||d.style.controls==="off"||d.style.controls==="false");
     if(d.style.loop)  md.loop=true;
     if(d.style.muted) md.muted=true;
-    if(isVid&&d.style.poster) md.poster=d.style.poster;
+    if(isVid&&d.style.poster) md.poster=resolveDocumentUrl(d.style.poster);
     box.appendChild(md); it.media=md;
   }
   placeItem(it,flow,absLayer,box);
@@ -2002,7 +2061,7 @@ function buildShape(it,svg,palette){
     span.innerHTML=inlineMd(d.text,palette);
     body.appendChild(span);
     body.style.color = pc(st.textcolor || st.color2 || (isBox ? "#233" : "#232830"));
-    if(st.size)  body.style.fontSize=sizeToPx(st.size,SW)+"px";
+    if(st.size)  body.style.fontSize=sizeToPx(st.size,SW,d.abs)+"px";
     body.style.textAlign = st.align||"center";
     body.style.alignItems = {top:"flex-start",middle:"center",bottom:"flex-end"}[st.valign]||"center";
     const pad = st.pad!=null ? sizeToPx(st.pad,SW) : 16;
@@ -2159,7 +2218,7 @@ function setVisible(it,on){
   if(it.shape) it.el.style.visibility=on?"visible":"hidden";
   if(it.media){
     try{
-      if(on){ if(it.def.style.autoplay && it.media.paused){ const p=it.media.play(); if(p&&p.catch) p.catch(()=>{}); } }
+      if(on){ if(it.allowAutoplay && it.def.style.autoplay && it.media.paused){ const p=it.media.play(); if(p&&p.catch) p.catch(()=>{}); } }
       else if(!it.media.paused) it.media.pause();
     }catch(_){}
   }
@@ -2296,6 +2355,7 @@ class Tween{
     };
     this.raf=requestAnimationFrame(tick);
   });}
+  cancel(){ if(this.done) return; this.done=true; cancelAnimationFrame(this.raf); this.resolve&&this.resolve(); }
   finish(){ if(this.done) return; this.done=true; cancelAnimationFrame(this.raf); this.onUpdate(1); this.resolve&&this.resolve(); }
 }
 
@@ -2591,7 +2651,15 @@ class Player{
       holder.querySelectorAll("video,audio").forEach(m=>{ try{ m.pause(); }catch(_){} });
     holder.innerHTML=""; holder.appendChild(this.render.root);
     this.step=-1;           // no step applied yet
-    this.busy=false; this.ff=false; this.live=[];
+    this.busy=false; this.ff=false; this.live=[]; this.disposed=false;
+  }
+  dispose(){
+    this.disposed=true; this.busy=false;
+    for(const it of this.render.items.values())it.allowAutoplay=false;
+    for(const t of this.live) t.cancel(); this.live=[];
+    this.render.root.getAnimations?.({subtree:true}).forEach(a=>a.cancel());
+    this.render.root.querySelectorAll("video,audio").forEach(m=>m.pause());
+    this.render.root.querySelectorAll("iframe").forEach(f=>f.remove());
   }
   get stepCount(){ return this.def.steps.length; }
 
@@ -2613,13 +2681,15 @@ class Player{
     this.step=Math.min(target,this.stepCount-1);
   }
   async runStep(s,onDone){                 // animated, honoring >>> chains
-    if(s>=this.stepCount) return;
+    if(this.disposed||s>=this.stepCount) return;
     this.busy=true; this.ff=false; this.step=s;
     for(const ph of this.def.steps[s]){
+      if(this.disposed) return;
       if(this.ff){ this.applyPhaseInstant(ph); continue; }
       if(ph.delay>0){
         const pause=new Tween(ph.delay,()=>{},EASINGS.linear);
         this.live=[pause]; await pause.start(); this.live=[];
+        if(this.disposed) return;
         if(this.ff){ this.applyPhaseInstant(ph); continue; }
       }
       this.applyTagOps(ph);
@@ -2631,14 +2701,16 @@ class Player{
       this.live=tws;
       await Promise.all(tws.map(t=>t.start()));
       this.live=[];
+      if(this.disposed) return;
     }
     this.busy=false; onDone&&onDone();
   }
   fastForward(){ this.ff=true; for(const t of this.live) t.finish(); }
   /* advance() -> true if it consumed the keypress, false if slide is finished */
   advance(){
+    if(this.disposed) return false;
     if(this.busy){ this.fastForward(); return true; }
-    if(this.step+1<this.stepCount){ this.runStep(this.step+1); return true; }
+    if(this.step+1<this.stepCount){ this.runStep(this.step+1,updateHud); return true; }
     return false;
   }
 }
@@ -2792,7 +2864,7 @@ srcEl.addEventListener("keydown",e=>{
       return;
     }
     if(key==="s"){
-      e.preventDefault(); downloadCurrentDocument(); return;
+      e.preventDefault(); if(currentDoc?.dropbox) saveToDropbox().catch(reportStorageError); else downloadCurrentDocument().catch(reportStorageError); return;
     }
     if(key==="y"){
       const before=srcEl.value;
@@ -2806,8 +2878,7 @@ srcEl.addEventListener("keydown",e=>{
   }
   if(e.key==="Tab"){ e.preventDefault();
     const {selectionStart:a,selectionEnd:b,value:v}=srcEl;
-    srcEl.value=v.slice(0,a)+"  "+v.slice(b); srcEl.selectionStart=srcEl.selectionEnd=a+2;
-    srcEl.dispatchEvent(new Event("input"));
+    replaceEditorRange(a,b,"  ",a+2,a+2);
   }
 });
 
@@ -2820,17 +2891,32 @@ function computeSlideRanges(text){
 }
 function slideIndexAt(pos){
   for(let i=0;i<slideRanges.length;i++){ if(pos>=slideRanges[i][0] && pos<=slideRanges[i][1]) return i; }
+  for(let i=1;i<slideRanges.length;i++) if(pos<slideRanges[i][0]) return i-1;
   return clamp(slideRanges.length-1,0,Infinity);
 }
 
 function refresh(){
-  deck=parseScript(srcEl.value);
+  setDocumentBase(currentDoc,srcEl.value);
+  try{ deck=parseScript(srcEl.value); }catch(e){
+    warnbar.className="warnbar on"; warnbar.textContent="⚠ Could not render: "+e.message; return;
+  }
   previewStepCache=null;  // imports and resolved control flow may change step numbering without changing source
   slideRanges=computeSlideRanges(srcEl.value);
   refreshEditorColorTools();
   selected=clamp(selected,0,deck.slides.length-1);
   warnbar.className="warnbar"+(deck.warnings.length?" on":"");
-  warnbar.innerHTML=deck.warnings.map(w=>"⚠ "+escapeHtml(w)).join("<br>");
+  warnbar.replaceChildren();
+  deck.warnings.forEach(w=>{
+    const at=/^slide (\d+), line (\d+)/.exec(w), node=document.createElement(at?"button":"div");
+    node.textContent="⚠ "+w;
+    if(at){ node.className="warn-link"; node.onclick=()=>{
+      const range=slideRanges[Number(at[1])-1]; if(!range) return;
+      const lines=srcEl.value.slice(range[0],range[1]).split("\n");
+      const pos=range[0]+lines.slice(0,Number(at[2])-1).reduce((n,line)=>n+line.length+1,0);
+      srcEl.focus(); srcEl.setSelectionRange(pos,pos); scrollCaretIntoView(pos); syncFromCaret();
+    }; }
+    warnbar.append(node,document.createElement("br"));
+  });
   rebuildEditorThumbs();
   showPreview();          // rebuilds when the selected slide model or caret section changed
 }
@@ -2846,6 +2932,16 @@ const NEW_DECK_TEXT="# Untitled\n## \n---\n### First slide\n- \n";
 let libraryDB=null, currentDoc=null, autosaveTimer=null, autosaveDisabled=false, quotaWarned=false;
 let lastAutoSnapshotText=null, lastAutoSnapshotTime=0;
 let lastStorageCheck=0, storageWarningShown=false;
+const memoryStores={docs:new Map(),versions:new Map(),settings:new Map()};
+const localSavedText=new Map(), liveDocuments=new Map(), localRevisions=new Map();
+let localSaveQueue=Promise.resolve(), pendingLocalWrites=0;
+const cloneRecord=v=>v==null?v:structuredClone(v);
+async function hydrateLocalCache(){
+  for(const name of Object.keys(memoryStores)){
+    const rows=await idbRequest(libraryDB.transaction(name).objectStore(name).getAll());
+    for(const row of rows){ memoryStores[name].set(row.id||row.key,row); if(name==="docs"){ localSavedText.set(row.id,row.text); liveDocuments.set(row.id,row); localRevisions.set(row.id,row.localRevision||0); } }
+  }
+}
 
 function idbRequest(req){ return new Promise((resolve,reject)=>{ req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error); }); }
 function idbTransactionDone(tx){ return new Promise((resolve,reject)=>{ tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); tx.onabort=()=>reject(tx.error||new Error("Storage transaction aborted")); }); }
@@ -2869,18 +2965,49 @@ function openLibrary(){
     req.onerror=()=>reject(req.error);
   });
 }
-async function dbGet(store,key){ return idbRequest(libraryDB.transaction(store).objectStore(store).get(key)); }
-async function dbGetAll(store){ return idbRequest(libraryDB.transaction(store).objectStore(store).getAll()); }
+async function dbGet(store,key){ return store==="docs"?(liveDocuments.get(key)||cloneRecord(memoryStores.docs.get(key))):cloneRecord(memoryStores[store].get(key)); }
+async function dbGetAll(store){ return [...memoryStores[store].values()].map(cloneRecord); }
 async function dbPut(store,value){
-  const tx=libraryDB.transaction(store,"readwrite"); tx.objectStore(store).put(value); await idbTransactionDone(tx); return value;
+  const copy=cloneRecord(value);
+  if(libraryDB){
+    const tx=libraryDB.transaction(store==="docs"?["docs","versions"]:store,"readwrite");
+    const done=idbTransactionDone(tx);
+    let recovered=null;
+    if(store==="docs"){
+      // Compare and preserve inside the SAME transaction. A stale tab cannot
+      // silently erase a newer browser copy, even before Dropbox synchronization.
+      const request=tx.objectStore("docs").get(copy.id);
+      request.onsuccess=()=>{
+        const previous=request.result;
+        if(previous&&(previous.localRevision||0)!==(localRevisions.get(copy.id)||0)&&previous.text!==copy.text){
+          recovered={id:makeId("h"),docId:copy.id,ts:Date.now(),text:previous.text,label:"Recovered before another tab saved"};
+          tx.objectStore("versions").put(recovered);
+        }
+        copy.localRevision=(previous?.localRevision||0)+1; tx.objectStore("docs").put(copy);
+      };
+    }else tx.objectStore(store).put(copy);
+    await done;
+    if(store==="docs"){
+      localRevisions.set(copy.id,copy.localRevision);
+      if(recovered){ memoryStores.versions.set(recovered.id,recovered); showNotice({text:"Another tab had a different browser version. It was preserved in Version History before saving this tab’s copy."}); }
+    }
+  }
+  memoryStores[store].set(copy.id||copy.key,store==="docs"?cloneRecord(liveDocuments.get(copy.id)||copy):copy);
+  return value;
 }
 async function dbDelete(store,key){
-  const tx=libraryDB.transaction(store,"readwrite"); tx.objectStore(store).delete(key); await idbTransactionDone(tx);
+  if(libraryDB){ const tx=libraryDB.transaction(store,"readwrite"),done=idbTransactionDone(tx); tx.objectStore(store).delete(key); await done; }
+  memoryStores[store].delete(key); if(store==="docs"){ localSavedText.delete(key); liveDocuments.delete(key); localRevisions.delete(key); }
 }
 async function versionsForDoc(docId){
-  const tx=libraryDB.transaction("versions");
-  return idbRequest(tx.objectStore("versions").index("docId").getAll(IDBKeyRange.only(docId)));
+  if(libraryDB){
+    const tx=libraryDB.transaction("versions"), rows=await idbRequest(tx.objectStore("versions").index("docId").getAll(IDBKeyRange.only(docId)));
+    for(const [id,rec] of memoryStores.versions)if(rec.docId===docId)memoryStores.versions.delete(id);
+    for(const row of rows)memoryStores.versions.set(row.id,row);
+  }
+  return [...memoryStores.versions.values()].filter(v=>v.docId===docId).map(cloneRecord).sort((a,b)=>a.ts-b.ts);
 }
+
 async function purgeAutomaticHistory(limit=25){
   const [docs,versions]=await Promise.all([dbGetAll("docs"),dbGetAll("versions")]);
   const byId=new Map(docs.map(d=>[d.id,d])), keep=new Map();
@@ -2894,8 +3021,7 @@ async function purgeAutomaticHistory(limit=25){
     const opened=(da?.lastOpenedAt||0)-(db?.lastOpenedAt||0); return opened||a.ts-b.ts;
   }).slice(0,limit);
   if(!candidates.length) return 0;
-  const tx=libraryDB.transaction("versions","readwrite"), store=tx.objectStore("versions");
-  candidates.forEach(v=>store.delete(v.id)); await idbTransactionDone(tx); return candidates.length;
+  for(const v of candidates) await dbDelete("versions",v.id); return candidates.length;
 }
 async function checkStoragePressure(force=false){
   if(!navigator.storage?.estimate||!libraryDB) return;
@@ -2927,7 +3053,7 @@ function isDownloaded(doc=currentDoc,text=srcEl.value){ return !!(doc&&doc.downl
 function isDirty(){
   if(!currentDoc) return false;
   if(currentDoc.transient&&srcEl.value===currentDoc.text) return false;
-  return !isDownloaded(currentDoc,srcEl.value);
+  return !isDownloaded(currentDoc,srcEl.value)&&currentDoc.dropbox?.savedText!==srcEl.value;
 }
 function cleanedTitle(value){ return String(value||"").replace(/\s+/g," ").trim().slice(0,120)||"Presentation"; }
 function downloadFilename(title){
@@ -2953,34 +3079,65 @@ function newDocument(title,text=NEW_DECK_TEXT){
     downloadedFingerprint:null,lastDownloadedAt:null,lastDownloadedFilename:null};
 }
 function starterDocument(){ const doc=newDocument("Presentation",SAMPLE); doc.transient=true; return doc; }
+async function saveLocalSnapshot(doc){
+  liveDocuments.set(doc.id,doc);
+  const snapshot=cloneRecord(doc);
+  memoryStores.docs.set(doc.id,snapshot); // keeps a recoverable copy even if IndexedDB is unavailable
+  pendingLocalWrites++; updateStorageStatus();
+  const task=localSaveQueue.catch(()=>{}).then(async()=>{
+    if(!libraryDB) return false;
+    try{
+      try{ await dbPut("docs",snapshot); }
+      catch(error){ if(!await purgeAutomaticHistory(25)) throw error; await dbPut("docs",snapshot); }
+      localSavedText.set(snapshot.id,snapshot.text); autosaveDisabled=false; quotaWarned=false; return true;
+    }catch(error){
+      autosaveDisabled=true;
+      if(!quotaWarned){ quotaWarned=true; showNotice({text:"Browser save failed. Your working copy is still open; download it or save it to Dropbox.",
+        actions:[{label:"Download",primary:true,onClick:downloadCurrentDocument},{label:"Retry browser save",onClick:retryBrowserStorage}]}); }
+      return false;
+    }
+  });
+  localSaveQueue=task;
+  try{ return await task; }
+  finally{ pendingLocalWrites--; updateDocumentChrome(); }
+}
 async function persistCurrentDocument(){
   clearTimeout(autosaveTimer); autosaveTimer=null;
-  if(!currentDoc||autosaveDisabled) return false;
-  if(currentDoc.transient&&currentDoc.text===srcEl.value) return true;
-  if(currentDoc.text!==srcEl.value) currentDoc.updatedAt=Date.now();
-  delete currentDoc.transient;
-  currentDoc.text=srcEl.value; currentDoc.selected=selected;
-  try{
-    await dbPut("docs",currentDoc); quotaWarned=false; updateDocumentChrome(); await renderRecentDocuments(); checkStoragePressure(); return true;
-  }catch(e){
-    try{
-      const removed=await purgeAutomaticHistory(25);
-      if(removed){ await dbPut("docs",currentDoc); updateDocumentChrome(); await renderRecentDocuments(); return true; }
-    }catch(_){}
-    autosaveDisabled=true;
-    if(!quotaWarned){ quotaWarned=true;
-      showNotice({text:"SlideDown couldn't save this presentation in the browser. Download it now to protect your changes.",
-        actions:[{label:"Download",primary:true,onClick:downloadCurrentDocument}]}); }
-    return false;
-  }
+  const doc=currentDoc; if(!doc) return false;
+  if(doc.transient&&doc.text===srcEl.value) return true;
+  if(doc.text!==srcEl.value) doc.updatedAt=Date.now();
+  delete doc.transient; doc.text=srcEl.value; doc.selected=selected;
+  const saved=await saveLocalSnapshot(doc);
+  scheduleCloudSave(doc); renderRecentDocuments(); checkStoragePressure(); return saved;
 }
 function scheduleAutosave(){
-  clearTimeout(autosaveTimer);
-  updateDocumentChrome(); renderRecentDocuments();
-  autosaveTimer=setTimeout(async()=>{ await persistCurrentDocument(); await maybeSnapshotHistory(); },AUTOSAVE_DEBOUNCE_MS);
+  clearTimeout(autosaveTimer); updateDocumentChrome();
+  autosaveTimer=setTimeout(async()=>{
+    const doc=currentDoc; await persistCurrentDocument();
+    if(currentDoc===doc) await maybeSnapshotHistory();
+  },AUTOSAVE_DEBOUNCE_MS);
 }
-window.addEventListener("beforeunload",e=>{ if(autosaveTimer||autosaveDisabled){ e.preventDefault(); e.returnValue=""; } });
+function hasUnprotectedChanges(){
+  if(pendingLocalWrites) return true;
+  const records=new Map([...memoryStores.docs,...liveDocuments]);
+  if(currentDoc&&!currentDoc.transient) records.set(currentDoc.id,{...currentDoc,text:srcEl.value});
+  if(currentDoc?.transient&&srcEl.value!==currentDoc.text) return true;
+  return [...records.values()].some(doc=>localSavedText.get(doc.id)!==doc.text && !isDownloaded(doc,doc.text) && doc.dropbox?.savedText!==doc.text);
+}
+window.addEventListener("beforeunload",e=>{ if(hasUnprotectedChanges()){ e.preventDefault(); e.returnValue=""; } });
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden"&&autosaveTimer) persistCurrentDocument(); });
+async function retryBrowserStorage(){
+  try{
+    if(!libraryDB) libraryDB=await openLibrary();
+    // Preserve the active session's working copies when storage becomes available.
+    for(const doc of memoryStores.docs.values()) await saveLocalSnapshot(doc);
+    for(const rec of memoryStores.versions.values()) await dbPut("versions",rec);
+    await persistCurrentDocument();
+    if(currentDoc) await setCurrentDocumentId(currentDoc.id);
+    if(autosaveDisabled) throw new Error("The browser still cannot save this presentation.");
+    showNotice({text:"Browser storage is working again.",timeout:3000});
+  }catch(error){ showNotice({text:"Browser storage is still unavailable. Download your work or save it to Dropbox."}); }
+}
 
 function relTime(ts){
   const s=Math.max(1, Math.round((Date.now()-ts)/1000));
@@ -3009,30 +3166,31 @@ function hideNotice(){ $("#notice").classList.remove("on"); }
 $("#noticeClose").addEventListener("click",hideNotice);
 
 /* ---------- per-presentation version history ---------- */
-async function pushHistorySnapshot(text,label){
-  if(!currentDoc) return false;
-  const hist=await versionsForDoc(currentDoc.id);
-  const rec={id:makeId("h"),docId:currentDoc.id,ts:Date.now(),text,label:label||null};
+async function pushHistorySnapshot(text,label,doc=currentDoc){
+  if(!doc) return false;
+  const hist=await versionsForDoc(doc.id);
+  const rec={id:makeId("h"),docId:doc.id,ts:Date.now(),text,label:label||null};
   try{
     await dbPut("versions",rec); hist.push(rec);
-    while(hist.length>HISTORY_MAX){
-      let idx=hist.findIndex(h=>!h.label); if(idx===-1) idx=0;
-      await dbDelete("versions",hist[idx].id); hist.splice(idx,1);
-    }
+    const automatic=hist.filter(h=>!h.label).sort((a,b)=>a.ts-b.ts);
+    while(automatic.length>HISTORY_MAX) await dbDelete("versions",automatic.shift().id);
     return true;
-  }catch(e){
-    if(label) alert("Couldn't save that checkpoint — browser storage is full. Delete old versions or download this presentation.");
+  }catch(error){
+    if(label) showNotice({text:"Checkpoint could not be saved. Download your presentation to protect this version."});
     return false;
   }
 }
+
 async function maybeSnapshotHistory(){
   const text=srcEl.value;
   if(!text.trim() || text===lastAutoSnapshotText) return;
   if(lastAutoSnapshotText!==null && Date.now()-lastAutoSnapshotTime<AUTO_SNAPSHOT_INTERVAL_MS) return;
-  if(await pushHistorySnapshot(text,null)){ lastAutoSnapshotText=text; lastAutoSnapshotTime=Date.now(); }
+  const doc=currentDoc;
+  if(await pushHistorySnapshot(text,null,doc)&&doc===currentDoc){ lastAutoSnapshotText=text; lastAutoSnapshotTime=Date.now(); }
 }
 async function openVersionHistory(){
-  const hist=(await versionsForDoc(currentDoc.id)).sort((a,b)=>b.ts-a.ts);
+  const historyDoc=currentDoc; if(!historyDoc) return;
+  const hist=(await versionsForDoc(historyDoc.id)).sort((a,b)=>b.ts-a.ts);
   $("#dlgTitle").textContent="Version History — "+currentDoc.title;
   const body=$("#dlgBody"); body.innerHTML="";
   if(!hist.length){
@@ -3066,7 +3224,10 @@ async function openVersionHistory(){
     const id=e.target.dataset.id; if(!id) return;
     const rec=hist.find(h=>h.id===id); if(!rec) return;
     if(e.target.classList.contains("histRestore")){
-      if(srcEl.value!==currentDoc.text && !confirm("Restore this version? Your current browser edits will be replaced (this won't affect saved checkpoints).")) return;
+      if(currentDoc!==historyDoc) return;
+      if(srcEl.value===rec.text){ close(); return; }
+      if(!confirm("Restore this version? A checkpoint of your current work will be saved first.")) return;
+      if(!await pushHistorySnapshot(srcEl.value,"Before restoring a version",historyDoc)) return;
       srcEl.value=rec.text; selected=0; refresh(); await persistCurrentDocument(); close();
     }else if(e.target.classList.contains("histDelete")){
       if(!confirm("Delete this saved version? This can't be undone.")) return;
@@ -3080,25 +3241,29 @@ $("#miCheckpoint").addEventListener("click", async ()=>{
   if(!v) return;
   if(await pushHistorySnapshot(srcEl.value, v.label||("Checkpoint "+new Date().toLocaleString()))){
     lastAutoSnapshotText=srcEl.value; lastAutoSnapshotTime=Date.now();
-    showNotice({text:"Checkpoint saved.", timeout:2500});
+    showNotice({text:libraryDB?"Checkpoint saved in browser.":"Checkpoint kept in memory only. Download or save to Dropbox before closing.", timeout:5000});
   }
 });
 $("#miHistory").addEventListener("click", openVersionHistory);
 
 function buildThumbs(container,onPick,markSelected){
   const keepScroll=container.scrollTop;           // rebuilds happen on every parse; don't jump the rail
-  container.innerHTML="";
+  const old=new Map([...container.children].map(t=>[t.dataset.key,t]));
+  const next=[];
   deck.slides.forEach((sd,i)=>{
-    const t=document.createElement("div");
+    const key=previewKey(i,sd.steps.length-1), reuse=old.get(key);
+    if(reuse){ next.push(reuse); return; }
+    const t=document.createElement("div"); t.dataset.key=key; next.push(t);
     t.className="thumb"+((markSelected&&i===selected)?" sel":"")+(sd.hidden?" hid":"");
     t.innerHTML=`<span class="num">${i+1}${sd.hidden?" · hidden":""}</span>`;
     const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
+    container.appendChild(t);
     const p=new Player(sd,frame,{thumb:true,settings:deck.settings,index:i,total:deck.slides.length}); p.jumpToStep(sd.steps.length-1);
     fitInto(frame,144,81);
     t.addEventListener("click",()=>onPick(i));
     t.addEventListener("dblclick",()=>startPresent(i,{fs:true,exact:true}));
-    container.appendChild(t);
   });
+  container.replaceChildren(...next);
   container.scrollTop=keepScroll;
 }
 /* Rebuild the big preview only when the resolved slide or caret section changes.
@@ -3132,7 +3297,7 @@ function previewKey(i,step){
   const renderSettings={};
   for(const k of ["font","headfont","size","size1","size2","size3","headsize","headsize1","headsize2","headsize3","accent","linkcolor","visitedlinkcolor","color","bg","dim","tint","__palette"])
     if(deck.settings&&deck.settings[k]!=null) renderSettings[k]=deck.settings[k];
-  return JSON.stringify([i,step,renderSettings,deck.slides[i]]);
+  return JSON.stringify([documentBaseUrl,i,step,renderSettings,deck.slides[i]]);
 }
 function showPreview(){
   if(!deck.slides.length){ stageHolder.innerHTML=""; lastPreviewKey=null; return; }
@@ -3250,11 +3415,15 @@ function startPresent(fromIndex, o={}){
   }
   srcEl.blur();
   presentOn=true; presentEl.classList.add("on");
+  player?.dispose();
+  stageHolder.querySelectorAll("video,audio").forEach(m=>m.pause());
   player=null;                                   // fresh entry — no transition from a stale slide
   gotoSlide(idx,{animate:true});
   if(o.fs && !document.fullscreenElement) enterFullscreen();   // valid only within a user gesture
 }
 function exitPresent(){
+  player?.dispose();
+  pholder.replaceChildren();
   presentOn=false; presentEl.classList.remove("on");
   presentEl.classList.remove("phone-ui","phone-landscape","phone-portrait");
   killLiveTransition();
@@ -3305,9 +3474,10 @@ function runSlideTransition(holder, oldRoot, newRoot, from, to){
 }
 function gotoSlide(i,{animate=false,lastStep=false}={}){
   const from=curSlide, oldRoot=player&&player.render&&player.render.root;
+  player?.dispose();
   curSlide=clamp(i,0,deck.slides.length-1);
   const holder=activeHolder();
-  player=new Player(deck.slides[curSlide],holder,{settings:deck.settings,index:curSlide,total:deck.slides.length});
+  player=new Player(deck.slides[curSlide],holder,{live:true,settings:deck.settings,index:curSlide,total:deck.slides.length});
   layoutPresent();
   const last=player.stepCount-1;
   if(lastStep) player.jumpToStep(last);
@@ -3363,10 +3533,10 @@ function toggleOverview(){
       const t=document.createElement("div"); t.className="thumb"+(i===curSlide?" sel":"")+(sd.hidden?" hid":"");
       t.innerHTML=`<span class="num">${i+1}${sd.hidden?" · hidden":""}</span>`;
       const frame=document.createElement("div"); frame.className="frame"; t.appendChild(frame);
+      overviewList.appendChild(t);
       const p=new Player(sd,frame,{thumb:true,settings:deck.settings,index:i,total:deck.slides.length}); p.jumpToStep(sd.steps.length-1);
       fitInto(frame,144,81);
       t.addEventListener("click",()=>{ overviewEl.classList.remove("on"); gotoSlide(i); });
-      overviewList.appendChild(t);
     });
   }
 }
@@ -3440,7 +3610,7 @@ document.addEventListener("keydown",e=>{
 presentEl.addEventListener("click",e=>{
   if(Date.now()<suppressPresentClickUntil) return;
   if(overviewEl.contains(e.target)||$("#hud").contains(e.target)||e.target.closest(".pnav")) return;
-  if(e.target.closest&&e.target.closest(".s-embed,.s-media")) return;   // interacting with an embedded app or media player
+  if(e.target.closest&&e.target.closest("a,button,input,textarea,select,.s-embed,.s-media")) return;   // interacting with an embedded app or media player
   advance();
 });
 
@@ -3452,9 +3622,9 @@ function updateDocumentChrome(){
   $("#docTitle").title=(currentDoc.transient?"Starter presentation — ":localOnly?"Saved only in this browser — ":"Downloaded — ")+"click to rename";
   $("#miSave").textContent="Download “"+downloadFilename(currentDoc.title)+"”";
   document.title=(localOnly?"• ":"")+currentDoc.title+" — SlideDown";
+  updateStorageStatus();
 }
 async function renderRecentDocuments(){
-  if(!libraryDB) return;
   const docs=(await dbGetAll("docs")).sort((a,b)=>(b.lastOpenedAt||0)-(a.lastOpenedAt||0)).slice(0,10);
   const list=$("#recentDocs"); list.innerHTML="";
   if(!docs.length){ list.innerHTML='<div class="recent-empty">No presentations yet</div>'; return; }
@@ -3483,14 +3653,14 @@ function closeSubmenus(){
   document.querySelectorAll(".msubmenu-trigger[aria-expanded=true]").forEach(b=>b.setAttribute("aria-expanded","false"));
 }
 function closeMenus(){ document.querySelectorAll(".menu.open").forEach(m=>m.classList.remove("open")); closeSubmenus(); }
-async function setCurrentDocumentId(id){ await dbPut("settings",{key:"currentDocId",value:id}); }
+async function setCurrentDocumentId(id){ try{await dbPut("settings",{key:"currentDocId",value:id});}catch(_){ /* document save status already reports failures */ } }
 async function switchDocument(id){
   if(currentDoc?.id===id) return true;
-  if(currentDoc&&!(await persistCurrentDocument())) return false;
+  if(currentDoc) await persistCurrentDocument();
   const doc=await dbGet("docs",id); if(!doc) return false;
-  currentDoc=doc; currentDoc.lastOpenedAt=Date.now(); autosaveDisabled=false;
+  currentDoc=doc; setDocumentBase(doc); currentDoc.lastOpenedAt=Date.now(); autosaveDisabled=false;
   srcEl.value=currentDoc.text||""; selected=clamp(currentDoc.selected||0,0,Infinity); refresh();
-  await dbPut("docs",currentDoc); await setCurrentDocumentId(currentDoc.id);
+  await saveLocalSnapshot(currentDoc); await setCurrentDocumentId(currentDoc.id);
   const hist=(await versionsForDoc(currentDoc.id)).sort((a,b)=>a.ts-b.ts);
   const last=hist[hist.length-1]; lastAutoSnapshotText=last?.text||null; lastAutoSnapshotTime=last?.ts||0;
   updateDocumentChrome(); await renderRecentDocuments(); hideNotice(); return true;
@@ -3498,11 +3668,10 @@ async function switchDocument(id){
 async function deleteVersionsForDoc(docId){
   const versions=await versionsForDoc(docId);
   if(!versions.length) return;
-  const tx=libraryDB.transaction("versions","readwrite"), store=tx.objectStore("versions");
-  versions.forEach(v=>store.delete(v.id)); await idbTransactionDone(tx);
+  for(const v of versions) await dbDelete("versions",v.id);
 }
 async function showStarterPresentation(){
-  currentDoc=starterDocument(); autosaveDisabled=false;
+  currentDoc=starterDocument(); documentBaseUrl=null; autosaveDisabled=false;
   srcEl.value=currentDoc.text; selected=0; refresh();
   lastAutoSnapshotText=null; lastAutoSnapshotTime=0;
   await dbDelete("settings","currentDocId");
@@ -3511,10 +3680,14 @@ async function showStarterPresentation(){
 async function removeLocalDocument(id){
   const doc=await dbGet("docs",id); if(!doc) return;
   const active=doc.id===currentDoc?.id, text=active?srcEl.value:doc.text;
-  if(!isDownloaded(doc,text)){
+  if(!isDownloaded(doc,text)&&doc.dropbox?.savedText!==text){
     const detail=doc.downloadedFingerprint?"It has changes made since its last download.":"It has never been downloaded.";
     if(!confirm("Remove “"+doc.title+"” from this browser? "+detail+" This cannot be undone.")) return;
   }
+  if(active){ clearTimeout(autosaveTimer); autosaveTimer=null; }
+  cancelCloudTimer(id);
+  if(cloudWrites.has(id)) await cloudWrites.get(id);
+  cancelCloudTimer(id); await localSaveQueue;
   await dbDelete("docs",id); await deleteVersionsForDoc(id);
   if(active){
     currentDoc=null;
@@ -3524,19 +3697,20 @@ async function removeLocalDocument(id){
   }else await renderRecentDocuments();
 }
 async function createPresentation(text=NEW_DECK_TEXT,wantedTitle=null,downloadedFilename=null){
-  if(currentDoc&&!(await persistCurrentDocument())) return null;
+  if(currentDoc) await persistCurrentDocument();
   const title=wantedTitle?await uniqueTitle(wantedTitle):await nextPresentationTitle();
   const doc=newDocument(title,text);
   if(downloadedFilename){
     doc.downloadedFingerprint=contentFingerprint(text); doc.lastDownloadedAt=Date.now(); doc.lastDownloadedFilename=downloadedFilename;
   }
-  await dbPut("docs",doc); await switchDocument(doc.id); return doc;
+  await saveLocalSnapshot(doc); await switchDocument(doc.id); return currentDoc;
 }
 async function renameCurrentDocument(value){
   if(!currentDoc) return;
-  currentDoc.title=await uniqueTitle(value,currentDoc.id); currentDoc.updatedAt=Date.now();
-  delete currentDoc.transient;
-  await dbPut("docs",currentDoc); updateDocumentChrome(); await renderRecentDocuments();
+  const doc=currentDoc; doc.title=await uniqueTitle(value,doc.id); doc.updatedAt=Date.now();
+  delete doc.transient;
+  if(doc===currentDoc) await persistCurrentDocument(); else await saveLocalSnapshot(doc);
+  updateDocumentChrome(); await renderRecentDocuments();
 }
 async function downloadCurrentDocument(){
   if(!currentDoc) return;
@@ -3752,7 +3926,7 @@ function openPresenterView(){
     if(e.key==="f"||e.key==="F"){ e.preventDefault(); fsPopup(); return; }
     handleShowKey(e);                       // same bindings as the main window
   });
-  d.addEventListener("click",e=>{ if(!hintDone){ fsPopup(); } else advance(); });
+  d.addEventListener("click",e=>{ if(e.target.closest("a,button,input,textarea,select,.s-embed,.s-media")) return; if(!hintDone){ fsPopup(); } else advance(); });
   w.addEventListener("resize",layoutPresent);
   w.addEventListener("pagehide",()=>{ if(presenterMode) exitPresenter(false); });
 
@@ -3763,6 +3937,7 @@ function openPresenterView(){
   gotoSlide(selected,{animate:true});
 }
 function exitPresenter(closeWin=true){
+  player?.dispose(); killLiveTransition();
   presenterMode=false;
   srcEl.readOnly=false;
   $("#pconsole").classList.remove("on");
@@ -3800,7 +3975,15 @@ $("#miSave").addEventListener("click",downloadCurrentDocument);
 $("#miSample").addEventListener("click",async()=>{ await createPresentation(SAMPLE,"SlideDown Sample"); });
 $("#miNew").addEventListener("click",async()=>{ await createPresentation(); });
 $("#miPptx").addEventListener("click",()=>$("#pptxIn").click());
-$("#miPrint").addEventListener("click",()=>{ buildPrintLayout(); setTimeout(()=>window.print(),30); });
+$("#miPrint").addEventListener("click",async()=>{
+  buildPrintLayout();
+  await Promise.race([Promise.all([
+    document.fonts?.ready,
+    ...[...dropboxResources.values()].map(entry=>entry.promise),
+    ...[...$("#printRoot").querySelectorAll("img")].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=img.onerror=resolve;}))
+  ]),new Promise(resolve=>setTimeout(resolve,5000))]);
+  window.print();
+});
 window.addEventListener("beforeprint",()=>{ if(!$("#printRoot").children.length) buildPrintLayout(); });   // Ctrl/Cmd-P path; menu path already built
 window.addEventListener("afterprint",()=>{ $("#printRoot").innerHTML=""; });
 
@@ -4149,6 +4332,7 @@ function showDialog(title, fields, okText){
     $("#dlgTitle").textContent=title;
     const body=$("#dlgBody"); body.innerHTML="";
     for(const f of fields){
+      if(f.type==="note"){ const note=document.createElement("p"); note.textContent=f.text; note.className="sub"; body.appendChild(note); continue; }
       const w=document.createElement("div"); w.className="dfield";
       const lab=document.createElement("label"); lab.textContent=f.label; w.appendChild(lab);
       let el;
@@ -4156,6 +4340,8 @@ function showDialog(title, fields, okText){
         for(const o of f.options){ const op=document.createElement("option"); op.value=o[0]; op.textContent=o[1]; el.appendChild(op); } }
       else if(f.type==="textarea"){ el=document.createElement("textarea"); }
       else{ el=document.createElement("input"); el.type="text"; }
+      el.readOnly=!!f.readOnly;
+      el.id="dialog-field-"+f.key; lab.htmlFor=el.id;
       el.value=f.value||""; el.placeholder=f.placeholder||""; el.dataset.key=f.key;
       if(f.list){ const dl=document.createElement("datalist"); dl.id="dl_"+f.key;
         for(const v of f.list){ const o=document.createElement("option"); o.value=v; dl.appendChild(o); }
@@ -4185,10 +4371,8 @@ function insertAtCursor(text, inline){
     const nlAfter  = b<v.length && v[b]!=="\n" ? "\n" : "";
     ins=nlBefore+text+nlAfter;
   }
-  srcEl.value=v.slice(0,a)+ins+v.slice(b);
   const caret=a+ins.length;
-  srcEl.focus(); srcEl.setSelectionRange(caret,caret);
-  srcEl.dispatchEvent(new Event("input"));
+  replaceEditorRange(a,b,ins,caret,caret);
 }
 const stylePrefix=v=>{
   const parts=[];
@@ -4317,12 +4501,50 @@ async function animDialog(){
 }
 document.querySelectorAll("[data-ins]").forEach(b=>b.addEventListener("click",()=>INSERTS[b.dataset.ins]()));
 
+function showFileBrowser(title,entries,onPick){
+  return new Promise(resolve=>{
+    $("#dlgTitle").textContent=title;
+    const body=$("#dlgBody"); body.replaceChildren();
+    const search=document.createElement("input"); search.className="file-browser-search"; search.placeholder="Search presentations…"; search.setAttribute("aria-label","Search presentations");
+    const list=document.createElement("div"); body.append(search,list);
+    const close=()=>{ $("#dlg").classList.remove("on"); $("#dlgCancel").style.display=""; $("#dlgOk").onclick=null; document.removeEventListener("keydown",esc,true); resolve(); };
+    const draw=()=>{
+      list.replaceChildren();
+      for(const entry of entries.filter(e=>e.name.toLowerCase().includes(search.value.toLowerCase()))){
+        const button=document.createElement("button"); button.className="btn file-browser-row"; button.textContent=entry.name;
+        button.onclick=()=>{ close(); Promise.resolve(onPick(entry)).catch(reportStorageError); }; list.appendChild(button);
+      }
+      if(!list.childElementCount) list.textContent="No presentations found.";
+    };
+    const esc=e=>{ if(e.key==="Escape"){ e.stopPropagation(); close(); } };
+    search.oninput=draw; draw(); $("#dlgCancel").style.display="none"; $("#dlgOk").textContent="Close"; $("#dlgOk").onclick=close;
+    document.addEventListener("keydown",esc,true); $("#dlg").classList.add("on"); search.focus();
+  });
+}
+$("#miAllDocuments").onclick=async()=>showFileBrowser("Browser presentations",(await dbGetAll("docs")).sort((a,b)=>b.updatedAt-a.updatedAt).map(d=>({name:d.title,id:d.id})),e=>switchDocument(e.id));
+$("#miStorageRetry").onclick=retryBrowserStorage;
+$("#miImageFile").onclick=()=>$("#imageFileIn").click();
+$("#imageFileIn").onchange=async e=>{
+  const file=e.target.files[0]; e.target.value=""; if(!file) return;
+  if(!/^image\/(png|jpeg|gif|webp|svg\+xml)$/.test(file.type)||file.size>10*1024*1024){ showNotice({text:"Choose a PNG, JPEG, GIF, WebP, or SVG image up to 10 MB."}); return; }
+  const reader=new FileReader();
+  reader.onload=()=>insertAtCursor("!["+file.name.replace(/[\[\]\r\n]/g,"")+"]("+reader.result+")\n",false);
+  reader.onerror=()=>showNotice({text:"Could not read that image."}); reader.readAsDataURL(file);
+};
+
 /* ---------- !import fetcher: parse asks, we fetch, then re-parse ---------- */
-PSL_IMPORTS.onUpdate=()=>refresh();
-PSL_IMPORTS.fetcher=url=>{
-  fetch(url).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
-    .then(txt=>{ PSL_IMPORTS.cache.set(url,{text:txt}); PSL_IMPORTS.onUpdate(); })
-    .catch(err=>{ PSL_IMPORTS.cache.set(url,{error:String(err)}); PSL_IMPORTS.onUpdate(); });
+PSL_IMPORTS.onUpdate=()=>{
+  refresh();
+  if((presentOn||presenterMode)&&player){
+    const step=player.step; gotoSlide(curSlide); player.jumpToStep(step); updateHud();
+  }
+};
+PSL_IMPORTS.fetcher=(url,cacheKey=url)=>{
+  const read=url.startsWith("dropbox:")?readDropboxResource(url,false).then(r=>r.text):
+    fetch(url).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); });
+  read
+    .then(txt=>{ PSL_IMPORTS.cache.set(cacheKey,{text:txt}); PSL_IMPORTS.onUpdate(); })
+    .catch(err=>{ PSL_IMPORTS.cache.set(cacheKey,{error:String(err)}); PSL_IMPORTS.onUpdate(); });
 };
 
 /* ---------- PowerPoint (.pptx) import ----------
@@ -4713,15 +4935,305 @@ async function pptxToPsl(file){
   return out.join("\n").replace(/\n{3,}/g,"\n\n")+"\n";
 }
 
+/* ============================================================
+   DROPBOX STORAGE — static hosting, OAuth authorization code + PKCE.
+   Publisher: set your public App Folder app key here once. Never add a secret.
+   Required scopes: files.metadata.read files.content.read files.content.write.
+   Tokens live only in this tab's sessionStorage; reconnect after expiration.
+   ============================================================ */
+const DROPBOX_APP_KEY="";
+const DBX_SESSION_KEY="slidedown.dropbox.session.v1", DBX_APP_KEY="slidedown.dropbox.appKey";
+let dbxSession=null, dbxPending=null;
+const cloudTimers=new Map(), cloudWrites=new Map(), cloudProblems=new Map();
+const dropboxResources=new Map(); let resourceSerial=0;
+function setDocumentBase(doc,text=doc?.text||""){
+  const binding=doc?.resourceDropbox||doc?.dropbox;
+  documentImportScope=[binding?.appKey,binding?.accountId].join("|");
+  documentBaseUrl=doc?.sourceUrl||(binding?.path?"dropbox://"+binding.path:null);
+  // An explicit source base makes remotely loaded decks portable to Dropbox.
+  let fence=false;
+  for(const line of text.split("\n")){
+    const t=line.trim(); if(fence){if(t.startsWith("```"))fence=false;continue;}
+    if(FENCE_OPEN.test(t)){fence=true;continue;}
+    const m=/^!set\s+baseurl\s+(https?:\/\/\S+)\s*$/i.exec(t);
+    if(m){documentBaseUrl=m[1];break;}
+  }
+}
+async function readDropboxResource(url,binary){
+  const binding=currentDoc?.resourceDropbox||currentDoc?.dropbox;
+  if(!cloudBindingMatches(binding)) throw new Error("Reconnect Dropbox to load this presentation’s linked media or templates.");
+  return dropboxRequest("files/download",{path:decodeURIComponent(new URL(url).pathname)},{download:true,binary});
+}
+function dropboxResourceUrl(url){
+  const binding=currentDoc?.resourceDropbox||currentDoc?.dropbox;
+  const key=[binding?.appKey,binding?.accountId,url].join("|");
+  if(dropboxResources.has(key)) return dropboxResources.get(key).url;
+  const placeholder="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=#sd-resource-"+(++resourceSerial);
+  if(!cloudBindingMatches(binding)) return placeholder;
+  const entry={url:placeholder}; dropboxResources.set(key,entry);
+  entry.promise=readDropboxResource(url,true).then(({blob})=>{
+    const ext=new URL(url).pathname.split(".").pop().toLowerCase();
+    const mime={png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml",mp4:"video/mp4",webm:"video/webm",mp3:"audio/mpeg",wav:"audio/wav",ogg:"audio/ogg"}[ext];
+    entry.url=URL.createObjectURL(mime?new Blob([blob],{type:mime}):blob);
+    const docs=[document]; if(presenterWin&&!presenterWin.closed)docs.push(presenterWin.document);
+    for(const doc of docs) for(const el of doc.querySelectorAll("[src],[poster],[style]")){
+      for(const attr of ["src","poster"])if(el.getAttribute(attr)===placeholder)el.setAttribute(attr,entry.url);
+      if(el.style?.backgroundImage.includes(placeholder))el.style.backgroundImage=el.style.backgroundImage.replace(placeholder,entry.url);
+    }
+  }).catch(error=>{entry.error=true;showNotice({text:"A Dropbox resource could not be loaded. "+error.message});});
+  return entry.url;
+}
+function clearDropboxResourceCache(){
+  for(const entry of dropboxResources.values())if(entry.url.startsWith("blob:"))URL.revokeObjectURL(entry.url);
+  dropboxResources.clear(); PSL_IMPORTS.cache.clear(); lastPreviewKey=null;
+  for(const t of thumbRail.children)t.dataset.key="";
+}
+
+try{ dbxSession=JSON.parse(sessionStorage.getItem(DBX_SESSION_KEY)||"null"); }catch(_){}
+function dropboxAppKey(){ try{return DROPBOX_APP_KEY||localStorage.getItem(DBX_APP_KEY)||"";}catch(_){return DROPBOX_APP_KEY;} }
+function dropboxConnected(){ return !!(dbxSession&&dbxSession.expiresAt>Date.now()+30000&&dbxSession.appKey===dropboxAppKey()); }
+function dropboxRedirectURI(){ return location.origin+location.pathname; }
+function setDropboxSession(session){
+  dbxSession=session;
+  try{ if(session) sessionStorage.setItem(DBX_SESSION_KEY,JSON.stringify(session)); else sessionStorage.removeItem(DBX_SESSION_KEY); }catch(_){}
+  updateStorageStatus();
+}
+function reportStorageError(error){ showNotice({text:error?.message||"The file operation could not be completed. Your working copy is still available."}); }
+function asciiJSON(value){ return JSON.stringify(value).replace(/[\u007f-\uffff]/g,c=>"\\u"+c.charCodeAt(0).toString(16).padStart(4,"0")); }
+async function dropboxRequest(route,args,{body,download=false,binary=false}={}){
+  if(!dropboxConnected()) throw new Error("Connect Dropbox to continue. Your local work is still available.");
+  const session=dbxSession, headers={Authorization:"Bearer "+session.accessToken};
+  const content=body!==undefined||download;
+  if(content){ headers["Dropbox-API-Arg"]=asciiJSON(args); if(body!==undefined) headers["Content-Type"]="application/octet-stream"; }
+  else headers["Content-Type"]="application/json";
+  const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),30000);
+  let response;
+  try{
+    response=await fetch("https://"+(content?"content":"api")+".dropboxapi.com/2/"+route,{
+      method:"POST",headers,body:content?body:JSON.stringify(args),signal:controller.signal,credentials:"omit",referrerPolicy:"no-referrer"});
+    if(!response.ok){
+      const detail=await response.json().catch(()=>({}));
+      if(response.status===401 && dbxSession===session) setDropboxSession(null);
+      const error=new Error(response.status===401?"Dropbox connection expired. Reconnect to resume saving.":
+        response.status===429?"Dropbox is busy. Retry saving in a moment.":"Dropbox could not complete the operation ("+response.status+").");
+      error.status=response.status; error.summary=detail.error_summary||"";
+      error.conflict=response.status===409 && /conflict/.test(error.summary);
+      throw error;
+    }
+    if(download){
+      const metadata=JSON.parse(response.headers.get("Dropbox-API-Result")||"{}");
+      if(metadata.size>100*1024*1024) throw new Error("This presentation is too large to open here (100 MB maximum).");
+      return binary?{metadata,blob:await response.blob()}:{metadata,text:await response.text()};
+    }
+    return await response.json();
+  }catch(error){
+    if(error.name==="AbortError") throw new Error("Dropbox timed out. Your work is retained locally; retry saving when the connection improves.");
+    throw error;
+  }finally{ clearTimeout(timeout); }
+}
+async function configureDropbox(){
+  const values=await showDialog("Dropbox setup",[
+    {type:"note",text:"For the site owner: create a scoped Dropbox API app with App Folder access. Enable files.metadata.read, files.content.read, and files.content.write. Register the exact redirect URL below. Enter the public app key, never the app secret. For everyone using your hosted copy, set DROPBOX_APP_KEY in the HTML once. The Dropbox App Console is at https://www.dropbox.com/developers/apps."},
+    {key:"appKey",label:"Public app key",value:dropboxAppKey(),readOnly:!!DROPBOX_APP_KEY},
+    {key:"redirect",label:"Redirect URL",value:dropboxRedirectURI(),readOnly:true}
+  ],"Use app key");
+  if(!values?.appKey) return false;
+  if(!/^[a-zA-Z0-9_-]+$/.test(values.appKey)) throw new Error("Enter the public Dropbox app key from the app console.");
+  try{ localStorage.setItem(DBX_APP_KEY,values.appKey); }catch(_){ throw new Error("This browser cannot retain the app key. Set DROPBOX_APP_KEY in the HTML instead."); }
+  setDropboxSession(null); return true;
+}
+async function connectDropbox(){
+  if(dropboxConnected()) return true;
+  if(!["https:","http:"].includes(location.protocol)||!window.isSecureContext)
+    throw new Error("Dropbox needs this file hosted over HTTPS, or on localhost during development. Local file:// editing and downloads still work.");
+  if(!dropboxAppKey()){ if(!await configureDropbox()) return false; }
+  if(dbxPending) throw new Error("A Dropbox connection window is already open.");
+  const popup=window.open("about:blank","SlideDownDropbox","width=650,height=750");
+  if(!popup) throw new Error("Allow pop-ups for SlideDown, then click Connect Dropbox again.");
+  try{
+    const random=()=>{ const bytes=crypto.getRandomValues(new Uint8Array(32)); return btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); };
+    const verifier=random(), state="sd-dbx-"+random(), appKey=dropboxAppKey();
+    const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier));
+    const challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+    const url=new URL("https://www.dropbox.com/oauth2/authorize");
+    url.search=new URLSearchParams({client_id:appKey,response_type:"code",redirect_uri:dropboxRedirectURI(),
+      code_challenge:challenge,code_challenge_method:"S256",state,token_access_type:"online",
+      scope:"files.metadata.read files.content.read files.content.write"}).toString();
+    return await new Promise((resolve,reject)=>{
+      let exchanging=false;
+      const cleanup=()=>{ clearInterval(timer); window.removeEventListener("message",receive); dbxPending=null; try{popup.close();}catch(_){} };
+      const started=Date.now();
+      const timer=setInterval(()=>{ if(!exchanging&&(popup.closed||Date.now()-started>10*60*1000)){cleanup();reject(new Error("Dropbox connection canceled or timed out."));} },500);
+      const receive=async event=>{
+        if(exchanging||event.origin!==location.origin||event.source!==popup||event.data?.type!=="slidedown-dropbox-code"||event.data.state!==state) return;
+        exchanging=true;
+        try{
+          if(event.data.error) throw new Error("Dropbox access was not granted.");
+          if(typeof event.data.code!=="string"||!event.data.code) throw new Error("Dropbox did not return an authorization code.");
+          const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),30000);
+          let token;
+          try{
+            const response=await fetch("https://api.dropboxapi.com/oauth2/token",{method:"POST",credentials:"omit",referrerPolicy:"no-referrer",signal:controller.signal,
+              headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"authorization_code",code:event.data.code,
+                client_id:appKey,code_verifier:verifier,redirect_uri:dropboxRedirectURI()})});
+            token=await response.json(); if(!response.ok||!token.access_token||!token.account_id) throw new Error("Dropbox authorization could not be completed. Check the app key, scopes, and redirect URL.");
+          }finally{clearTimeout(timeout);}
+          setDropboxSession({appKey,accessToken:token.access_token,accountId:token.account_id,expiresAt:Date.now()+Number(token.expires_in||14400)*1000});
+          cleanup(); clearDropboxResourceCache(); refresh(); showNotice({text:"Dropbox connected. Choose Save to Dropbox for a new cloud file, or Open from Dropbox.",timeout:7000});
+          for(const doc of liveDocuments.values()) scheduleCloudSave(doc); resolve(true);
+        }catch(error){cleanup();reject(error);}
+      };
+      dbxPending={state,popup}; window.addEventListener("message",receive); popup.location.href=url.href;
+    });
+  }catch(error){ try{popup.close();}catch(_){} throw error; }
+}
+function finishDropboxRedirect(){
+  const q=new URLSearchParams(location.search),state=q.get("state");
+  if(!state?.startsWith("sd-dbx-")) return false;
+  const message={type:"slidedown-dropbox-code",state,code:q.get("code"),error:q.get("error")};
+  history.replaceState(null,"",location.pathname);
+  if(window.opener){ window.opener.postMessage(message,location.origin); window.close(); }
+  document.body.textContent="Dropbox authorization returned. You can close this window and return to SlideDown. If the original tab was closed, connect again there.";
+  return true;
+}
+function disconnectDropbox(){
+  for(const id of cloudTimers.keys()) cancelCloudTimer(id);
+  setDropboxSession(null);
+  showNotice({text:"Dropbox disconnected in this tab. Your presentations remain in Dropbox and in browser storage. You can revoke app access in Dropbox’s Connected apps settings."});
+}
+function cancelCloudTimer(id){ clearTimeout(cloudTimers.get(id)); cloudTimers.delete(id); }
+function cloudBindingMatches(binding){ return dropboxConnected()&&binding?.accountId===dbxSession.accountId&&binding.appKey===dbxSession.appKey; }
+function scheduleCloudSave(doc){
+  if(!doc?.dropbox||doc.dropbox.savedText===doc.text||!cloudBindingMatches(doc.dropbox)||cloudProblems.get(doc.id)?.conflict) return;
+  cancelCloudTimer(doc.id);
+  cloudTimers.set(doc.id,setTimeout(()=>{ cloudTimers.delete(doc.id); syncDropboxDocument(doc).catch(reportStorageError); },1500));
+  updateStorageStatus();
+}
+async function syncDropboxDocument(doc){
+  if(cloudWrites.has(doc.id)) return cloudWrites.get(doc.id);
+  const binding=doc.dropbox;
+  if(!binding||binding.savedText===doc.text) return true;
+  if(!cloudBindingMatches(binding)) throw new Error("Reconnect the Dropbox account and app used for this file, or explicitly save a copy in the connected account.");
+  if(navigator.onLine===false){ updateStorageStatus(); return false; }
+  const text=doc.text,blob=new Blob([text],{type:"application/octet-stream"});
+  if(blob.size>100*1024*1024) throw new Error("This presentation exceeds the 100 MB save limit. Use external URLs for large videos.");
+  cancelCloudTimer(doc.id); cloudProblems.delete(doc.id);
+  const task=(async()=>{
+    try{
+      const metadata=await dropboxRequest("files/upload",{path:binding.id||binding.path,
+        mode:binding.rev?{".tag":"update",update:binding.rev}:{".tag":"add"},autorename:false,strict_conflict:true,mute:true},{body:blob});
+      if(typeof metadata.id!=="string"||typeof metadata.rev!=="string"||!metadata.rev) throw new Error("Dropbox did not confirm the saved file revision. Open the Dropbox file list before retrying.");
+      if(doc.dropbox===binding){
+        doc.dropbox={...binding,id:metadata.id,path:metadata.path_display||binding.path,rev:metadata.rev,savedText:text};
+        await saveLocalSnapshot(doc);
+      }
+      return true;
+    }catch(error){
+      cloudProblems.set(doc.id,{conflict:!!error.conflict,message:error.message});
+      if(error.conflict){
+        showNotice({text:"Dropbox has a different version of “"+doc.title+"”. Your edits are preserved. Open the Dropbox version separately, or save your work as a new file.",actions:[
+          {label:"Open Dropbox version",onClick:()=>openDropboxPath(binding.id||binding.path,true).catch(reportStorageError)},
+          {label:"Save my copy",primary:true,onClick:()=>saveToDropbox(true,doc).catch(reportStorageError)}]});
+      }else showNotice({text:error.message+" Your working copy is retained; use Save to Dropbox to retry."});
+      return false;
+    }finally{
+      cloudWrites.delete(doc.id); updateStorageStatus();
+      if(!cloudProblems.has(doc.id)&&doc.dropbox?.savedText!==doc.text) scheduleCloudSave(doc);
+    }
+  })();
+  cloudWrites.set(doc.id,task); updateStorageStatus(); return task;
+}
+async function saveToDropbox(copy=false,doc=currentDoc){
+  if(!doc) return;
+  if(doc===currentDoc) await persistCurrentDocument();
+  if(!dropboxConnected()&&!await connectDropbox()) return;
+  if(cloudWrites.has(doc.id)) await cloudWrites.get(doc.id);
+  if(copy||!doc.dropbox){
+    const values=await showDialog(copy?"Save a copy to Dropbox":"Save to Dropbox",[
+      {type:"note",text:"Choose a filename in the app’s Dropbox folder. Linked files autosave while Dropbox is connected. Existing files will never be overwritten by this operation. For portable images, use Insert → Image from File; relative media paths must also exist beside the Dropbox file."},
+      {key:"filename",label:"Filename",value:downloadFilename(doc.title+(copy?" copy":""))}
+    ],"Save");
+    if(!values) return;
+    const filename=values.filename;
+    if(!filename||/[\\/:*?"<>|\x00-\x1f]/.test(filename)||/[. ]$/.test(filename)) throw new Error("Use a filename without slashes or reserved characters.");
+    const path="/"+(filename.toLowerCase().endsWith(".psl")?filename:filename+".psl");
+    const previous=doc.dropbox;
+    doc.dropbox={path,rev:null,savedText:null,accountId:dbxSession.accountId,appKey:dbxSession.appKey};
+    cloudProblems.delete(doc.id);
+    if(!await syncDropboxDocument(doc)){ doc.dropbox=previous; await saveLocalSnapshot(doc); updateStorageStatus(); return; }
+  }else await syncDropboxDocument(doc);
+}
+async function openDropboxPath(path,forceCopy=false){
+  if(currentDoc) await persistCurrentDocument();
+  const session=dbxSession;
+  const {metadata,text}=await dropboxRequest("files/download",{path},{download:true});
+  const match=[...memoryStores.docs.values()].find(d=>d.dropbox?.id===metadata.id&&d.dropbox.accountId===session.accountId&&d.dropbox.appKey===session.appKey);
+  // Opening from Dropbox never replaces a local document, including unsynced work.
+  if(match&&!forceCopy&&match.dropbox.rev===metadata.rev){ await switchDocument(match.id); showNotice({text:"Opened your browser working copy. To inspect Dropbox separately, use Dropbox Version History."}); return; }
+  const doc=await createPresentation(text,metadata.name?.replace(/\.psl$/i,"")||"Dropbox presentation");
+  doc.dropbox={path:metadata.path_display,id:metadata.id,rev:metadata.rev,savedText:text,accountId:session.accountId,appKey:session.appKey};
+  setDocumentBase(doc); lastPreviewKey=null; refresh();
+  await saveLocalSnapshot(doc); updateDocumentChrome();
+}
+async function openDropboxBrowser(){
+  if(!dropboxConnected()&&!await connectDropbox()) return;
+  const entries=[]; let page=await dropboxRequest("files/list_folder",{path:"",recursive:true,include_deleted:false,limit:200});
+  for(;;){
+    entries.push(...page.entries.filter(e=>e[".tag"]==="file"&&/\.psl$/i.test(e.name)).map(e=>({name:e.path_display,id:e.id})));
+    if(!page.has_more) break;
+    page=await dropboxRequest("files/list_folder/continue",{cursor:page.cursor});
+  }
+  await showFileBrowser("Dropbox presentations",entries.sort((a,b)=>a.name.localeCompare(b.name)),e=>openDropboxPath(e.id));
+}
+async function openDropboxHistory(){
+  const doc=currentDoc,binding=doc?.dropbox;
+  if(!binding?.rev) throw new Error("Save this presentation to Dropbox first.");
+  if(!dropboxConnected()&&!await connectDropbox()) return;
+  if(!cloudBindingMatches(binding)) throw new Error("Connect the Dropbox account used for this presentation.");
+  const result=await dropboxRequest("files/list_revisions",{path:binding.id||binding.path,mode:{".tag":"id"},limit:100});
+  await showFileBrowser("Dropbox history — "+doc.title,result.entries.map(e=>({name:new Date(e.server_modified).toLocaleString()+" — "+e.rev,rev:e.rev})),async entry=>{
+    // Load as a separate document: restoration cannot destroy the current working copy.
+    const {text}=await dropboxRequest("files/download",{path:"rev:"+entry.rev},{download:true});
+    const recovered=await createPresentation(text,doc.title+" — recovered version");
+    recovered.sourceUrl=doc.sourceUrl||null; recovered.resourceDropbox=cloneRecord(doc.resourceDropbox||binding); await saveLocalSnapshot(recovered); setDocumentBase(recovered); refresh();
+    showNotice({text:"Opened this Dropbox revision as a separate browser presentation. The original Dropbox file is unchanged."});
+  });
+}
+function updateStorageStatus(){
+  const el=$("#storageStatus"); if(!el) return;
+  const doc=currentDoc;
+  const local=!doc?"Opening…":doc.transient&&doc.text===srcEl.value?"Starter presentation":pendingLocalWrites?"Saving in browser…":
+    localSavedText.get(doc.id)===srcEl.value?"Saved in browser":"Browser copy not yet saved";
+  let cloud=dropboxConnected()?"Dropbox connected":"Dropbox not connected";
+  if(doc?.dropbox){
+    if(cloudWrites.has(doc.id)) cloud="Saving to Dropbox…";
+    else if(cloudProblems.get(doc.id)?.conflict) cloud="Dropbox conflict — both versions preserved";
+    else if(doc.dropbox.savedText===srcEl.value) cloud="Saved to Dropbox";
+    else if(!cloudBindingMatches(doc.dropbox)) cloud="Dropbox changes pending — reconnect";
+    else if(navigator.onLine===false) cloud="Dropbox changes pending — offline";
+    else if(cloudProblems.has(doc.id)) cloud="Dropbox save failed — retry";
+    else cloud="Dropbox changes pending";
+    cloud+=" · "+doc.dropbox.path;
+  }
+  el.textContent=local+" · "+cloud; el.title=el.textContent;
+  $("#miCloudDisconnect").hidden=!dbxSession;
+  $("#miCloudConnect").textContent=dropboxConnected()?"Dropbox Connected":"Connect Dropbox…";
+}
+$("#miCloudSetup").onclick=()=>configureDropbox().catch(reportStorageError);
+$("#miCloudConnect").onclick=()=>connectDropbox().catch(reportStorageError);
+$("#miCloudDisconnect").onclick=disconnectDropbox;
+$("#miCloudSave").onclick=()=>saveToDropbox().catch(reportStorageError);
+$("#miCloudCopy").onclick=()=>saveToDropbox(true).catch(reportStorageError);
+$("#miCloudOpen").onclick=()=>openDropboxBrowser().catch(reportStorageError);
+$("#miCloudHistory").onclick=()=>openDropboxHistory().catch(reportStorageError);
+window.addEventListener("online",async()=>{ await persistCurrentDocument(); for(const doc of liveDocuments.values()) scheduleCloudSave(doc); });
+window.addEventListener("offline",updateStorageStatus);
+setInterval(updateStorageStatus,30000);
+
 async function initializeLocalLibrary(){
   libraryDB=await openLibrary();
+  await hydrateLocalCache();
   let docs=await dbGetAll("docs"), recovered=null;
-  const versionDocIds=new Set((await dbGetAll("versions")).map(v=>v.docId));
-  const oldStarters=docs.filter(d=>d.title==="Presentation"&&d.text===SAMPLE&&!d.downloadedFingerprint&&!versionDocIds.has(d.id));
-  if(oldStarters.length){
-    for(const doc of oldStarters){ await dbDelete("docs",doc.id); await deleteVersionsForDoc(doc.id); }
-    docs=docs.filter(d=>!oldStarters.some(s=>s.id===d.id));
-  }
   if(!docs.length){
     recovered=readLegacy(LEGACY_AUTOSAVE_KEY);
     if(!recovered){
@@ -4754,38 +5266,33 @@ async function initializeLocalLibrary(){
     Post slidedown.html + your .psl script online, then share:
       slidedown.html?present=my_talk.psl        (relative or absolute URL)
       slidedown.html?present=...&slide=5        (start on slide 5)          */
-(function boot(){
-  const q=new URLSearchParams(location.search);
-  const remote=q.get("present")||q.get("script");
-  if(!remote){
-    srcEl.value="% Opening your SlideDown presentations …"; refresh();
-    window.slidedownReady=initializeLocalLibrary().catch(err=>{
-      console.error("SlideDown library unavailable",err);
+(async function boot(){
+  if(finishDropboxRedirect()) return;
+  const q=new URLSearchParams(location.search),remote=q.get("present")||q.get("script");
+  srcEl.value="% Opening your SlideDown presentations …"; refresh();
+  window.slidedownReady=(async()=>{
+    try{ await initializeLocalLibrary(); }
+    catch(error){
+      console.error("SlideDown browser storage unavailable",error);
+      libraryDB=null; autosaveDisabled=true;
       const rec=readLegacy(LEGACY_AUTOSAVE_KEY);
-      currentDoc=rec?newDocument("Presentation",rec.text||SAMPLE):starterDocument(); currentDoc.selected=rec?.selected||0;
-      srcEl.value=currentDoc.text; selected=currentDoc.selected; autosaveDisabled=true; refresh(); updateDocumentChrome();
-      showNotice({text:"Browser storage is unavailable. Download your work before closing this page.",
-        actions:[{label:"Download",primary:true,onClick:downloadCurrentDocument}]});
-    });
-    return;
-  }
-  $("#docTitle").textContent=remote.split("/").pop().replace(/\.[^.]+$/,"")||"Remote Presentation";
-  srcEl.value="% Loading "+remote+" …"; refresh();
-  window.slidedownReady=fetch(remote)
-    .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
-    .then(txt=>{
-      srcEl.value=txt; selected=0; refresh();
-      const s=parseInt(q.get("slide"),10);
-      startPresent(isNaN(s)?0:s-1,{exact:!isNaN(s)});   // fullscreen needs a gesture: press f or ⛶
-    })
-    .catch(err=>{
-      srcEl.value="### Could not load the presentation\n"
-        +"{color=#b03030} URL: "+remote+"\n"
-        +"{color=#b03030} "+String(err).replace(/\n/g," ")+"\n"
-        +"Check the address, and that the host allows cross-origin requests.\n"
-        +"---\n"+SAMPLE;
-      selected=0; refresh();
-    });
+      currentDoc=currentDoc||[...memoryStores.docs.values()].sort((a,b)=>b.updatedAt-a.updatedAt)[0]||(rec?newDocument("Presentation",rec.text||SAMPLE):starterDocument());
+      srcEl.value=currentDoc.text; selected=0; refresh(); updateDocumentChrome();
+      showNotice({text:"Browser storage is unavailable. You can still edit, open files, download, and save to Dropbox."});
+    }
+    if(!remote) return;
+    try{
+      const url=new URL(remote,location.href);
+      if(!["https:","http:"].includes(url.protocol)) throw new Error("Use an HTTP or HTTPS presentation URL.");
+      const response=await fetch(url); if(!response.ok) throw new Error("HTTP "+response.status);
+      const raw=await response.text();
+      const text="!set baseurl "+(response.url||url.href)+"\n"+raw;
+      const doc=await createPresentation(text,url.pathname.split("/").pop().replace(/\.[^.]+$/,"")||"Remote presentation");
+      doc.sourceUrl=response.url||url.href; documentBaseUrl=doc.sourceUrl;
+      await saveLocalSnapshot(doc); refresh();
+      const slide=parseInt(q.get("slide"),10); startPresent(isNaN(slide)?0:slide-1,{exact:!isNaN(slide)});
+    }catch(error){ showNotice({text:"Could not load the remote presentation: "+error.message}); }
+  })();
 })();
 </script>
 </body>
