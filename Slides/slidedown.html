@@ -147,8 +147,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
              color:var(--chrome-dim);font-size:10px;cursor:pointer;user-select:none}
 .rail-toggle:hover{color:#e8edf5;background:#20262f}
 .preview-pane.rail-off .thumb-rail{display:none}
-.editor-pane textarea{flex:1;resize:none;border:0;outline:none;background:var(--ink);color:#cdd6e4;font-family:var(--mono);font-size:13.5px;line-height:1.55;padding:16px 18px;tab-size:2;white-space:pre;overflow:auto}
-.editor-pane textarea::selection{background:#3b4a61}
+.editor-pane textarea{flex:1;min-height:0;resize:none;border:0;outline:none;background:var(--ink);color:#cdd6e4;font-family:var(--mono);font-size:13.5px;line-height:1.55;padding:16px 18px;tab-size:2;white-space:pre;overflow:auto}
+.editor-pane textarea::selection{background:#f2c66d;color:#10151c}
+.editor-pane textarea.wrap-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.editor-tools{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-bottom:1px solid var(--line);color:var(--chrome-dim);font-size:12px}
+.editor-tools .btn{padding:4px 9px;font-size:12px}
+.editor-tools .btn[aria-pressed="true"]{background:#f2c66d;color:#10151c;border-color:#f2c66d}
 .warnbar{max-height:90px;overflow:auto;border-top:1px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:11.5px;color:#d9a05a;padding:6px 12px;display:none}
 .warnbar.on{display:block}
 
@@ -431,7 +435,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 
 <div class="split" id="split">
   <div class="editor-pane">
-    <textarea id="src" spellcheck="false" aria-label="Slide script"></textarea>
+    <div class="editor-tools"><span>Slide script</span><button class="btn" id="btnWrap" aria-pressed="false" aria-controls="src" title="Wrap long lines in the editor without changing the script">Wrap text</button></div>
+    <textarea id="src" wrap="off" spellcheck="false" aria-label="Slide script"></textarea>
     <div class="warnbar" id="warnbar"></div>
   </div>
   <div class="gutter" id="gutter" title="Drag to resize · double-click to maximize the editor (Ctrl/Cmd+\)">
@@ -588,6 +593,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!anim pic path (cx,cy) (x,y) 1s</td><td>Move along a quadratic Bézier from the current position via a control point.</td></tr>
       <tr><td>!anim pic enter drop<br>!anim pic exit slideleft 0.4s</td><td>Entrance / exit effects: <code>fade slideleft slideright slideup slidedown grow drop spin</code> (exit also <code>shrink</code>). For an entrance, declare the element and its <code>enter</code> in the <i>same</i> step — it appears with the effect. <code>drop</code> defaults to a bounce.</td></tr>
     </table>
+    <p class="sub">Use <b>Wrap text</b> above the editor to fit long lines to the pane. The preference is remembered in this browser and does not insert line breaks or change the presentation.</p>
     <p class="sub" style="margin-top:14px">Consecutive <code>!anim</code> lines run <b>simultaneously</b>. Geometric selections in one phase must be disjoint or contain exactly the same members; use <code>&gt;&gt;&gt;</code> between partial overlaps. Separate with <code>...</code> to wait for a keypress, or <code>&gt;&gt;&gt;</code> to auto-run in sequence. The <b>Insert ▸ Animation…</b> menu builds these lines for you.</p>
 
     <h3>Presenting</h3>
@@ -2754,6 +2760,20 @@ function fitInto(holder, maxW, maxH){
 
 /* ---------- editor preview ---------- */
 const srcEl=$("#src"), thumbRail=$("#thumbRail"), stageHolder=$("#stageHolder"), warnbar=$("#warnbar");
+const EDITOR_WRAP_KEY="slidedown.editor.wrap";
+function setEditorWrap(wrap,persist=true){
+  srcEl.classList.toggle("wrap-text",wrap);
+  srcEl.wrap=wrap?"soft":"off";
+  $("#btnWrap").setAttribute("aria-pressed",String(wrap));
+  if(persist){
+    try{ localStorage.setItem(EDITOR_WRAP_KEY,String(wrap)); }catch(_){}
+    hideColorTip();
+    if(presenterMode) revealSlideInEditor(curSlide);
+    else scrollCaretIntoView(srcEl.selectionStart);
+  }
+}
+try{ setEditorWrap(localStorage.getItem(EDITOR_WRAP_KEY)==="true",false); }catch(_){}
+$("#btnWrap").addEventListener("click",()=>setEditorWrap(!srcEl.classList.contains("wrap-text")));
 let parseTimer=null;
 srcEl.addEventListener("input",()=>{ clearTimeout(parseTimer); parseTimer=setTimeout(refresh,300); scheduleAutosave(); });
 function replaceEditorRange(start,end,text,selectionStart,selectionEnd){
@@ -3222,7 +3242,7 @@ async function openVersionHistory(){
   $("#dlgTitle").textContent="Version History — "+currentDoc.title;
   const body=$("#dlgBody"); body.innerHTML="";
   if(!hist.length){
-    body.innerHTML=`<p class="sub" style="margin:0">No saved versions yet. SlideDown quietly checkpoints your work every few minutes while you edit, or use <b>File ▸ Save Checkpoint…</b> to save one by hand.</p>`;
+    body.innerHTML=`<p class="sub" style="margin:0">No saved versions yet. SlideDown quietly checkpoints your work every few minutes while you edit, or use <b>File ▸ Local Storage ▸ Save Checkpoint…</b> to save one by hand.</p>`;
   }else{
     const list=document.createElement("div"); list.className="histList";
     for(const h of hist){
@@ -3366,10 +3386,11 @@ function jumpEditorToSlide(i){
   showPreview();
 }
 function scrollCaretIntoView(pos){
-  const before=srcEl.value.slice(0,pos);
-  const line=(before.match(/\n/g)||[]).length;
   const lh=parseFloat(getComputedStyle(srcEl).lineHeight)||20;
-  const target=line*lh - srcEl.clientHeight/3;
+  const lineTop=srcEl.classList.contains("wrap-text")
+    ?editorPointAtOffset(pos).y-srcEl.getBoundingClientRect().top+srcEl.scrollTop-lh
+    :(srcEl.value.slice(0,pos).match(/\n/g)||[]).length*lh;
+  const target=lineTop - srcEl.clientHeight/3;
   srcEl.scrollTop=clamp(target,0,srcEl.scrollHeight);
 }
 
@@ -3834,7 +3855,41 @@ function editorTextMetrics(){
   const ctx=canvas.getContext("2d"); ctx.font=cs.font;
   return {cs,charWidth:ctx.measureText("M").width||8,lineHeight:parseFloat(cs.lineHeight)||20,tabSize:parseInt(cs.tabSize)||2};
 }
+// Let the browser measure soft wraps, tabs, and Unicode instead of estimating columns.
+// The mirror is inert and reused; it is never part of the user's editable content.
+function wrappedEditorGeometry(){
+  const cs=getComputedStyle(srcEl);
+  let mirror=wrappedEditorGeometry.mirror;
+  if(!mirror){
+    mirror=document.createElement("div"); mirror.setAttribute("aria-hidden","true");
+    mirror.style.cssText="position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none;box-sizing:border-box;border:0;";
+    document.body.appendChild(mirror); wrappedEditorGeometry.mirror=mirror;
+  }
+  for(const key of ["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","tabSize","paddingTop","paddingRight","paddingBottom","paddingLeft","whiteSpace","overflowWrap","wordBreak","textIndent","textTransform"])
+    mirror.style[key]=cs[key];
+  mirror.style.width=srcEl.clientWidth+"px";
+  const text=srcEl.value+"\u200b"; // Gives an empty last line a measurable caret.
+  if(mirror.textContent!==text) mirror.textContent=text;
+  const node=mirror.firstChild, range=document.createRange(), base=mirror.getBoundingClientRect();
+  return {base,lineHeight:parseFloat(cs.lineHeight)||20,rectAt(pos){
+    pos=clamp(pos,0,srcEl.value.length);
+    range.setStart(node,pos); range.setEnd(node,pos+1);
+    return range.getBoundingClientRect();
+  }};
+}
 function editorOffsetAtPoint(clientX,clientY){
+  if(srcEl.classList.contains("wrap-text")){
+    const rect=srcEl.getBoundingClientRect(), g=wrappedEditorGeometry();
+    const x=clientX-rect.left+srcEl.scrollLeft+g.base.left;
+    const y=clientY-rect.top+srcEl.scrollTop+g.base.top;
+    let lo=0,hi=srcEl.value.length;
+    while(lo<hi){
+      const mid=(lo+hi)>>1, r=g.rectAt(mid);
+      if(y>=r.top+g.lineHeight || (y>=r.top && x>r.left+r.width/2)) lo=mid+1;
+      else hi=mid;
+    }
+    return lo;
+  }
   const rect=srcEl.getBoundingClientRect(), {cs,charWidth,lineHeight,tabSize}=editorTextMetrics();
   const x=clientX-rect.left+srcEl.scrollLeft-parseFloat(cs.paddingLeft),
     y=clientY-rect.top+srcEl.scrollTop-parseFloat(cs.paddingTop);
@@ -3846,6 +3901,11 @@ function editorOffsetAtPoint(clientX,clientY){
   return start+i;
 }
 function editorPointAtOffset(pos){
+  if(srcEl.classList.contains("wrap-text")){
+    const rect=srcEl.getBoundingClientRect(), g=wrappedEditorGeometry(), r=g.rectAt(pos);
+    return {x:rect.left+r.left-g.base.left-srcEl.scrollLeft,
+      y:rect.top+r.top-g.base.top+g.lineHeight-srcEl.scrollTop};
+  }
   const rect=srcEl.getBoundingClientRect(), {cs,charWidth,lineHeight,tabSize}=editorTextMetrics();
   const before=srcEl.value.slice(0,pos), row=(before.match(/\n/g)||[]).length, line=before.slice(before.lastIndexOf("\n")+1);
   let col=0; for(const ch of line) col=ch==="\t"?col+(tabSize-col%tabSize):col+1;
@@ -4125,7 +4185,8 @@ const DEMO_IMG="data:image/svg+xml;utf8,"+encodeURIComponent(
 <text x="200" y="252" font-family="Georgia,serif" font-size="26" fill="#fbf9f4" text-anchor="middle">specimen #42</text>
 </svg>`);
 
-const SAMPLE=`% ===== A tour of the Portable Slide Language (PSL) =====
+const SAMPLE=`% Use Wrap text above the editor to fit long source lines without changing the deck.
+% ===== A tour of the Portable Slide Language (PSL) =====
 !set transition fade 0.35
 # SlideDown
 ## A tour of the Portable Slide Language.
