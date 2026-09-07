@@ -313,7 +313,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   .pslide .slide{position:absolute;left:0;top:0;transform:none!important}
 }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
-#mFile>.mlist{max-height:calc(100vh - 65px);overflow-y:auto}
+/* Scroll recent documents without clipping the storage submenus. */
+#mFile>.mlist{max-height:calc(100vh - 65px);overflow:visible}
+#mFile.open>.mlist{display:flex;flex-direction:column}
+#mFile>.mlist>*{flex-shrink:0}
+#mFile>.mlist>.recent-list{flex-shrink:1;min-height:0}
 [hidden]{display:none!important}
 .storage-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto;padding:5px 14px;background:var(--panel);border-top:1px solid var(--line);color:var(--chrome-dim);font-size:12px}
 .warn-link{background:none;border:0;padding:0;color:inherit;cursor:pointer;font:inherit;text-align:left;text-decoration:underline}
