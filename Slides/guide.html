@@ -304,6 +304,9 @@ step</h2>
 waits for the next spacebar/click.</li>
 <li><code>&gt;&gt;&gt;</code> — a <strong>chain</strong>. What follows
 runs <em>automatically</em> when the previous animations finish.</li>
+<li><code>&gt;&gt;&gt; 1.5s</code> — a <strong>timed chain</strong>. After
+the previous animations finish, wait 1.5 seconds before continuing
+automatically.</li>
 </ul>
 <pre><code>### Build-up
 - Shown immediately
@@ -314,8 +317,8 @@ runs <em>automatically</em> when the previous animations finish.</li>
   - This one waits for its own keypress</code></pre>
 <p>Consecutive <code>!anim</code> lines run
 <strong>simultaneously</strong>; separate them with <code>...</code>
-(wait for input) or <code>&gt;&gt;&gt;</code> (auto-sequence) to stage
-them.</p>
+(wait for input), <code>&gt;&gt;&gt;</code> (auto-sequence), or
+<code>&gt;&gt;&gt; 1.5s</code> (delayed auto-sequence) to stage them.</p>
 <hr />
 <h2 id="placement-labels-styling-the-three-prefixes">5. Placement,
 labels &amp; styling (the three prefixes)</h2>
@@ -533,8 +536,10 @@ their first-listed point)</td>
 !anim dot color #c23b22 0.5s          ← starts when the move finishes</code></pre>
 <p><strong>Timing model:</strong> consecutive <code>!anim</code> lines
 fire simultaneously. Put <code>...</code> between groups to wait for
-input, or <code>&gt;&gt;&gt;</code> to auto-chain. Pressing a key
-<em>during</em> an animation finishes it instantly.</p>
+input, <code>&gt;&gt;&gt;</code> to auto-chain immediately, or
+<code>&gt;&gt;&gt; 1.5s</code> to wait before the next chained group.
+Pressing a key during an animation or timed-chain delay finishes the
+sequence instantly.</p>
 <hr />
 <h2 id="variables-expressions-functions">10. Variables, expressions
 &amp; functions</h2>
@@ -692,7 +697,7 @@ sends CORS headers.</p>
 <h2 id="quick-reference">14. Quick reference</h2>
 <pre><code>STRUCTURE          --- new slide   !--- pocket slide   % comment
                    # Title   ## Subtitle   ### Heading   - bullet (2-sp indent)
-                   ...  pause      &gt;&gt;&gt;  auto-chain
+                   ...  pause      &gt;&gt;&gt; [duration]  auto-chain
 PREFIXES           @(x,y)  [label]  {style}      (any order, before content)
 STYLE KEYS         size color font fill w h thick align valign anchor opacity
                    + shapes/boxes: textcolor pad round tint dim
