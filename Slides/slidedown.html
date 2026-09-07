@@ -72,6 +72,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .mlist{display:none;position:absolute;left:0;top:calc(100% - 5px);z-index:100;min-width:210px;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
 .menu.open>.mlist{display:block}
 .mitem{display:block;width:100%;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:var(--chrome-text);font-family:var(--ui);font-size:13px;text-align:left;white-space:nowrap;cursor:pointer}
+.mitem[hidden]{display:none}
 .mitem:disabled{opacity:.45;cursor:default}
 .mitem:not(:disabled):hover,.mitem:not(:disabled):focus-visible{background:var(--panel2);outline:none}
 .msubmenu{position:relative}
@@ -331,18 +332,34 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   <div class="menu" id="mFile"><button class="mbtn">File</button><div class="mlist">
     <button class="mitem" id="miNew">New Presentation</button>
     <button class="mitem" id="miOpen">Open File…</button>
-    <button class="mitem" id="miCloudSave">Save to Dropbox…</button>
-    <button class="mitem" id="miCloudOpen">Open from Dropbox…</button>
-    <button class="mitem" id="miCloudHistory">Dropbox Version History…</button>
-    <button class="mitem" id="miCloudCopy">Save a Copy to Dropbox…</button>
-    <button class="mitem" id="miCloudConnect">Connect Dropbox…</button>
-    <button class="mitem" id="miCloudDisconnect" hidden>Disconnect Dropbox</button>
-    <button class="mitem" id="miCloudSetup">Dropbox Settings…</button>
-    <div class="msep"></div>
     <button class="mitem" id="miSave">Download “Presentation.psl”</button>
     <div class="msep"></div>
-    <button class="mitem" id="miCheckpoint">Save Checkpoint…</button>
-    <button class="mitem" id="miHistory">Version History…</button>
+    <div class="msubmenu" id="dropboxSubmenu">
+      <button class="mitem msubmenu-trigger" id="dropboxMenuTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="dropboxMenu">
+        <span>Dropbox</span><span class="msubmenu-arrow" aria-hidden="true">›</span>
+      </button>
+      <div class="mlist msubmenu-list" id="dropboxMenu" role="menu" aria-label="Dropbox">
+        <button class="mitem" id="miCloudConnect">Connect Dropbox…</button>
+        <button class="mitem" id="miCloudDisconnect" hidden>Disconnect Dropbox</button>
+        <div class="msep"></div>
+        <button class="mitem" id="miCloudOpen">Open from Dropbox…</button>
+        <button class="mitem" id="miCloudSave">Save to Dropbox…</button>
+        <button class="mitem" id="miCloudCopy">Save a Copy to Dropbox…</button>
+        <button class="mitem" id="miCloudHistory">Dropbox Version History…</button>
+      </div>
+    </div>
+    <div class="msubmenu" id="localStorageSubmenu">
+      <button class="mitem msubmenu-trigger" id="localStorageMenuTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="localStorageMenu">
+        <span>Local Storage</span><span class="msubmenu-arrow" aria-hidden="true">›</span>
+      </button>
+      <div class="mlist msubmenu-list" id="localStorageMenu" role="menu" aria-label="Local Storage">
+        <button class="mitem" id="miAllDocuments">All Browser Presentations…</button>
+        <button class="mitem" id="miCheckpoint">Save Checkpoint…</button>
+        <button class="mitem" id="miHistory">Version History…</button>
+        <div class="msep"></div>
+        <button class="mitem" id="miStorageRetry" disabled>Retry Browser Storage</button>
+      </div>
+    </div>
     <div class="msep"></div>
     <button class="mitem" id="miSample">Load Sample Deck</button>
     <div class="msep"></div>
@@ -350,8 +367,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
     <div class="msep"></div>
     <button class="mitem" id="miPrint">Print / Save as PDF…</button>
     <div class="msep"></div>
-    <button class="mitem" id="miAllDocuments">All Browser Presentations…</button>
-    <button class="mitem" id="miStorageRetry">Retry Browser Storage</button>
     <div class="msection">Recent Presentations</div>
     <div class="recent-list" id="recentDocs"><div class="recent-empty">Loading…</div></div>
   </div></div>
@@ -3128,17 +3143,24 @@ function hasUnprotectedChanges(){
 }
 window.addEventListener("beforeunload",e=>{ if(hasUnprotectedChanges()){ e.preventDefault(); e.returnValue=""; } });
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden"&&autosaveTimer) persistCurrentDocument(); });
+let browserStorageRetrying=false;
 async function retryBrowserStorage(){
+  if(browserStorageRetrying) return;
+  browserStorageRetrying=true; updateStorageStatus();
+  showNotice({text:"Retrying browser storage…"});
   try{
     if(!libraryDB) libraryDB=await openLibrary();
     // Preserve the active session's working copies when storage becomes available.
-    for(const doc of memoryStores.docs.values()) await saveLocalSnapshot(doc);
+    for(const doc of [...memoryStores.docs.values()]){
+      if(!await saveLocalSnapshot(doc)) throw new Error("Browser save failed.");
+    }
     for(const rec of memoryStores.versions.values()) await dbPut("versions",rec);
-    await persistCurrentDocument();
+    if(!await persistCurrentDocument()) throw new Error("Browser save failed.");
     if(currentDoc) await setCurrentDocumentId(currentDoc.id);
-    if(autosaveDisabled) throw new Error("The browser still cannot save this presentation.");
-    showNotice({text:"Browser storage is working again.",timeout:3000});
-  }catch(error){ showNotice({text:"Browser storage is still unavailable. Download your work or save it to Dropbox."}); }
+    autosaveDisabled=false; quotaWarned=false;
+    showNotice({text:"Browser storage is working. Your browser presentations have been saved."});
+  }catch(error){ autosaveDisabled=true; showNotice({text:"Browser storage is still unavailable. Download your work or save it to Dropbox."}); }
+  finally{ browserStorageRetrying=false; updateStorageStatus(); }
 }
 
 function relTime(ts){
@@ -3875,11 +3897,21 @@ document.addEventListener("click",e=>{
 document.querySelectorAll(".mitem:not(.msubmenu-trigger)").forEach(it=>it.addEventListener("click",closeMenus));
 document.querySelectorAll(".msubmenu").forEach(submenu=>{
   const trigger=submenu.querySelector(":scope>.msubmenu-trigger"), list=submenu.querySelector(":scope>.msubmenu-list");
-  const setOpen=open=>{ submenu.classList.toggle("open",open); trigger.setAttribute("aria-expanded",String(open)); };
+  const closeSiblings=()=>{
+    for(const sibling of submenu.parentElement.children){
+      if(sibling!==submenu&&sibling.classList.contains("msubmenu")){
+        sibling.classList.remove("open"); sibling.querySelector(":scope>.msubmenu-trigger").setAttribute("aria-expanded","false");
+      }
+    }
+  };
+  const setOpen=open=>{
+    if(open) closeSiblings();
+    submenu.classList.toggle("open",open); trigger.setAttribute("aria-expanded",String(open));
+  };
   trigger.addEventListener("click",e=>{ setOpen(!submenu.classList.contains("open")); e.stopPropagation(); });
   trigger.addEventListener("keydown",e=>{
     if(e.key==="ArrowRight"||e.key==="ArrowDown"){
-      e.preventDefault(); setOpen(true); list.querySelector(".mitem")?.focus();
+      e.preventDefault(); setOpen(true); list.querySelector(".mitem:not(:disabled):not([hidden])")?.focus();
     }else if(e.key==="Escape"){
       e.preventDefault(); setOpen(false);
     }
@@ -3889,7 +3921,7 @@ document.querySelectorAll(".msubmenu").forEach(submenu=>{
       e.preventDefault(); e.stopPropagation(); setOpen(false); trigger.focus();
     }
   });
-  submenu.addEventListener("mouseenter",()=>trigger.setAttribute("aria-expanded","true"));
+  submenu.addEventListener("mouseenter",()=>{ closeSiblings(); trigger.setAttribute("aria-expanded","true"); });
   submenu.addEventListener("mouseleave",()=>{ if(!submenu.classList.contains("open")) trigger.setAttribute("aria-expanded","false"); });
 });
 
@@ -4946,7 +4978,7 @@ async function pptxToPsl(file){
    Tokens live only in this tab's sessionStorage; reconnect after expiration.
    ============================================================ */
 const DROPBOX_APP_KEY="z2tjsaay6vpj3nq";
-const DBX_SESSION_KEY="slidedown.dropbox.session.v1", DBX_APP_KEY="slidedown.dropbox.appKey";
+const DBX_SESSION_KEY="slidedown.dropbox.session.v1";
 let dbxSession=null, dbxPending=null;
 const cloudTimers=new Map(), cloudWrites=new Map(), cloudProblems=new Map();
 const dropboxResources=new Map(); let resourceSerial=0;
@@ -4994,7 +5026,7 @@ function clearDropboxResourceCache(){
 }
 
 try{ dbxSession=JSON.parse(sessionStorage.getItem(DBX_SESSION_KEY)||"null"); }catch(_){}
-function dropboxAppKey(){ try{return DROPBOX_APP_KEY||localStorage.getItem(DBX_APP_KEY)||"";}catch(_){return DROPBOX_APP_KEY;} }
+function dropboxAppKey(){ return DROPBOX_APP_KEY; }
 function dropboxConnected(){ return !!(dbxSession&&dbxSession.expiresAt>Date.now()+30000&&dbxSession.appKey===dropboxAppKey()); }
 function dropboxRedirectURI(){ return location.origin+location.pathname; }
 function setDropboxSession(session){
@@ -5035,22 +5067,11 @@ async function dropboxRequest(route,args,{body,download=false,binary=false}={}){
     throw error;
   }finally{ clearTimeout(timeout); }
 }
-async function configureDropbox(){
-  const values=await showDialog("Dropbox setup",[
-    {type:"note",text:"For the site owner: create a scoped Dropbox API app with App Folder access. Enable files.metadata.read, files.content.read, and files.content.write. Register the exact redirect URL below. Enter the public app key, never the app secret. For everyone using your hosted copy, set DROPBOX_APP_KEY in the HTML once. The Dropbox App Console is at https://www.dropbox.com/developers/apps."},
-    {key:"appKey",label:"Public app key",value:dropboxAppKey(),readOnly:!!DROPBOX_APP_KEY},
-    {key:"redirect",label:"Redirect URL",value:dropboxRedirectURI(),readOnly:true}
-  ],"Use app key");
-  if(!values?.appKey) return false;
-  if(!/^[a-zA-Z0-9_-]+$/.test(values.appKey)) throw new Error("Enter the public Dropbox app key from the app console.");
-  try{ localStorage.setItem(DBX_APP_KEY,values.appKey); }catch(_){ throw new Error("This browser cannot retain the app key. Set DROPBOX_APP_KEY in the HTML instead."); }
-  setDropboxSession(null); return true;
-}
 async function connectDropbox(){
   if(dropboxConnected()) return true;
   if(!["https:","http:"].includes(location.protocol)||!window.isSecureContext)
     throw new Error("Dropbox needs this file hosted over HTTPS, or on localhost during development. Local file:// editing and downloads still work.");
-  if(!dropboxAppKey()){ if(!await configureDropbox()) return false; }
+  if(!dropboxAppKey()) throw new Error("Dropbox is not configured for this site. Contact the site owner to enable it.");
   if(dbxPending) throw new Error("A Dropbox connection window is already open.");
   const popup=window.open("about:blank","SlideDownDropbox","width=650,height=750");
   if(!popup) throw new Error("Allow pop-ups for SlideDown, then click Connect Dropbox again.");
@@ -5221,6 +5242,10 @@ function updateStorageStatus(){
     cloud+=" · App folder: "+doc.dropbox.path;
   }
   el.textContent=local+" · "+cloud; el.title=el.textContent+(doc?.dropbox?". Find this file in Dropbox → Apps → your app folder, in the account you connected.":"");
+  const retry=$("#miStorageRetry");
+  retry.disabled=browserStorageRetrying||!!libraryDB&&!autosaveDisabled;
+  retry.textContent=browserStorageRetrying?"Retrying Browser Storage…":"Retry Browser Storage";
+  retry.title=browserStorageRetrying?"A recovery attempt is in progress":retry.disabled?"Browser storage is working; no retry is needed":"Retry saving this tab’s working copies after a browser storage failure";
   const connected=dropboxConnected();
   for(const id of ["miCloudSave","miCloudCopy","miCloudOpen","miCloudHistory"]){
     const button=$("#"+id);
@@ -5231,7 +5256,6 @@ function updateStorageStatus(){
   $("#miCloudDisconnect").hidden=!dbxSession;
   $("#miCloudConnect").textContent=dropboxConnected()?"Dropbox Connected":"Connect Dropbox…";
 }
-$("#miCloudSetup").onclick=()=>configureDropbox().catch(reportStorageError);
 $("#miCloudConnect").onclick=()=>connectDropbox().catch(reportStorageError);
 $("#miCloudDisconnect").onclick=disconnectDropbox;
 $("#miCloudSave").onclick=()=>saveToDropbox().catch(reportStorageError);
