@@ -233,10 +233,13 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .slide .s-code{max-width:100%;margin:0;padding:18px 22px;border:1px solid #d9d6cd;border-radius:7px;background:#f3f1eb;
                     color:#232830;font-family:var(--mono);font-size:21px;line-height:1.4;overflow:hidden}
 .slide .s-code code,.slide .s-code code.hljs{display:block;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit}
-.slide .s-table{max-width:100%;border-collapse:collapse;border:2px solid var(--slide-accent,var(--teal));font-size:24px;line-height:1.3}
-.slide .s-table th,.slide .s-table td{padding:10px 15px;border:1px solid #aeb5b7;vertical-align:top}
-.slide .s-table th{background:rgba(31,111,107,.13);font-weight:600;color:inherit}
-.slide .s-table tbody tr:nth-child(even){background:rgba(35,40,48,.035)}
+.slide .s-table{max-width:100%;border-collapse:collapse;border:var(--table-outer,2px) solid var(--table-line,var(--slide-accent,var(--teal)));font-size:24px;line-height:1.3}
+.slide .s-table th,.slide .s-table td{padding:var(--table-pad,10px 15px);border-style:solid;border-color:var(--table-line,#aeb5b7);border-width:0;vertical-align:var(--table-valign,top);overflow-wrap:anywhere}
+.slide .s-table tr>*+*{border-left-width:var(--table-vertical,1px)}
+.slide .s-table tr+tr>*,.slide .s-table thead+tbody tr:first-child>*{border-top-width:var(--table-horizontal,1px)}
+.slide .s-table th{background:var(--table-header-fill,rgba(31,111,107,.13));font-weight:600;color:var(--table-header-text,inherit)}
+.slide .s-table tbody{background:var(--table-body-fill,transparent);color:var(--table-body-text,inherit)}
+.slide .s-table tbody tr:nth-child(even){background:var(--table-stripe,rgba(35,40,48,.035))}
 .hidden-item{visibility:hidden}
 
 /* ---------- presentation mode ---------- */
@@ -544,6 +547,17 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>{rotate=25} !rect (…)(…)</td><td>Give an element a starting rotation, in degrees, about its own center.</td></tr>
     </table>
 
+    <h3>Table styling</h3>
+    <p class="sub">Put a style prefix before the first pipe row, or use a named style. Example: <code>[results] {w=900px, headerfill=#1f6f6b, headertext=white, colwidths=(40%,60%)} | Group | Result |</code></p>
+    <table>
+      <tr><td>outer / thick / stroke</td><td>Outer border width, interior rule width, and shared line color. Bare border widths are pixels; zero removes them independently.</td></tr>
+      <tr><td>rules=all|rows|columns|none</td><td>Which interior rules are drawn. The outer border is independent.</td></tr>
+      <tr><td>headerfill / headertext<br>bodyfill / bodytext / stripe</td><td>Header colors, body colors, and fill for even body rows. CSS colors and document-palette names work.</td></tr>
+      <tr><td>pad / valign / w / size / font</td><td>Cell padding and vertical alignment; table width and typography. Use explicit px for lengths.</td></tr>
+      <tr><td>colwidths=(40%,60%)<br>colalign=(left,right)</td><td>One entry per column. Widths accept percentages, pixels, or auto. Column alignment overrides align, which overrides Markdown alignment.</td></tr>
+      <tr><td>!anim results headerfill blue 0.5s<br>!anim results rules rows</td><td>Colors and lengths interpolate; font, align, valign, rules, colwidths, and colalign change instantly with no duration (or 0s).</td></tr>
+    </table>
+    <p class="sub">Explicit <code>textcolor</code> works on ordinary text as well as shape text. Rectangles retain 6px corners and text boxes 12px; <code>round=0</code> makes square corners. Use <code>!anim target w 400px</code> for width, <code>h</code> for image/video/embed height, and <code>textsize</code> for font size. Chart data/palette and media sources/playback flags remain creation-time properties; unsupported animations produce warnings.</p>
     <h3>Images, backgrounds &amp; embeds</h3>
     <table>
       <tr><td>![caption](url)</td><td>Image. Size with <code>{w=0.3}</code> (fraction of slide width) or pixels.</td></tr>
@@ -825,9 +839,18 @@ function inlineMd(s,palette){
 }
 let _colorProbe=null;
 function resolveColor(c){
+  if(c==="none") c="transparent";
   if(!_colorProbe){_colorProbe=document.createElement("span");_colorProbe.style.display="none";document.body.appendChild(_colorProbe);}
   _colorProbe.style.color=""; _colorProbe.style.color=c;
-  const m=getComputedStyle(_colorProbe).color.match(/[\d.]+/g)||[0,0,0,1];
+  const computed=getComputedStyle(_colorProbe).color;
+  if(/^(?:color|color-mix|lab|lch|oklab|oklch)\(/.test(computed)){
+    const canvas=resolveColor.canvas||(resolveColor.canvas=document.createElement("canvas"));
+    canvas.width=canvas.height=1;
+    const ctx=canvas.getContext("2d",{willReadFrequently:true});
+    if(ctx){ctx.clearRect(0,0,1,1);ctx.fillStyle=computed;ctx.fillRect(0,0,1,1);
+      const [r,g,b,a]=ctx.getImageData(0,0,1,1).data;return {r,g,b,a:a/255};}
+  }
+  const m=computed.match(/[\d.]+/g)||[0,0,0,1];
   return {r:+m[0],g:+m[1],b:+m[2],a:m.length>3?+m[3]:1};
 }
 const mixColor=(A,B,t)=>`rgba(${Math.round(A.r+(B.r-A.r)*t)},${Math.round(A.g+(B.g-A.g)*t)},${Math.round(A.b+(B.b-A.b)*t)},${(A.a+(B.a-A.a)*t).toFixed(3)})`;
@@ -1177,6 +1200,93 @@ const RE_STYLE = /^\{(?!\{)([^}]*)\}\s*/;
 const RE_PAIR  = new RegExp(`\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\)`,"g");
 const RE_DUR   = /(?:^|\s)(\S+)\s*s\s*$/i;
 
+/* Shared style vocabulary: creation validation and animation dispatch use this registry.
+   null animation means intentionally static; legacy size animation means media width. */
+const TEXT_KINDS=["h1","h2","h3","p","li","code","table"];
+const SHAPE_KINDS=["line","arrow","rect","textbox","circle","ellipse","polygon","polyline","curve"];
+const MEDIA_KINDS=["img","embed","video","audio"];
+const PROPERTY_SCHEMA={};
+function defineProperties(names,type,kinds,animation,defaultValue){
+  for(const name of names.split(" ")) PROPERTY_SCHEMA[name]={type,kinds,animation,default:defaultValue};
+}
+defineProperties("opacity","opacity","all","number",1);
+defineProperties("rotate","number","all","rotate",0);
+defineProperties("z","integer","all","z",0);
+defineProperties("color","color",[...TEXT_KINDS,...SHAPE_KINDS,"chart"],"legacy-color","inherited text / shape stroke / chart ink");
+defineProperties("textcolor","color","text","color","inherited text / #232830 shape text");
+defineProperties("fill","paint",[...TEXT_KINDS,...SHAPE_KINDS,"chart"],"color","transparent / shape none / textbox tint / chart palette");
+defineProperties("stroke","paint",[...SHAPE_KINDS,"code","table"],"color","#232830 / code #d9d6cd / table #aeb5b7");
+defineProperties("thick","length",[...SHAPE_KINDS,"code","table","chart"],"number","4px shapes / 0 textbox / 1px table rules");
+defineProperties("round","length",["rect","textbox","code"],"number","6px rect / 12px textbox / 7px code");
+defineProperties("size","length",[...TEXT_KINDS,...SHAPE_KINDS,"chart"],"textsize","element/deck typography");
+defineProperties("font","string","text","discrete","inherited");
+defineProperties("align","align","text","discrete","left / center shape text / Markdown column alignment");
+defineProperties("valign","valign",[...SHAPE_KINDS,"table"],"discrete","middle shape text / top table");
+defineProperties("pad","length",[...SHAPE_KINDS,"code","table"],"number","16px shape text / code 18px 22px / table 10px 15px");
+defineProperties("w","length",[...TEXT_KINDS,...MEDIA_KINDS],"number","auto / media default width");
+defineProperties("h","length",["img","embed","video"],"number","auto / media default height");
+defineProperties("anchor","anchor",[...TEXT_KINDS,...MEDIA_KINDS],null,"top-left");
+defineProperties("border","paint",SHAPE_KINDS,null,"legacy stroke alias");
+defineProperties("color2","color",SHAPE_KINDS,null,"legacy textcolor alias");
+defineProperties("poster","string",["video"],null,"");
+defineProperties("autoplay loop muted controls","boolean",["video","audio"],null,"controls on; others off");
+defineProperties("colors","string",["chart"],null,"chart palette");
+defineProperties("values","boolean",["chart"],null,true);
+defineProperties("outer","length",["table"],"number","2px");
+defineProperties("rules","rules",["table"],"discrete","all");
+defineProperties("headerfill headertext bodyfill bodytext stripe","color",["table"],"color","table theme");
+defineProperties("colwidths","widths",["table"],"discrete","auto");
+defineProperties("colalign","aligns",["table"],"discrete","Markdown alignment");
+for(const name of ["color","fill","thick","size"]) PROPERTY_SCHEMA[name].staticKinds=["chart"];
+Object.assign(PROPERTY_SCHEMA.headerfill,{default:"rgba(31,111,107,.13)"});
+Object.assign(PROPERTY_SCHEMA.headertext,{default:"inherit"});
+Object.assign(PROPERTY_SCHEMA.bodyfill,{default:"transparent"});
+Object.assign(PROPERTY_SCHEMA.bodytext,{default:"inherit"});
+Object.assign(PROPERTY_SCHEMA.stripe,{default:"rgba(35,40,48,.035)"});
+const enabledFlag=value=>value===true||["1","on","true"].includes(String(value));
+const propertyList=value=>String(value).replace(/^\(|\)$/g,"").split(",").map(v=>v.trim());
+const PROPERTY_LENGTH=new RegExp(`^${NUM_PATTERN}(?:px|em)?$`,"i");
+function propertyApplies(spec,item){
+  return spec.kinds==="all" || (spec.kinds==="text" ? TEXT_KINDS.includes(item.kind)||["rect","textbox","circle","ellipse","polygon"].includes(item.kind)||!!item.text : spec.kinds.includes(item.kind));
+}
+function propertyValueValid(spec,value,palette){
+  const v=String(value).trim(), n=Number(v);
+  switch(spec.type){
+    case "opacity": return v!==""&&Number.isFinite(n)&&n>=0&&n<=1;
+    case "number": return v!==""&&Number.isFinite(n);
+    case "integer": return v!==""&&Number.isInteger(n);
+    case "length": return PROPERTY_LENGTH.test(v)&&Number.isFinite(parseFloat(v))&&parseFloat(v)>=0;
+    case "color": case "paint": return (spec.type==="paint"&&v==="none")||isCssColor(resolvePaletteColor(v,palette));
+    case "align": return ["left","center","right","justify"].includes(v);
+    case "valign": return ["top","middle","bottom"].includes(v);
+    case "anchor": return ["center","top-left"].includes(v);
+    case "rules": return ["all","rows","columns","none"].includes(v);
+    case "boolean": return value===true||["0","1","on","off","true","false"].includes(v);
+    case "widths": return propertyList(v).every(x=>/^(?:auto|(?:\d+(?:\.\d+)?|\.\d+)(?:px|%)?)$/.test(x)&& (x==="auto"||Number.isFinite(parseFloat(x))&&parseFloat(x)>0));
+    case "aligns": return propertyList(v).every(x=>["left","center","right","justify"].includes(x));
+    default: return v.length>0;
+  }
+}
+function validateItemProperties(item,warnings,where,palette){
+  for(const [name,value] of Object.entries(item.style)){
+    const spec=PROPERTY_SCHEMA[name];
+    const textOnly=["size","font","align","valign","pad","textcolor","color2"].includes(name);
+    if(!spec || !propertyApplies(spec,item) || (name==="fill"&&["line","arrow"].includes(item.kind)) || (textOnly&&["line","arrow","polyline","curve"].includes(item.kind)&&!item.text)){
+      warnings.push(`${where}: ${name} style is not supported for ${item.kind}${item.label?` “${item.label}”`:""}`);
+      continue; // Retain unknown legacy keys for compatibility; never render them as CSS.
+    }
+    if(!propertyValueValid(spec,value,palette)){
+      warnings.push(`${where}: invalid ${name} value “${value}” (${spec.type})`); delete item.style[name];
+    }
+  }
+  for(const name of ["colwidths","colalign"]){
+    if(item.kind==="table"&&item.style[name]!=null){
+      const columns=Math.max(item.head?.length||0,...item.rows.map(r=>r.length));
+      if(propertyList(item.style[name]).length!==columns){ warnings.push(`${where}: ${name} needs one value per table column (${columns})`); delete item.style[name]; }
+    }
+  }
+}
+
 function parseStyle(s, namedStyles, warnings, whereStr){
   const st={}; let lastKey=null;
   // A bare word continues the previous value only where that's meaningful:
@@ -1238,6 +1348,7 @@ function backgroundDef(value,palette){
 function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
   const slide={items:[], steps:[[newPhase()]], bg:null, hasH1:false, hasH3:false};
   let step=0, phase=0, nextId=0;
+  let itemWhere="slide "+(slideIndex+1);
   let loopBudget=20000;                    // total foreach iterations per slide
   function cur(){ return slide.steps[step][phase]; }
   // Warning locations account for a prepended !all block.
@@ -1248,6 +1359,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
   // THIS point in the script), stamp the mode, register its label for
   // ${label.member} access, and reveal it in the current step/phase.
   function addItem(item){
+    validateItemProperties(item,warnings,itemWhere,vars.__palette);
     if(item.pos) item.pos={x:cvx(item.pos.x,vars), y:cvy(item.pos.y,vars)};
     item.abs=isAbs(vars);
     if(item.label) vars.__labels[item.label]=item;
@@ -1279,7 +1391,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
 
   function processLines(L){
   for(let k=0; k<L.length; k++){
-    const raw=L[k].text, lnNo=L[k].n;
+    const raw=L[k].text, lnNo=L[k].n; itemWhere=where(lnNo);
     if(!raw.trim()) continue;
     const indent=(raw.match(/^ */)[0].length);
     let line=raw.trim();
@@ -1645,9 +1757,28 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
     const content=argsRaw.trim();
     return content ? {target,verb,dur:0,text:content} : bad("text needs replacement content");
   }
-  const hadDuration=RE_DUR.test(argsRaw);
-  let [args,dur,durError]=takeDur(argsRaw);
+  const discreteSpec=PROPERTY_SCHEMA[verb];
+  if(discreteSpec?.animation==="discrete"){
+    const duration=argsRaw.match(/\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+))s\s*$/i);
+    if(duration&&Number(duration[1])!==0) return bad(`${verb} is discrete; omit the duration or use 0s`);
+    const value=duration?argsRaw.slice(0,duration.index).trim():argsRaw.trim();
+    if(!propertyValueValid(discreteSpec,value,vars.__palette)) return bad(`invalid ${verb} value “${value}” (${discreteSpec.type})`);
+    return {target,verb,property:true,value,dur:0};
+  }
+  const colorSpec=PROPERTY_SCHEMA[verb];
+  const bareColor=colorSpec&&["color","paint"].includes(colorSpec.type)&&propertyValueValid(colorSpec,argsRaw,vars.__palette);
+  const hadDuration=!bareColor&&RE_DUR.test(argsRaw);
+  let [args,dur,durError]=bareColor?[argsRaw.trim(),DEFAULT_DUR,null]:takeDur(argsRaw);
   if(durError) return bad(durError);
+  const spec=PROPERTY_SCHEMA[verb];
+  if(spec && ["w","h","font","align","valign","pad","outer","rules","headerfill","headertext","bodyfill","bodytext","stripe","colwidths","colalign"].includes(verb)){
+    if(!propertyValueValid(spec,args,vars.__palette)) return bad(`invalid ${verb} value “${args}” (${spec.type})`);
+    if(spec.animation==="discrete" && hadDuration && dur!==0) return bad(`${verb} is discrete; omit the duration or use 0s`);
+    return {target,verb,property:true,value:args,dur:spec.animation==="discrete"?0:dur};
+  }
+  if(spec && ["color","fill","stroke","textcolor","thick","round"].includes(verb) && !propertyValueValid(spec,args,vars.__palette))
+    return bad(`invalid ${verb} value “${args}” (${spec.type})`);
+  if(verb==="textsize"&&!propertyValueValid(PROPERTY_SCHEMA.size,args,vars.__palette)) return bad("textsize needs a non-negative size");
   switch(verb){
     case "hide": case "show": return args ? bad(`${verb} takes only an optional duration`) : {target,verb,dur};
     case "path":{ const p=pairs(args); if(p.length<2) return bad("path needs (ctrlx,ctrly) (destx,desty)");
@@ -1667,9 +1798,9 @@ function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
     case "point":{ const n=parseInt(args); const p=pairs(args);
       if(!(n>=1)||!p.length) return bad("point needs a point index and (x,y)");
       return {target,verb,dur,n,x:cvx(p[0][0],vars),y:cvy(p[0][1],vars)}; }
-    case "size":{ const v=parseFloat(args); if(isNaN(v)) return bad("size needs a width");
-      return {target,verb,dur,w:cvlen(v,vars,SW)}; }
-    case "scale":{ const v=parseFloat(args); if(isNaN(v)) return bad("scale needs a factor");
+    case "size":{ if(!propertyValueValid(PROPERTY_SCHEMA.w,args,vars.__palette)) return bad("size needs a non-negative width");
+      return {target,verb,dur,size:args,w:styleLen(args,SW,vars)}; }
+    case "scale":{ const v=parseFloat(args); if(!STRICT_NUMBER.test(args)||!Number.isFinite(v)) return bad("scale needs a finite factor");
       return {target,verb,dur,f:v}; }
     case "rotate":{
       const rm=args.match(new RegExp(`^(${NUM_PATTERN})\\s*(?:around\\s*\\(\\s*(${NUM_PATTERN})\\s*,\\s*(${NUM_PATTERN})\\s*\\))?\\s*$`,"i"));
@@ -1741,23 +1872,36 @@ function validateSlideAnimations(slide, warnings, slideIndex){
       for(const item of targets){
         const kind=item.kind, subject=a.target.startsWith("@")
           ? `${kind} in ${describe(a.target)}` : `${kind} “${a.target}”`;
-        if(a.verb==="size" && !["img","embed","video"].includes(kind)){
+        const spec=PROPERTY_SCHEMA[a.verb];
+        if(spec && a.verb!=="size" && (!propertyApplies(spec,item) || (spec.staticKinds?.includes(kind)) ||
+          (a.verb==="thick"&&![...SHAPE_KINDS,"code","table"].includes(kind)) ||
+          (["fill","stroke"].includes(a.verb)&&["line","arrow"].includes(kind)&&a.verb==="fill") ||
+          (["textcolor","font","align","valign","pad"].includes(a.verb)&&SHAPE_KINDS.includes(kind)&&!item.text))){
+          warnings.push(`${at}: ${a.verb} animation is not supported for ${subject}`); a.invalid=true; continue;
+        }
+        if(kind==="table"&&((a.verb.startsWith("header")&&!item.head)||(a.verb.startsWith("body")&&!item.rows.length)||(a.verb==="stripe"&&item.rows.length<2))){
+          warnings.push(`${at}: ${a.verb} needs the corresponding table rows`); a.invalid=true; continue;
+        }
+        if(["colwidths","colalign"].includes(a.verb)&&propertyList(a.value).length!==Math.max(item.head?.length||0,...(item.rows||[]).map(r=>r.length))){
+          warnings.push(`${at}: ${a.verb} needs one value per table column`); a.invalid=true; continue;
+        }
+        if(a.verb==="size" && !["img","embed","video",...TEXT_KINDS].includes(kind)&&!item.text){
           warnings.push(`${at}: size animation is not supported for ${subject}`); a.invalid=true;
-        }else if((a.verb==="move"||a.verb==="path") && kind==="chart" && !a.target.startsWith("@")){
+        }else if((["move","path","translate"].includes(a.verb)) && kind==="chart" && !a.target.startsWith("@")){
           warnings.push(`${at}: ${a.verb} animation is not supported for ${subject}`); a.invalid=true;
         }else if(a.verb==="point" && (!item.coords || a.n>item.coords.length)){
           warnings.push(`${at}: point ${a.n} does not exist on ${subject}`); a.invalid=true;
-        }else if(a.verb==="textsize" && (["img","embed","video","audio","line","arrow","polyline","curve","chart"].includes(kind) && !item.text)){
+        }else if(a.verb==="textsize" && !TEXT_KINDS.includes(kind) && !item.text){
           warnings.push(`${at}: textsize animation needs every element in ${describe(a.target)} to contain text`); a.invalid=true;
         }else if(["color","fill","stroke","textcolor","thick","round"].includes(a.verb) && ["img","embed","video","audio"].includes(kind)){
           warnings.push(`${at}: color animation is not supported for ${kind} in ${describe(a.target)}`); a.invalid=true;
-        }else if(a.verb==="fill" && ["line","arrow","polyline","curve"].includes(kind)){
+        }else if(a.verb==="fill" && ["line","arrow"].includes(kind)){
           warnings.push(`${at}: fill animation is not supported for ${subject}`); a.invalid=true;
         }else if(a.verb==="textcolor" && !item.text && ["line","arrow","polyline","curve","chart"].includes(kind)){
           warnings.push(`${at}: textcolor animation needs every element in ${describe(a.target)} to contain text`); a.invalid=true;
         }else if(a.verb==="text" && !["h1","h2","h3","p","li"].includes(kind) && !item.text){
           warnings.push(`${at}: text animation needs every element in ${describe(a.target)} to contain editable text`); a.invalid=true;
-        }else if(a.verb==="round" && !["rect","textbox"].includes(kind)){
+        }else if(a.verb==="round" && !["rect","textbox","code"].includes(kind)){
           warnings.push(`${at}: round animation is not supported for ${subject}`); a.invalid=true;
         }
       }
@@ -1802,6 +1946,9 @@ function sizeToPx(v, span, abs){     // "44px" | "2em" | "0.4" | "512"
   if(isNaN(n)) return null;
   if(Math.abs(n)>1) return n;                        // pixels either way
   return n*(abs?SH:span);                            // absolute: unit = slide height
+}
+function propertyLength(value,name,abs=false){
+  return name==="thick"||name==="outer" ? (String(value).endsWith("em")?parseFloat(value)*30:parseFloat(value)) : sizeToPx(value,name==="h"?SH:SW,["round","pad"].includes(name)?false:abs);
 }
 const SVGNS="http://www.w3.org/2000/svg";
 
@@ -1879,7 +2026,7 @@ function renderSlide(slideDef, opts){
 
   for(const sourceDef of slideDef.items){
     const def=withDeckTextSize(sourceDef,st);
-    const it={def, el:null, shape:null, coords:def.coords?def.coords.map(c=>c.slice()):null,
+    const it={def, propertyStyle:{...def.style}, el:null, shape:null, coords:def.coords?def.coords.map(c=>c.slice()):null,
               r:def.r, rx:def.rx, ry:def.ry, w:def.w, h:def.h, visible:false,
               tags:new Set(def.tags||[]), scale:1, rot:0, rotOrigin:null,
               layer:Number.isFinite(Number(def.style.z))?Number(def.style.z):0,
@@ -1920,7 +2067,8 @@ function applyItemLayer(it){
 
 function applyTextStyle(el,style,palette,abs=false){
   if(style.size)  el.style.fontSize=sizeToPx(style.size,SW,abs)+"px";
-  if(style.color) el.style.color=resolvePaletteColor(style.color,palette);
+  if(style.textcolor||style.color) el.style.color=resolvePaletteColor(style.textcolor||style.color,palette);
+  if(style.fill) el.style.backgroundColor=resolvePaletteColor(style.fill==="none"?"transparent":style.fill,palette);
   if(style.font)  el.style.fontFamily=style.font;
   if(style.align) el.style.textAlign=style.align;
   if(style.w)     el.style.width=sizeToPx(style.w,SW,abs)+"px";
@@ -1939,6 +2087,10 @@ function buildCode(it,flow,absLayer,palette){
   else codeEl.textContent=d.code;          // no hljs / unknown language -> plain
   pre.appendChild(codeEl);
   applyTextStyle(pre,d.style,palette,d.abs);
+  if(d.style.stroke) pre.style.borderColor=resolvePaletteColor(d.style.stroke,palette);
+  if(d.style.thick!=null) pre.style.borderWidth=propertyLength(d.style.thick,"thick",d.abs)+"px";
+  if(d.style.round!=null) pre.style.borderRadius=propertyLength(d.style.round,"round",d.abs)+"px";
+  if(d.style.pad!=null) pre.style.padding=propertyLength(d.style.pad,"pad",d.abs)+"px";
   placeItem(it,flow,absLayer,pre);
 }
 function buildTable(it,flow,absLayer,palette){
@@ -1958,7 +2110,27 @@ function buildTable(it,flow,absLayer,palette){
   d.rows.forEach(r=>tbody.appendChild(mkRow("td",r)));
   tb.appendChild(tbody);
   applyTextStyle(tb,d.style,palette,d.abs);
+  applyTableStyle(tb,d.style,palette,d);
   placeItem(it,flow,absLayer,tb);
+}
+function applyTableStyle(tb,style,palette,def){
+  const vars={stroke:"--table-line",thick:"--table-rule",outer:"--table-outer",pad:"--table-pad",headerfill:"--table-header-fill",headertext:"--table-header-text",bodyfill:"--table-body-fill",bodytext:"--table-body-text",stripe:"--table-stripe",valign:"--table-valign"};
+  for(const [name,css] of Object.entries(vars)) if(style[name]!=null){
+    const spec=PROPERTY_SCHEMA[name],value=style[name];
+    tb.style.setProperty(css,spec.type==="length"?propertyLength(value,name,def.abs)+"px":spec.type==="color"||spec.type==="paint"?resolvePaletteColor(value==="none"?"transparent":value,palette):value);
+  }
+  const rules=style.rules||"all";
+  tb.style.setProperty("--table-horizontal",["all","rows"].includes(rules)?"var(--table-rule, 1px)":"0px");
+  tb.style.setProperty("--table-vertical",["all","columns"].includes(rules)?"var(--table-rule, 1px)":"0px");
+  const widths=style.colwidths?propertyList(style.colwidths):null;
+  if(widths){
+    let group=tb.querySelector("colgroup"); if(!group){group=document.createElement("colgroup");tb.prepend(group);}
+    group.replaceChildren(...widths.map(w=>{const col=document.createElement("col");col.style.width=/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(w)?w+"px":w;return col;}));
+    tb.style.tableLayout="fixed";
+    if(!style.w) tb.style.width="100%";
+  }
+  const aligns=style.colalign?propertyList(style.colalign):def.aligns||[];
+  for(const row of tb.rows) for(let i=0;i<row.cells.length;i++) row.cells[i].style.textAlign=(style.colalign?aligns[i]:style.align||aligns[i])||"left";
 }
 function placeItem(it,flow,absLayer,el){
   if(it.def.pos){
@@ -2038,10 +2210,10 @@ function buildMedia(it,flow,absLayer,opts){
   }else{
     const md=document.createElement(isVid?"video":"audio");
     md.src=resolveDocumentUrl(d.src); md.preload="metadata"; md.playsInline=true;
-    md.addEventListener("loadedmetadata",()=>{ if(it.visible&&it.allowAutoplay&&d.style.autoplay)md.play().catch(()=>{}); });
+    md.addEventListener("loadedmetadata",()=>{ if(it.visible&&it.allowAutoplay&&enabledFlag(d.style.autoplay))md.play().catch(()=>{}); });
     md.controls = !(d.style.controls==="0"||d.style.controls==="off"||d.style.controls==="false");
-    if(d.style.loop)  md.loop=true;
-    if(d.style.muted) md.muted=true;
+    if(enabledFlag(d.style.loop))  md.loop=true;
+    if(enabledFlag(d.style.muted)) md.muted=true;
     if(isVid&&d.style.poster) md.poster=resolveDocumentUrl(d.style.poster);
     box.appendChild(md); it.media=md;
   }
@@ -2052,7 +2224,7 @@ function buildShape(it,svg,palette){
   const isBox = d.kind==="textbox";
   const pc=value=>resolvePaletteColor(value,palette);
   const stroke = pc(st.stroke || st.color || st.border || (isBox ? "none" : "#232830"));
-  const thick  = st.thick!=null ? parseFloat(st.thick) : (isBox ? 0 : 4);
+  const thick  = st.thick!=null ? propertyLength(st.thick,"thick",d.abs) : (isBox ? 0 : 4);
   const fill   = pc(st.fill || (isBox ? "rgba(31,111,107,0.12)" : "none"));
   const g=document.createElementNS(SVGNS,"g");
   it.stroke=stroke; it.thick=thick;
@@ -2076,7 +2248,7 @@ function buildShape(it,svg,palette){
     const tag = isBox ? "rect" : {circle:"circle",ellipse:"ellipse",rect:"rect"}[d.kind];
     const sh=document.createElementNS(SVGNS,tag);
     sh.setAttribute("stroke",stroke); sh.setAttribute("stroke-width",thick); sh.setAttribute("fill",fill);
-    if(tag==="rect"){ const rad = st.round!=null ? sizeToPx(st.round,SW) : (isBox?12:6); sh.setAttribute("rx",rad); }
+    if(tag==="rect"){ const rad = st.round!=null ? propertyLength(st.round,"round",d.abs) : (isBox?12:6); sh.setAttribute("rx",rad); }
     g.appendChild(sh); it.shapeEl=sh;
   }
   // optional inner text via a foreignObject (wraps, uses inline markdown)
@@ -2087,10 +2259,11 @@ function buildShape(it,svg,palette){
     span.innerHTML=inlineMd(d.text,palette);
     body.appendChild(span);
     body.style.color = pc(st.textcolor || st.color2 || (isBox ? "#233" : "#232830"));
+    if(st.font) body.style.fontFamily=st.font;
     if(st.size)  body.style.fontSize=sizeToPx(st.size,SW,d.abs)+"px";
     body.style.textAlign = st.align||"center";
     body.style.alignItems = {top:"flex-start",middle:"center",bottom:"flex-end"}[st.valign]||"center";
-    const pad = st.pad!=null ? sizeToPx(st.pad,SW) : 16;
+    const pad = st.pad!=null ? propertyLength(st.pad,"pad",d.abs) : 16;
     body.style.padding=pad+"px";
     fo.appendChild(body); g.appendChild(fo); it.fo=fo; it.foBody=body;
   }
@@ -2179,7 +2352,7 @@ function buildChart(it,svg,documentPalette){
       const pl=document.createElementNS(SVGNS,"polyline");
       pl.setAttribute("points",data.map((p,i)=>`${X(i)},${Y(p.value)}`).join(" "));
       pl.setAttribute("fill","none"); pl.setAttribute("stroke",col(0));
-      pl.setAttribute("stroke-width",st.thick!=null?parseFloat(st.thick):4);
+      pl.setAttribute("stroke-width",st.thick!=null?propertyLength(st.thick,"thick",d.abs):4);
       pl.setAttribute("stroke-linecap","round"); pl.setAttribute("stroke-linejoin","round");
       g.appendChild(pl);
       data.forEach((p,i)=>{
@@ -2244,7 +2417,7 @@ function setVisible(it,on){
   if(it.shape) it.el.style.visibility=on?"visible":"hidden";
   if(it.media){
     try{
-      if(on){ if(it.allowAutoplay && it.def.style.autoplay && it.media.paused){ const p=it.media.play(); if(p&&p.catch) p.catch(()=>{}); } }
+      if(on){ if(it.allowAutoplay && enabledFlag(it.def.style.autoplay) && it.media.paused){ const p=it.media.play(); if(p&&p.catch) p.catch(()=>{}); } }
       else if(!it.media.paused) it.media.pause();
     }catch(_){}
   }
@@ -2404,6 +2577,27 @@ function makeItemAnim(a, render, warnings, it){
   const el=it.el;
   const EZ=EASINGS[a.ease] || (a.verb==="enter"&&a.effect==="drop" ? EASINGS.bounce : undefined);
   const T=(dur,fn)=>new Tween(dur,fn,EZ);
+  if(a.property){
+    const spec=PROPERTY_SCHEMA[a.verb], name=a.verb, tgt=it.foBody||it.img||it.inner||el;
+    const apply=value=>{
+      it.propertyStyle[name]=value;
+      if(it.def.kind==="table") applyTableStyle(tgt,it.propertyStyle,render.palette,it.def);
+      const css={w:"width",h:"height",font:"fontFamily",align:"textAlign",valign:"alignItems",pad:"padding"}[name];
+      if(css && !(it.def.kind==="table"&&["valign","pad"].includes(name))) tgt.style[css]=name==="valign"?{top:"flex-start",middle:"center",bottom:"flex-end"}[value]:value;
+      if(it.embedBox){it.embedW=parseFloat(it.embedBox.style.width);it.embedH=parseFloat(it.embedBox.style.height);}
+    };
+    if(spec.animation==="discrete"){apply(a.value);return null;}
+    if(spec.animation==="color"){
+      const css={headerfill:"backgroundColor",headertext:"color",bodyfill:"backgroundColor",bodytext:"color",stripe:"backgroundColor"}[name];
+      const target=tgt.querySelector(name.startsWith("header")?"th":name==="stripe"?"tbody tr:nth-child(even)":"tbody")||tgt;
+      const A=resolveColor(getComputedStyle(target)[css]),B=resolveColor(resolvePaletteColor(a.value,render.palette));
+      return T(a.dur,t=>apply(mixColor(A,B,t)));
+    }
+    const css={w:"width",h:"height",pad:"paddingTop",outer:"borderTopWidth"}[name];
+    const target=name==="pad"&&it.def.kind==="table"?tgt.querySelector("th,td")||tgt:tgt;
+    const v0=parseFloat(getComputedStyle(target)[css])||0, v1=propertyLength(a.value,name,it.def.abs);
+    return T(a.dur,t=>apply((v0+(v1-v0)*t)+"px"));
+  }
   switch(a.verb){
     case "enter": case "exit":{
       const [dx,dy,sc,rot]=FX[a.effect]||FX.fade;
@@ -2485,6 +2679,7 @@ function makeItemAnim(a, render, warnings, it){
       return T(a.dur,t=>{ it.coords[i]=[s[0]+(dest.x-s[0])*t, s[1]+(dest.y-s[1])*t]; updateShape(it); });
     }
     case "size":{
+      if(TEXT_KINDS.includes(it.def.kind)||it.foBody) return makeItemAnim({...a,verb:"textsize"},render,warnings,it);
       if(it.embedBox){                   // embedded app: scale box, keep aspect
         const w0=it.embedW, ratio=it.embedH/it.embedW;
         return T(a.dur,t=>{ const w=w0+(a.w-w0)*t;
@@ -2524,12 +2719,19 @@ function makeItemAnim(a, render, warnings, it){
       return T(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
     }
     case "fill":{
+      if(!it.shape){
+        const tgt=it.inner||el,A=resolveColor(getComputedStyle(tgt).backgroundColor),B=resolveColor(a.color==="none"?"transparent":a.color);
+        return T(a.dur,t=>{tgt.style.backgroundColor=mixColor(A,B,t);});
+      }
       if(!it.shapeEl) return null;
       const A=resolveColor(it.shapeEl.getAttribute("fill")||"transparent"), B=resolveColor(a.color);
       return T(a.dur,t=>{ it.shapeEl.setAttribute("fill",mixColor(A,B,t)); });
     }
     case "stroke":{
-      if(!it.shape) return null;
+      if(!it.shape){
+        const tgt=it.inner||el,A=resolveColor(getComputedStyle(tgt).borderTopColor),B=resolveColor(a.color==="none"?"transparent":a.color);
+        return T(a.dur,t=>{const c=mixColor(A,B,t);tgt.style.borderColor=c;if(it.def.kind==="table"){it.propertyStyle.stroke=c;tgt.style.setProperty("--table-line",c);}});
+      }
       const source=(it.lineEl&&it.lineEl.getAttribute("stroke"))||(it.shapeEl&&it.shapeEl.getAttribute("stroke"))||it.stroke;
       const A=resolveColor(source), B=resolveColor(a.color);
       return T(a.dur,t=>{ const c=mixColor(A,B,t); if(t>=1) it.stroke=a.color;
@@ -2543,22 +2745,31 @@ function makeItemAnim(a, render, warnings, it){
       return T(a.dur,t=>{ tgt.style.color=mixColor(A,B,t); });
     }
     case "opacity":{
-      const source=it.shape?getComputedStyle(el).opacity:getComputedStyle(it.inner||el).opacity;
+      const target=it.shape?el:it.img||it.inner||el;
+      const source=getComputedStyle(target).opacity;
       const v0=Number.isFinite(parseFloat(source))?parseFloat(source):1;
-      return T(a.dur,t=>{ const v=v0+(a.value-v0)*t; if(it.shape) el.setAttribute("opacity",v); else (it.inner||el).style.opacity=v; });
+      return T(a.dur,t=>{ const v=v0+(a.value-v0)*t; if(it.shape) el.setAttribute("opacity",v); else target.style.opacity=v; });
     }
     case "thick":{
-      if(!it.shape) return null;
+      if(!it.shape){
+        const tgt=it.inner||el,source=it.def.kind==="table"?tgt.querySelector("tbody tr+tr td,thead+tbody td")||tgt:tgt;
+        const v0=parseFloat(getComputedStyle(source).borderTopWidth)||0,v1=propertyLength(a.size,"thick",it.def.abs);
+        return T(a.dur,t=>{const v=(v0+(v1-v0)*t)+"px";if(it.def.kind==="table"){it.propertyStyle.thick=v;tgt.style.setProperty("--table-rule",v);}else tgt.style.borderWidth=v;});
+      }
       const v0=it.thick||parseFloat((it.shapeEl&&it.shapeEl.getAttribute("stroke-width"))||0);
-      const v1=sizeToPx(a.size,SW); if(v1==null) return null;
+      const v1=propertyLength(a.size,"thick",it.def.abs); if(v1==null) return null;
       return T(a.dur,t=>{ const v=v0+(v1-v0)*t; it.thick=v;
         it.lineEl&&it.lineEl.setAttribute("stroke-width",v);
         it.shapeEl&&it.shapeEl.setAttribute("stroke-width",v);
         if(it.headEl) updateShape(it); });
     }
     case "round":{
+      if(!it.shape){
+        const tgt=it.inner||el,v0=parseFloat(getComputedStyle(tgt).borderRadius)||0,v1=propertyLength(a.size,"round",it.def.abs);
+        return T(a.dur,t=>{tgt.style.borderRadius=(v0+(v1-v0)*t)+"px";});
+      }
       if(!it.shapeEl||it.shapeEl.tagName.toLowerCase()!=="rect") return null;
-      const v0=parseFloat(it.shapeEl.getAttribute("rx"))||0, v1=sizeToPx(a.size,SW); if(v1==null) return null;
+      const v0=parseFloat(it.shapeEl.getAttribute("rx"))||0, v1=propertyLength(a.size,"round",it.def.abs); if(v1==null) return null;
       return T(a.dur,t=>{ it.shapeEl.setAttribute("rx",v0+(v1-v0)*t); });
     }
     case "text":{
@@ -2568,7 +2779,7 @@ function makeItemAnim(a, render, warnings, it){
     case "textsize":{
       const tgt=it.foBody||it.inner||el;
       const s0=parseFloat(getComputedStyle(tgt).fontSize);
-      const s1=sizeToPx(a.size,SW);
+      const s1=sizeToPx(a.size,SW,it.def.abs);
       if(s1==null) return null;
       return T(a.dur,t=>{ tgt.style.fontSize=(s0+(s1-s0)*t)+"px"; });
     }
@@ -4401,12 +4612,15 @@ Skipped when advancing &mdash; but reachable from the overview (v) or a thumbnai
 !anim arc point 3 (\${dia.cx - 30}, \${dia.cy + 50})
 ---
 ### Tables
-Markdown pipe tables, with optional alignment markers:
-| Feature | Syntax | Alignment |
+Markdown pipe tables, with optional alignment markers and reusable styles:
+[tour_table] {w=1000px, headerfill=#1f6f6b, headertext=white, stripe=#e8f1ef, pad=12px, colwidths=(30%,45%,25%)} | Feature | Syntax | Alignment |
 |:--------|:------:|----------:|
 | Bullets | \`- item\` | left |
 | **Bold** & *italic* | \`**b**\` \`*i*\` | center |
 | Variables | slide \${slide_num} of \${num_slides} | right |
+...
+!anim tour_table headerfill #4a6fb3 0.5s
+!anim tour_table rules rows
 ---
 ### Deck-wide styling with !set
 - \`!set bg\` / \`!set color\` / \`!set accent\` — default background & colors
@@ -4522,12 +4736,20 @@ const INSERTS={
     if(!v||!v.url) return;
     insertAtCursor(`[${v.text||v.url}](${v.url})`, true); },
   table: async()=>{ const v=await showDialog("Insert table",[
-      {key:"cols",label:"Columns",value:"3"},{key:"rows",label:"Body rows",value:"2"}]);
+      {key:"cols",label:"Columns",value:"3"},{key:"rows",label:"Body rows",value:"2"},
+      {key:"lbl",label:"Label (optional)",placeholder:"results"},
+      {key:"rules",label:"Interior rules",type:"select",options:[["all","Rows and columns"],["rows","Rows only"],["columns","Columns only"],["none","None"]]},
+      {key:"headerfill",label:"Header fill",placeholder:"#1f6f6b"},
+      {key:"headertext",label:"Header text",placeholder:"white"},
+      {key:"pad",label:"Cell padding",placeholder:"12px"},
+      {key:"width",label:"Table width",placeholder:"900px"}]);
     if(!v) return;
     const c=clamp(parseInt(v.cols)||3,1,12), r=clamp(parseInt(v.rows)||2,1,30);
     const row=f=>"| "+Array.from({length:c},f).join(" | ")+" |";
     const lines=[row((_,i)=>"Header "+(i+1)), row(()=>":---"),
                  ...Array.from({length:r},()=>row(()=>"…"))];
+    const style=[v.rules!=="all"?"rules="+v.rules:"",...['headerfill','headertext','pad'].filter(k=>v[k]).map(k=>k+"="+v[k]),v.width?"w="+v.width:""] .filter(Boolean);
+    lines[0]=(v.lbl?`[${v.lbl}] `:"")+(style.length?`{${style.join(", ")}} `:"")+lines[0];
     insertAtCursor(lines.join("\n")); },
   chart: async()=>{ const v=await showDialog("Insert chart",[
       {key:"type",label:"Chart type",type:"select",options:[["bar","Bar chart"],["line","Line chart"],["pie","Pie chart"]]},
@@ -4586,8 +4808,10 @@ async function animDialog(){
     {key:"target",label:"Target label"+(labels.length?"":" (label an element first — e.g. [pic])"),list:labels,placeholder:labels[0]||"myLabel"},
     {key:"verb",label:"Effect",type:"select",options:[["move","Move to position"],["path","Move along a curve"],
       ["enter","Entrance effect"],["exit","Exit effect"],["hide","Fade out"],["show","Fade in"],
-      ["size","Resize image / video / embed"],["scale","Scale"],["rotate","Rotate"],["color","Change color"],["textsize","Change text size"],["point","Move one vertex"]],
-     onChange:(el,body)=>{ const args=body.querySelector('[data-key="args"]'); if(args) args.placeholder=ANIM_HINTS[el.value]||""; }},
+      ["size","Resize image / video / embed"],["scale","Scale"],["rotate","Rotate"],["color","Change color (legacy)"],["textsize","Change text size"],["point","Move one vertex"],
+      ...["fill","stroke","textcolor","opacity","thick","round","w","h","font","align","valign","pad","outer","rules","headerfill","headertext","bodyfill","bodytext","stripe","colwidths","colalign"].map(name=>[name,({fill:"Fill color",stroke:"Stroke / rule color",textcolor:"Text color",opacity:"Opacity",thick:"Stroke / rule width",round:"Corner radius",w:"Width",h:"Height",font:"Font family",align:"Text alignment",valign:"Vertical alignment",pad:"Padding",outer:"Table outer border",rules:"Table interior rules",headerfill:"Header fill",headertext:"Header text color",bodyfill:"Body fill",bodytext:"Body text color",stripe:"Alternating row fill",colwidths:"Column widths",colalign:"Column alignment"})[name]]) ],
+     onChange:(el,body)=>{ const args=body.querySelector('[data-key="args"]'); if(args) args.placeholder=ANIM_HINTS[el.value]||PROPERTY_SCHEMA[el.value]?.type||"";
+       const duration=body.querySelector('[data-key="dur"]'); if(duration){duration.disabled=PROPERTY_SCHEMA[el.value]?.animation==="discrete";} }},
     {key:"args",label:"Arguments",placeholder:ANIM_HINTS.move},
     {key:"dur",label:"Duration (seconds)",value:"0.7"},
     {key:"ease",label:"Easing",type:"select",options:[["","default (ease in-out)"],["linear","linear"],["easein","ease in"],["easeout","ease out"],["back","back (overshoot)"],["bounce","bounce"],["elastic","elastic"]]},
@@ -4596,7 +4820,7 @@ async function animDialog(){
   const lines=[];
   if(v.when==="after") lines.push(">>>");
   if(v.when==="click") lines.push("...");
-  const dur=(v.verb==="hide"||v.verb==="show")&&!v.args ? (v.dur&&v.dur!=="0.7"?` ${v.dur}s`:"") : ` ${v.dur||"0.7"}s`;
+  const dur=PROPERTY_SCHEMA[v.verb]?.animation==="discrete"?"":(v.verb==="hide"||v.verb==="show")&&!v.args ? (v.dur&&v.dur!=="0.7"?` ${v.dur}s`:"") : ` ${v.dur||"0.7"}s`;
   lines.push((v.ease?`{ease=${v.ease}} `:"")+`!anim ${v.target} ${v.verb}${v.args?" "+v.args:""}${dur}`);
   insertAtCursor(lines.join("\n"));
 }
