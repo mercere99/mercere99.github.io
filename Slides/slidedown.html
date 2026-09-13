@@ -234,7 +234,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
                     color:#232830;font-family:var(--mono);font-size:21px;line-height:1.4;overflow:hidden}
 .slide .s-code code,.slide .s-code code.hljs{display:block;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit}
 .slide .s-table{max-width:100%;border-collapse:collapse;border:var(--table-outer,2px) solid var(--table-line,var(--slide-accent,var(--teal)));font-size:24px;line-height:1.3}
-.slide .s-table th,.slide .s-table td{padding:var(--table-pad,10px 15px);border-style:solid;border-color:var(--table-line,#aeb5b7);border-width:0;vertical-align:var(--table-valign,top);overflow-wrap:anywhere}
+/* Keep whole-word minimum widths in automatic tables; fixed columns may break long tokens. */
+.slide .s-table th,.slide .s-table td{padding:var(--table-pad,10px 15px);border-style:solid;border-color:var(--table-line,#aeb5b7);border-width:0;vertical-align:var(--table-valign,top);overflow-wrap:break-word}
 .slide .s-table tr>*+*{border-left-width:var(--table-vertical,1px)}
 .slide .s-table tr+tr>*,.slide .s-table thead+tbody tr:first-child>*{border-top-width:var(--table-horizontal,1px)}
 .slide .s-table th{background:var(--table-header-fill,rgba(31,111,107,.13));font-weight:600;color:var(--table-header-text,inherit)}
@@ -831,8 +832,10 @@ function inlineMd(s,palette){
   // entities stay usable: &nbsp; &mdash; &rarr; &#8594; &#x1F600; ... (never tags)
   h = h.replace(/&amp;(#\d{1,7}|#x[0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,30});/g,"&$1;");
   const restore=t=>t.replace(/\u0000(\d+)\u0000/g,(_,i)=>stash[+i]||"");
-  const format=t=>renderInlineControls(t,palette).split(/(<[^>]*>)/g).map((part,i)=>i%2?part:
-    part.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\*([^*]+)\*/g,"<i>$1</i>")).join("");
+  // Protect generated tags as tokens, rather than splitting the text at them:
+  // emphasis may surround an inline control, but must never rewrite its attributes.
+  const format=t=>renderInlineControls(t,palette).replace(/<[^>]*>/g,keep)
+    .replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\*([^*]+)\*/g,"<i>$1</i>");
   h = renderInlineLinks(h,keep,t=>restore(format(t)));
   h = restore(format(h));
   return h;
@@ -2132,6 +2135,13 @@ function applyTableStyle(tb,style,palette,def){
   const aligns=style.colalign?propertyList(style.colalign):def.aligns||[];
   for(const row of tb.rows) for(let i=0;i<row.cells.length;i++) row.cells[i].style.textAlign=(style.colalign?aligns[i]:style.align||aligns[i])||"left";
 }
+function setPositionedWidth(it,width){
+  if(!it.el.classList.contains("abs-item")) return;
+  // An explicit width owns the wrapper too; the default text cap must not
+  // constrain tables, code, or images through their max-width:100% rules.
+  it.el.style.maxWidth="none";
+  it.el.style.width=width;
+}
 function placeItem(it,flow,absLayer,el){
   if(it.def.pos){
     const wrap=document.createElement("div"); wrap.className="abs-item";
@@ -2139,6 +2149,7 @@ function placeItem(it,flow,absLayer,el){
     if(it.def.style.anchor==="center") wrap.style.transform="translate(-50%,-50%)";
     wrap.appendChild(el); absLayer.appendChild(wrap);
     it.el=wrap; it.x=it.def.pos.x; it.y=it.def.pos.y; it.inner=el;
+    if(it.def.style.w) setPositionedWidth(it,sizeToPx(it.def.style.w,SW,it.def.abs)+"px");
   }else{
     flow.appendChild(el); it.el=el; it.inner=el;
   }
@@ -2584,6 +2595,7 @@ function makeItemAnim(a, render, warnings, it){
       if(it.def.kind==="table") applyTableStyle(tgt,it.propertyStyle,render.palette,it.def);
       const css={w:"width",h:"height",font:"fontFamily",align:"textAlign",valign:"alignItems",pad:"padding"}[name];
       if(css && !(it.def.kind==="table"&&["valign","pad"].includes(name))) tgt.style[css]=name==="valign"?{top:"flex-start",middle:"center",bottom:"flex-end"}[value]:value;
+      if(name==="w") setPositionedWidth(it,value);
       if(it.embedBox){it.embedW=parseFloat(it.embedBox.style.width);it.embedH=parseFloat(it.embedBox.style.height);}
     };
     if(spec.animation==="discrete"){apply(a.value);return null;}
@@ -2684,12 +2696,12 @@ function makeItemAnim(a, render, warnings, it){
         const w0=it.embedW, ratio=it.embedH/it.embedW;
         return T(a.dur,t=>{ const w=w0+(a.w-w0)*t;
           it.embedW=w; it.embedH=w*ratio;
-          it.embedBox.style.width=w+"px"; it.embedBox.style.height=(w*ratio)+"px"; });
+          it.embedBox.style.width=w+"px"; it.embedBox.style.height=(w*ratio)+"px"; setPositionedWidth(it,w+"px"); });
       }
       const img=it.img||(it.inner&&it.inner.querySelector&&it.inner.querySelector("img"));
       if(!img) return null;
       const w0=img.getBoundingClientRect().width/currentScale(render);
-      return T(a.dur,t=>{ img.style.width=(w0+(a.w-w0)*t)+"px"; });
+      return T(a.dur,t=>{ img.style.width=(w0+(a.w-w0)*t)+"px"; setPositionedWidth(it,img.style.width); });
     }
     case "scale":{
       const f0=it.scale;
