@@ -17,6 +17,52 @@ body {
   margin: 0;
 }
 
+.startup-warning {
+  max-width: 44rem;
+  margin: 4rem auto;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid #ef6b73;
+  border-left: 0.4rem solid #ff5361;
+  border-radius: 0.75rem;
+  background: #351b27;
+  color: #fff4f5;
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 35%);
+}
+
+.startup-warning h1 {
+  margin-top: 0;
+  color: #ffb3b8;
+}
+
+.fatal-error-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 1rem;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  background: rgb(3 10 16 / 82%);
+}
+
+.fatal-error-overlay .startup-warning {
+  margin: 0;
+}
+
+.fatal-error-overlay button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ffb3b8;
+  border-radius: 0.5rem;
+  background: #5a2332;
+  color: #fff4f5;
+  cursor: pointer;
+}
+
+.startup-warning code {
+  color: #fff;
+  font-weight: 700;
+}
+
 body {
   min-width: 320px;
   background:
@@ -204,6 +250,12 @@ select:focus-visible {
   border-radius: 14px;
   background: linear-gradient(145deg, rgba(18, 45, 63, 0.95), rgba(9, 27, 40, 0.96));
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+}
+
+.population-description {
+  margin: 2px 8px 0;
+  color: #abc8d7;
+  font-size: 0.8rem;
 }
 
 .canvas-frame {
@@ -632,6 +684,14 @@ select:focus-visible {
   color: #9fc4cf;
 }
 
+.freezer-message-error {
+  border: 1px solid rgba(255, 105, 105, 0.72);
+  background: rgba(132, 28, 38, 0.42);
+  color: #ffd4d4;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(255, 105, 105, 0.12);
+}
+
 .freezer-section {
   margin-top: 10px;
   padding: 10px;
@@ -660,6 +720,23 @@ select:focus-visible {
   margin: 2px 0 0;
   color: #7894a1;
   font-size: 0.6rem;
+}
+
+.checkpoint-import-row {
+  margin: 8px 0;
+  padding: 8px;
+  display: grid;
+  gap: 5px;
+  border: 1px dashed rgba(99, 213, 224, 0.28);
+  border-radius: 8px;
+  color: #9fc4cf;
+  font-size: 0.62rem;
+}
+
+.checkpoint-import-row input[type="file"] {
+  max-width: 100%;
+  color: #dcebf1;
+  font-size: 0.62rem;
 }
 
 .freezer-save-button,
@@ -2100,4 +2177,112 @@ select:focus-visible {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Analyze workspace */
+.analyze-workspace { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; padding: 24px; }
+.analysis-navigation, .analysis-content { background: #102330; border: 1px solid #314654; border-radius: 16px; padding: 24px; }
+.analysis-navigation h2 { margin: 0 0 6px; font-size: 20px; }
+.analysis-navigation p, .analysis-content > p, .analysis-details { color: #a9bdcb; font-size: 14px; line-height: 1.6; }
+.analysis-choice { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px 10px; margin-top: 12px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #c5d5df; cursor: pointer; }
+.analysis-choice img { width: 40px; height: 40px; object-fit: contain; }
+.analysis-choice small { display: block; margin-top: 5px; color: #a9bdcb; }
+.analysis-choice.is-active { background: #183b49; border-color: #4bafc1; color: #fff; }
+.analysis-choice:hover { background: #204151; }
+.analysis-content h1 { font-size: 28px; margin: 4px 0 10px; }
+.analysis-content .analysis-eyebrow { color: #65d7e6; font-size: 11px; letter-spacing: 2px; font-weight: 700; margin: 0; }
+.analysis-controls { display: flex; flex-wrap: wrap; gap: 16px; margin: 24px 0; }
+.analysis-controls > div { flex: 1 1 150px; }
+.analysis-controls label { display: block; color: #b3c8d5; font-size: 12px; margin-bottom: 8px; }
+.analysis-controls select { width: 100%; background: #091d2b; color: #eef7fb; border: 1px solid #466070; border-radius: 7px; padding: 10px; }
+.analysis-legend { display: flex; flex-wrap: wrap; gap: 24px; font-size: 14px; }
+.analysis-plot { width: 100%; height: auto; display: block; }
+.analysis-plot text { font: 12px system-ui, sans-serif; }
+.analysis-plot text:not([fill]) { fill: #b3c8d5; }
+.analysis-plot circle:hover { r: 5; stroke: white; }
+.analysis-content .analysis-footnote { padding-top: 16px; border-top: 1px solid #314654; font-size: 12px; }
+.analysis-empty { min-height: 350px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #a9bdcb; }
+.analysis-empty img { width: 100px; height: 100px; object-fit: contain; margin-bottom: 24px; }
+.analysis-empty p { max-width: 480px; line-height: 1.6; }
+@media (max-width: 850px) {
+  .analyze-workspace { grid-template-columns: 1fr; padding: 12px; }
+  .analysis-navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .analysis-navigation > p { display: none; }
+  .analysis-choice { width: auto; margin: 0; }
+  .analysis-content { padding: 16px; }
+}
+
+.configuration-error {
+  padding: 10px;
+  border: 1px solid #dd9970;
+  border-radius: 6px;
+  color: #ffd0ad;
+  font-size: 0.8rem;
+}
+
+/* Phylogeny explorer: a canvas keeps large retained histories out of the DOM. */
+.phylogeny-summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 22px 0; }
+.phylogeny-summary > div { background: #0b1c29; border: 1px solid #2c4453; border-radius: 9px; padding: 13px; }
+.phylogeny-summary span { display: block; color: #a9bdcb; font-size: 11px; margin-bottom: 8px; }
+.phylogeny-summary strong { font-size: 20px; color: #edf6fa; overflow-wrap: anywhere; }
+.phylogeny-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; }
+.phylogeny-controls label { display: block; color: #b3c8d5; font-size: 12px; }
+.phylogeny-controls select, .phylogeny-controls input { display: block; background: #091d2b; border: 1px solid #466070; border-radius: 6px; padding: 9px; color: #edf6fa; margin-top: 7px; max-width: 100%; }
+#phylogeny_search { margin-left: auto; }
+#phylogeny_search > div { display: flex; gap: 6px; align-items: end; }
+#phylogeny_id { width: 115px; }
+.phylogeny-toolbar { display: flex; flex-wrap: wrap; gap: 7px; margin: 16px 0; }
+#phylogeny_view button { border: 1px solid #426072; background: #193647; border-radius: 6px; color: #e5f3f8; padding: 8px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+#phylogeny_view button:hover:not(:disabled), #phylogeny_view button[aria-pressed='true'] { background: #25546a; border-color: #65d7e6; }
+#phylogeny_view button:disabled { opacity: .4; cursor: default; }
+#phylogeny_view :focus-visible { outline: 2px solid #65d7e6; outline-offset: 3px; }
+.phylogeny-legend { display: flex; flex-wrap: wrap; gap: 16px; color: #b9cedb; font-size: 11px; }
+.phylogeny-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.phylogeny-key { width: 8px; height: 8px; border-radius: 50%; background: #8095aa; }
+.phylogeny-key.living { background: #65d7c5; }
+.phylogeny-key.root { background: #c5a3ff; border-radius: 0; transform: rotate(45deg); }
+.phylogeny-key.mrca { background: transparent; border: 2px solid #f5c56e; }
+.phylogeny-key.path { height: 2px; width: 16px; background: #f5c56e; }
+.phylogeny-status { color: #a9bdcb; font-size: 12px; min-height: 18px; margin: 16px 0 8px; }
+.phylogeny-explorer { display: grid; grid-template-columns: minmax(0, 1fr) 270px; border: 1px solid #314b5d; border-radius: 10px; overflow: hidden; background: #0b1c29; }
+.phylogeny-plot-wrap { min-width: 0; position: relative; }
+#phylogeny_canvas { display: block; width: 100%; height: 520px; touch-action: none; cursor: grab; }
+#phylogeny_canvas:active { cursor: grabbing; }
+.phylogeny-hint { margin: 0; padding: 10px 12px; text-align: center; color: #91a9ba; font-size: 11px; border-top: 1px solid #20394b; }
+.phylogeny-tooltip { position: absolute; pointer-events: none; max-width: 245px; padding: 9px 11px; background: #213e50; color: #fff; border: 1px solid #5a7b91; border-radius: 6px; font-size: 12px; box-shadow: 0 4px 16px #0005; }
+.phylogeny-inspector { padding: 18px; border-left: 1px solid #314b5d; max-height: 557px; overflow-y: auto; }
+.phylogeny-inspector h2 { margin: 6px 0 14px; font-size: 20px; }
+.phylogeny-inspector h3 { font-size: 14px; margin-top: 22px; }
+.phylogeny-inspector small, .phylogeny-inspector p { font-size: 12px; color: #a9bdcb; line-height: 1.6; }
+.phylogeny-inspector .analysis-eyebrow { font-size: 9px; color: #65d7c5; }
+.phylogeny-facts { font-size: 12px; }
+.phylogeny-facts > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #20394b; }
+.phylogeny-facts dt { color: #9fb7c6; overflow-wrap: anywhere; }
+.phylogeny-facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.phylogeny-genome { color: #65d7e6; background: #102a3b; padding: 10px; border-radius: 5px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 1200px) {
+  .phylogeny-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .phylogeny-explorer { grid-template-columns: minmax(0, 1fr); }
+  .phylogeny-inspector { border-left: 0; border-top: 1px solid #314b5d; max-height: 350px; }
+  #phylogeny_search { margin-left: 0; }
+}
+@media (max-width: 600px) {
+  #phylogeny_canvas { height: 380px; }
+  .phylogeny-controls { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .phylogeny-summary strong { font-size: 17px; }
+}
+
+.environment-presets {
+  margin-bottom: 16px;
+}
+
+.environment-presets > label {
+  color: #63d5e0;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.environment-presets > .configuration-select {
+  width: 100%;
+  min-width: 0;
 }

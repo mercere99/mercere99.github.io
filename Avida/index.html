@@ -10,6 +10,71 @@
 <body>
   <noscript>Avida requires JavaScript and WebAssembly.</noscript>
   <main id="emp_base"></main>
-  <script src="Avida.js"></script>
+  <script src="phylogeny.js"></script>
+  <script>
+    // Empirical replaces #emp_base when it renders, so look the element up at each use.
+    const startupRoot = () => document.getElementById("emp_base");
+    const hasStarted = () => startupRoot().children.length > 0;
+    let fatalErrorShown = false;
+    // Report only the first failure; later ones are usually its consequences.
+    const showFatalError = (title, message) => {
+      if (fatalErrorShown) return;
+      fatalErrorShown = true;
+      const warning = document.createElement("section");
+      warning.className = "startup-warning";
+      warning.setAttribute("role", "alert");
+      const heading = document.createElement("h1");
+      heading.textContent = title;
+      const details = document.createElement("p");
+      details.textContent = message;
+      warning.append(heading, details);
+      if (!hasStarted()) {
+        startupRoot().append(warning);
+        return;
+      }
+      // After startup the interface still looks usable but no longer responds, so cover it.
+      const help = document.createElement("p");
+      help.textContent = "Reload to start again. Freezer items saved in this browser are kept.";
+      const reload = document.createElement("button");
+      reload.type = "button";
+      reload.textContent = "Reload Avida";
+      reload.addEventListener("click", () => window.location.reload());
+      warning.append(help, reload);
+      const overlay = document.createElement("div");
+      overlay.className = "fatal-error-overlay";
+      overlay.append(warning);
+      document.body.append(overlay);
+      reload.focus();
+    };
+    const showStartupError = message => showFatalError("Avida could not start", message);
+    window.AvidaShowFatalError = message => showFatalError("Avida stopped", message);
+    // Emscripten adopts this global when Avida.js loads; aborts include running out of memory.
+    var Module = {
+      // Release builds pass no reason; running out of memory is the most likely cause.
+      onAbort: what => window.AvidaShowFatalError(String(what
+        || "The simulation stopped unexpectedly, possibly because it ran out of memory."))
+    };
+    window.addEventListener("error", event => {
+      // Once running, only WebAssembly traps are fatal; other page errors may be harmless.
+      if (!hasStarted()) showStartupError(event.message);
+      else if (event.error instanceof WebAssembly.RuntimeError) {
+        window.AvidaShowFatalError(event.message);
+      }
+    });
+    window.addEventListener("unhandledrejection", event => {
+      if (hasStarted()) return;
+      showStartupError(String(event.reason || "Avida initialization failed."));
+    });
+    const params = new URLSearchParams(window.location.search);
+    const threaded = params.get("execution") === "threaded";
+    if (threaded && (!window.crossOriginIsolated || typeof SharedArrayBuffer === "undefined")) {
+      showStartupError("The optional threaded build needs SharedArrayBuffer and COOP/COEP headers. Run make server-threaded, or remove execution=threaded from the URL to use the ordinary build.");
+    } else {
+      const script = document.createElement("script");
+      const profile = params.get("population") === "well-mixed" ? "-well-mixed" : "";
+      script.src = `Avida${profile}${threaded ? "-threaded" : ""}.js`;
+      document.body.appendChild(script);
+    }
+  </script>
 </body>
 </html>
