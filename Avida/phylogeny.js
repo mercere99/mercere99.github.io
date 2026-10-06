@@ -76,7 +76,7 @@
     active = null;
   }
 
-  function mount(data, inspect) {
+  function mount(data, inspect, graphLineage, openLineage, inspectOrganism) {
     unmount();
     const host = document.getElementById('phylogeny_view');
     if (!host) return;
@@ -102,17 +102,25 @@
     }
     host.dataset.records = model.nodes.size;
     host.dataset.living = model.living;
-    $('mrca').disabled = model.mrca === NONE;
+    const selection = $('select'), choices = new Map();
+    const option = value => selection.querySelector(`option[value='${value}']`);
+    option('mrca').disabled = model.mrca === NONE;
     let newestLiving = NONE;
     for (const node of model.order) {
       if (node.death === NONE && (newestLiving === NONE || node.id > newestLiving)) newestLiving = node.id;
     }
-    $('living').disabled = newestLiving === NONE;
+    option('living').disabled = newestLiving === NONE;
 
     function updateStatus() {
-      $('parent').disabled = selected === NONE || model.nodes.get(selected).parent === NONE;
+      option('parent').disabled = selected === NONE || model.nodes.get(selected).parent === NONE;
+      $('inspect').disabled = selected === NONE;
       $('lineage').disabled = selected === NONE;
-      $('lineage').setAttribute('aria-pressed', String(isolated));
+      $('graph_lineage').disabled = selected === NONE || !data.canGraphLineage;
+      $('graph_lineage').title = !data.canGraphLineage
+        ? (model.complete ? 'Lineage traits are available before the run ends.'
+          : 'No modules provide retained lineage measurements.')
+        : selected === NONE ? 'Select an organism to graph its lineage.'
+          : 'Graph recorded traits from the oldest ancestor to the selected organism.';
       host.dataset.selected = selected === NONE ? '' : selected;
       host.dataset.visible = graph.visible.length;
       host.dataset.isolated = String(isolated);
@@ -140,6 +148,7 @@
     }
     function draw() {
       frame = 0;
+      host.dataset.scale = scale; host.dataset.panX = panX; host.dataset.panY = panY;
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
@@ -233,15 +242,17 @@
       panX = x - (x - panX) * next / scale; panY = y - (y - panY) * next / scale;
       scale = next; schedule();
     }
-    function select(id, center = false) {
+    function select(id, selectionMessage = '') {
       if (!model.nodes.has(id)) {
         message = `Organism #${id} is not maintained in this phylogeny.`; updateStatus(); return;
       }
-      selected = id; message = ''; $('id').value = String(id);
-      rebuild(isolated);
-      if (center) {
-        const item = graph.visible.find(n => n.node.id === id), point = base(item);
-        panX = width / 2 - point.x * scale; panY = height / 2 - point.y * scale;
+      selected = id; message = selectionMessage; $('id').value = String(id);
+      rebuild();
+      const position = screen(graph.visible.find(n => n.node.id === id));
+      // Changing selection should not move a visible organism. If it is outside the plot,
+      // fit the complete tree so the new selection has its full ancestry as context.
+      if (position.x < 10 || position.x > width - 10 || position.y < 32 || position.y > height - 32) {
+        isolated = false; rebuild(true);
       }
       inspect(id); schedule();
     }
@@ -258,21 +269,35 @@
     }
     on($('axis'), 'change', () => { message = ''; rebuild(true); });
     on($('detail'), 'change', () => { message = ''; rebuild(); });
-    on($('fit'), 'click', () => { message = ''; rebuild(true); });
-    on($('all'), 'click', () => { isolated = false; message = ''; rebuild(true); });
+    function reset() { isolated = false; message = ''; rebuild(true); }
+    on($('reset'), 'click', reset);
+    on($('graph_lineage'), 'click', () => {
+      if (selected !== NONE && data.canGraphLineage) graphLineage(selected);
+    });
     on($('zoom_in'), 'click', () => zoom(1.6));
     on($('zoom_out'), 'click', () => zoom(1 / 1.6));
-    on($('mrca'), 'click', () => select(model.mrca, true));
-    on($('living'), 'click', () => select(newestLiving, true));
-    on($('parent'), 'click', () => select(model.nodes.get(selected).parent, true));
-    on($('lineage'), 'click', () => { isolated = !isolated; message = ''; rebuild(true); });
+    on(selection, 'change', () => {
+      const value = selection.value;
+      selection.value = '';
+      if (value === 'mrca') select(model.mrca);
+      else if (value === 'living') select(newestLiving);
+      else if (value === 'parent' && selected !== NONE) select(model.nodes.get(selected).parent);
+      else if (choices.has(value)) {
+        const {id, name, parent} = choices.get(value);
+        select(id, parent
+          ? `Selected #${id}: its parent/previous gestation performed ${name}; no living organism has performed it in the current gestation yet.`
+          : `Selected #${id}: performed ${name} during its current gestation.`);
+      }
+    });
+    on($('lineage'), 'click', () => { if (selected !== NONE) openLineage(selected); });
+    on($('inspect'), 'click', () => { if (selected !== NONE) inspectOrganism(selected); });
     on($('search'), 'submit', event => {
       event.preventDefault();
       const value = $('id').value.trim();
       if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) {
         message = 'Enter a non-negative whole organism ID.'; updateStatus(); return;
       }
-      select(Number(value), true);
+      select(Number(value));
     });
     on(canvas, 'wheel', event => {
       event.preventDefault(); const p = point(event); zoom(Math.exp(-Math.max(-100, Math.min(100, event.deltaY)) * .008), p.x, p.y);
@@ -307,25 +332,37 @@
     on(canvas, 'keydown', event => {
       if (event.key === '+' || event.key === '=') zoom(1.6);
       else if (event.key === '-') zoom(1 / 1.6);
-      else if (event.key === 'Home') rebuild(true);
+      else if (event.key === 'Home') reset();
       else if (event.key.startsWith('Arrow') && graph.visible.length) {
         const node = model.nodes.get(selected);
-        if (event.key === 'ArrowLeft' && node?.parent !== NONE && node) select(node.parent, true);
-        else if (event.key === 'ArrowRight' && node?.children.length) select(node.children[0].id, true);
+        if (event.key === 'ArrowLeft' && node?.parent !== NONE && node) select(node.parent);
+        else if (event.key === 'ArrowRight' && node?.children.length) select(node.children[0].id);
         else {
           const index = graph.visible.findIndex(n => n.node.id === selected);
           const offset = event.key === 'ArrowUp' ? -1 : 1;
-          select(graph.visible[(index + offset + graph.visible.length) % graph.visible.length].node.id, true);
+          select(graph.visible[(index + offset + graph.visible.length) % graph.visible.length].node.id);
         }
       } else return;
       event.preventDefault();
     });
     rebuild(true);
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
-    active = { dispose() { observer.disconnect(); controller.abort(); if (frame) cancelAnimationFrame(frame); } };
+    active = {
+      addTaskChoice(task, name, id, parent) {
+        if (!model.nodes.has(id)) return;
+        const value = `task:${task}`;
+        choices.set(value, {id, name, parent});
+        const item = document.createElement('option');
+        item.value = value; item.textContent = `Select task ${name}`;
+        item.title = parent ? 'Parent/previous gestation match' : 'Current gestation match';
+        selection.append(item);
+      },
+      dispose() { observer.disconnect(); controller.abort(); if (frame) cancelAnimationFrame(frame); }
+    };
   }
 
-  const api = { buildModel, lineage, layout, mount, unmount };
+  const api = { buildModel, lineage, layout, mount, unmount,
+    addTaskChoice: (...args) => active?.addTaskChoice(...args) };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.avidaPhylogeny = api;
 })(globalThis);
