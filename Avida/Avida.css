@@ -2339,10 +2339,9 @@ fieldset.configuration-content { min-width: 0; margin: 0; padding: 0; border: 0;
   .population-card .population-run-status { align-self: center; }
 }
 .color-selector { margin-left: 0; }
-.legend-disclosure { margin-bottom: 12px; padding: 10px 12px; font-size: .84rem;
-  border: 1px solid rgba(132, 180, 200, 0.16); border-radius: 14px;
-  background: rgba(13, 35, 50, 0.76); }
-.legend-disclosure > summary { cursor: pointer; color: #cde7ed; }
+.legend-disclosure { padding: 12px 0; border-bottom: 1px solid #304d5e; }
+.legend-disclosure > summary { cursor: pointer; font-weight: 700; color: #9ae0e7; }
+#population_color_legend { display: flow-root; }
 .population-color-legend { margin-top: 8px; padding-top: 8px; }
 .population-stat-group { margin-top: 16px; }
 .population-stat-group h3 { margin: 0 0 8px; font-size: .88rem; color: #cde7ed; }
@@ -2613,20 +2612,21 @@ summary:focus-visible, canvas:focus-visible, [contenteditable]:focus-visible {
 .lineage-caption { color: #afc6d3; max-width: 100ch; line-height: 1.5; }
 .lineage-table-scroll { overflow: auto; max-width: 100%; border: 1px solid #304d5e; border-radius: 10px; }
 .lineage-table { border-collapse: collapse; width: 100%; font-size: .82rem; }
-.lineage-table th, .lineage-table td { text-align: left; padding: 12px; vertical-align: top; border-bottom: 1px solid #294454; }
-.lineage-table th { background: #143547; white-space: nowrap; }
+.lineage-table th, .lineage-table td { text-align: left; padding: 9px 6px; vertical-align: top; border-bottom: 1px solid #294454; }
+.lineage-table th { background: #143547; white-space: normal; min-width: 3ch; }
 .lineage-table th button { font: inherit; color: #7de4ef; cursor: pointer; padding: 0; border: 0; border-bottom: 1px dashed; background: none; }
 .lineage-table tr:nth-child(odd) { background: #0e2737; }
 .lineage-table td small { display: block; margin-top: 5px; color: #a4becb; white-space: nowrap; }
-.lineage-genome { min-width: 180px; max-width: 320px; }
+.lineage-genome { width: 17ch; max-width: 240px; }
 .lineage-genome summary { cursor: pointer; }
 .lineage-genome pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-.about-workspace { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1fr); align-items: center; gap: clamp(20px, 5vw, 100px); padding: clamp(24px, 5vw, 80px); }
+.about-workspace { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1fr); align-items: start; gap: clamp(20px, 5vw, 100px); padding: clamp(24px, 5vw, 80px); }
 .about-logo { width: 100%; max-width: 520px; justify-self: center; }
 .about-workspace h1 { font-size: clamp(2.5rem, 5vw, 5rem); margin-bottom: 0; color: #f8d568; }
-.about-workspace p { max-width: 70ch; line-height: 1.65; }
+.about-workspace p { max-width: 80ch; font-size: .9rem; line-height: 1.5; }
+.about-workspace h2 { font-size: 1.1rem; margin: 1.5em 0 .6em; }
 .about-version { color: #9db8ed; }
-.about-author { font-size: 1.25rem; }
+.about-workspace .about-author { font-size: 1.1rem; }
 .configuration-inspector { padding: 22px; display: grid !important; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: 12px 28px; align-items: start; }
 .configuration-header { display: contents; }
 .configuration-tabs { grid-column: 1; grid-row: 1; margin: 0; }
@@ -2790,3 +2790,12 @@ button[hidden] { display: none !important; }
 }
 #org_hardware > details { margin-top: 10px; }
 #org_genome_list:focus-visible { outline: 2px solid #63d5e0; outline-offset: 2px; }
+
+.organism-inspector-actions { justify-content: flex-end; margin: 0 0 12px; }
+.organism-inspector-actions button { display: flex; flex-direction: column; align-items: center;
+  gap: 3px; min-width: 62px; padding: 6px 9px; font-size: .78rem; }
+.organism-inspector-actions img { width: 34px; height: 34px; object-fit: contain; }
+.organism-kill-icon { color: #ff6767; font-size: 38px; line-height: 34px; height: 34px; font-weight: 700; }
+.organism-inspector-actions button:disabled { opacity: .4; cursor: default; }
+.lineage-actions button[aria-pressed='true'] { border-color: #7de4ef; background: #20546b; }
+.configuration-warning { color: #f5cd7d; font-size: .85rem; line-height: 1.5; }

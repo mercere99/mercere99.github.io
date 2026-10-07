@@ -216,15 +216,41 @@
     freezerSizeObserver.observe(grid);
     divider.updateValue();
   };
+  let legendHeight = 0, legendWidth = 0, legendKey = '', legendSmallerSince = null;
+  let legendUpdate = 0, legendRunning = false;
+  const stabilizeLegend = (update = legendUpdate, running = legendRunning) => {
+    const reset = update < legendUpdate;
+    legendUpdate = update; legendRunning = running;
+    const body = document.getElementById('population_legend_body');
+    const content = document.getElementById('population_color_legend');
+    if (!body || !content || !document.getElementById('legend_disclosure')?.open) return;
+    const {height, width} = content.getBoundingClientRect();
+    const key = document.getElementById('population_color_mode')?.value + ':'
+      + document.getElementById('population_color_task')?.value;
+    // Measure the natural inner content, independently of the outer reserved space.
+    // Width/color changes and restarts establish a fresh baseline.
+    if (!running || reset || key !== legendKey || Math.abs(width - legendWidth) > 1
+        || height >= legendHeight) {
+      legendHeight = height; legendSmallerSince = null;
+    } else {
+      if (legendSmallerSince === null) legendSmallerSince = update;
+      if (update - legendSmallerSince >= 1000) {
+        legendHeight = height; legendSmallerSince = null;
+      }
+    }
+    legendWidth = width; legendKey = key;
+    body.style.minHeight = running ? `${legendHeight}px` : '';
+  };
+  window.addEventListener('resize', () => stabilizeLegend());
   const configurationHelp = () => {
     const root = document.getElementById('configuration_inspector');
     if (!root) return;
     const descriptions = {
-      scheduled_events: 'Schedule pauses and resource changes at run start, run end, or selected updates. Add an event, choose when it runs, and select its action. Add a resource pool in Environment before scheduling resource changes.\n\nBefore the run starts, new events default to a pause at update 10,000. After the run starts, new events default to pausing 1,000 updates from now. Existing events can be edited while the run is paused.',
-      resource_pools: 'Resource pools are shared supplies that can limit the rewards organisms receive for performing tasks. Give each pool a name, choose its starting amount, and set its inflow and outflow. All organisms draw from the same pool.\n\nEach update first removes the outflow fraction, then adds the inflow amount. Assign a pool to a reaction to make its reward depend on how much resource it consumes. An empty pool gives no reward. Events can set or adjust a pool during a run; Population shows current amounts and Graphs shows their history.',
-      reactions: 'Reactions connect a computational task to a change in an organism’s traits, such as increasing its merit. Choose the task, the affected trait, the operation, and the reward value. The trigger limit controls how many executions are rewarded per gestation; zero means unlimited.\n\nA reaction without a resource pool applies its full reward. With a pool, it requests the selected fraction of the available resource: Multiply uses the reward value raised to the units consumed, while Add uses the reward value times the units consumed. An empty pool provides no reward. This lets organisms compete for resources by performing tasks.',
+      scheduled_events: 'Schedule pauses and resource changes at run start, run end, or selected updates. Add an event, choose when it runs, and select its action. Add a resource pool in Environment before scheduling resource changes.\n\nBefore the run starts, new events default to a pause at update 10,000. After the run starts, new events default to pausing 1,000 updates from now. Existing events can be edited while the run is paused. A warning marks elapsed schedules: past actions are not replayed, but future interval repetitions still run. Elapsed events remain in saved configurations for future runs.',
+      resource_pools: 'Resource pools are shared supplies that can limit the rewards organisms receive for performing tasks. Give each pool a name, choose its starting amount, and set its inflow and outflow. All organisms draw from the same pool.\n\nEach update first removes the outflow fraction, then adds the inflow amount. Assign a pool to a reaction to make its reward depend on how much resource it consumes. An empty pool gives no reward. Events can set or adjust a pool during a run; Population shows current amounts and Graphs shows their history.\n\nEdit the environment while paused, including after startup. Existing pools retain their current quantities, even when renamed; new pools use their initial amounts. Inflow and outflow changes take effect at the next update. Use an event to change the current amount directly.',
+      reactions: 'Reactions connect a computational task to a change in an organism’s traits, such as increasing its merit. Choose the task, the affected trait, the operation, and the reward value. The trigger limit controls how many executions are rewarded per gestation; zero means unlimited.\n\nA reaction without a resource pool applies its full reward. With a pool, it requests the selected fraction of the available resource: Multiply uses the reward value raised to the units consumed, while Add uses the reward value times the units consumed. An empty pool provides no reward. This lets organisms compete for resources by performing tasks.\n\nChanges made while paused affect subsequent task executions. Existing earned rewards and task counts remain unchanged; trigger limits still use the current gestation’s task counts.',
       name: 'The resource name used to connect a reaction or event to this resource pool.',
-      initial: 'The starting quantity in this resource pool.',
+      initial: 'The starting quantity for a new pool or a new run. Editing this value after startup does not reset an existing pool’s current amount; use a resource event to change that amount.',
       inflow: 'The quantity added to this resource pool per update.',
       outflow: 'The fraction removed from this resource pool per update, from 0 to 1.',
       task: 'The computational task that triggers this reaction when an organism performs it.',
@@ -243,7 +269,7 @@
       action: 'Pause stops evolution at the scheduled point so you can inspect the population and resume when ready.\n\nSet resource replaces a pool’s current amount with the specified nonnegative quantity. Adjust resource adds the specified number of units; a negative change removes units, stopping at zero. Add a pool in Environment to make these actions available.\n\nImported configurations may also contain other Avida commands. These remain listed so their behavior is preserved.',
       event_resource: 'Choose the existing resource pool this event will change. Set resource replaces its amount; Adjust resource adds or removes units. Define pools in Environment before scheduling changes. Update events run after the normal inflow and outflow.',
       amount: 'For Set resource, enter the new nonnegative total in the pool. For Adjust resource, enter the number of units to add; use a negative value to remove units. Removal stops at zero. For example, setting 100 replaces the total with 100, while adjusting by 100 adds 100 to the existing total.',
-      preset: 'A preset replaces the environment resources and reactions with the selected template. Selecting a preset only previews it: the environment will not be altered until you click Load environment.'
+      preset: 'A preset replaces the environment resources and reactions with the selected template. Selecting a preset only previews it: the environment will not be altered until you click Load environment.\n\nLoading replaces reactions and resource pools. Events for removed pools are also removed; other settings and events are kept. You can edit the result below. After startup, pause first: matching pools retain their current amounts and new pools use their initial amounts.'
     };
     const copyParagraphs = (container, text) => {
       for (const part of text.split('\n\n')) {
@@ -259,9 +285,10 @@
       const description = field?.querySelector('.configuration-description');
       let key = section || control.id.replace(/^(resource|reaction|event)_/, '').replace(/_\d+$/, '');
       if (control.id.startsWith('event_resource_')) key = 'event_resource';
-      const text = description?.textContent.trim() || descriptions[key]
+      let text = description?.textContent.trim() || descriptions[key]
         || (control.id.includes('preset') ? descriptions.preset : control.title)
         || `Set ${label.textContent.trim().toLowerCase()} for the current experiment.`;
+      if (control.id === 'environment_preset') text += '\n\n' + (document.getElementById('environment_preset_description')?.textContent.trim() || '');
       const title = label.textContent.trim().replace(/\*$/, '').trim();
       if (description) description.hidden = true;
       const help = document.createElement('div');
@@ -292,6 +319,7 @@
     }
   };
   window.AvidaInterface = {
+    stabilizeLegend,
     patchOrganism(html) {
       const root = document.getElementById('organism_mode_content');
       if (!root) return;
@@ -329,7 +357,10 @@
       }
     },
     preserveLegend() { legend = capture(document.getElementById('population_color_legend')); },
-    restoreLegend() { restore(document.getElementById('population_color_legend'), legend); },
+    restoreLegend(update, running) {
+      restore(document.getElementById('population_color_legend'), legend);
+      stabilizeLegend(update, running);
+    },
     refresh: null,
     preservePage() {
       const saved = new Map(page.map(item => [item.id, item]));
@@ -349,6 +380,7 @@
       updateGenomeScrollHint();
       observeHeader();
       resizeFreezer();
+      stabilizeLegend();
       const preview = document.getElementById('configuration_preview');
       if (preview && preview.dataset.configurationId !== previewedConfiguration) {
         previewedConfiguration = preview.dataset.configurationId;
