@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WizardCrisis</title>
+<style>
+  :root {
+    --ink:        #0e0c16;   /* dungeon dark */
+    --stone:      #262033;   /* wall violet-gray */
+    --floor:      #1a1626;
+    --parchment:  #e8dfc8;   /* panel text */
+    --dim:        #9b92a8;
+    --arcane:     #8f7bff;   /* mana / magic violet */
+    --arcane-glo: #b7a8ff;
+    --ember:      #e8a34c;   /* torchlight / HP amber */
+    --blood:      #d4544a;
+    --panel:      #171226ee;
+    --line:       #3a3150;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--ink);
+               color: var(--parchment); font-family: var(--serif); }
+  #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: absolute; top: 14px; left: 16px; width: 240px; pointer-events: none; }
+  #hud .title { font-size: 15px; letter-spacing: .18em; color: var(--dim);
+                text-transform: uppercase; margin-bottom: 6px; }
+  #hud .title b { color: var(--parchment); }
+  .bar { height: 12px; border: 1px solid var(--line); border-radius: 6px;
+         background: #0006; margin: 4px 0; overflow: hidden; position: relative; }
+  .bar > i { display: block; height: 100%; width: 50%;
+             transition: width .15s ease; }
+  #hpbar  > i { background: linear-gradient(90deg, #b8432f, var(--ember)); }
+  #mpbar  > i { background: linear-gradient(90deg, #4a3fb8, var(--arcane)); }
+  #xpbar { height: 5px; } #xpbar > i { background: #6fae7c; }
+  .bar .lbl { position: absolute; inset: 0; font: 9px/12px var(--mono);
+              text-align: center; color: #fffc; text-shadow: 0 1px 2px #000; }
+  #fx { font: 11px var(--mono); color: var(--arcane-glo); min-height: 15px; margin-top: 3px; }
+
+  #lvlup { position: absolute; top: 118px; left: 16px; display: none;
+           background: #2c2440; border: 1px solid var(--ember); color: var(--ember);
+           font: 12px var(--mono); padding: 6px 12px; border-radius: 8px; cursor: pointer;
+           animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 14px #e8a34c88; } }
+
+  /* ---------- Icon buttons ---------- */
+  #icons { position: absolute; top: 14px; right: 16px; display: flex; gap: 10px; }
+  .iconbtn { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line);
+             background: var(--panel); font-size: 22px; cursor: pointer; color: var(--parchment);
+             display: grid; place-items: center; transition: border-color .15s, transform .1s; }
+  .iconbtn:hover { border-color: var(--arcane); transform: translateY(-1px); }
+  .iconbtn.active { border-color: var(--arcane); box-shadow: 0 0 12px #8f7bff55; }
+
+  /* ---------- Side panel ---------- */
+  #panel { position: absolute; top: 0; right: 0; bottom: 0; width: 340px;
+           background: var(--panel); border-left: 1px solid var(--line);
+           transform: translateX(100%); transition: transform .22s ease;
+           padding: 74px 18px 18px; overflow-y: auto; backdrop-filter: blur(4px); }
+  #panel.open { transform: translateX(0); }
+  #panel h2 { font-size: 18px; letter-spacing: .1em; margin-bottom: 4px; }
+  #panel .sub { font: 11px var(--mono); color: var(--dim); margin-bottom: 14px; }
+
+  .item { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px;
+          background: #1e1830; cursor: grab; }
+  .item.dragging { opacity: .35; }
+  .item .row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; cursor: pointer; }
+  .item .glyph { font-size: 20px; width: 26px; text-align: center; }
+  .item .name { flex: 1; font-size: 15px; }
+  .star { background: none; border: none; font-size: 18px; cursor: pointer;
+          color: #55506b; transition: color .12s, text-shadow .12s; }
+  .star.lit { color: var(--ember); text-shadow: 0 0 8px #e8a34c99; }
+  .item .details { display: none; padding: 0 12px 10px; font-size: 12.5px; color: var(--dim); }
+  .item.expanded .details { display: block; }
+  .details .statline { color: var(--arcane-glo); font-family: var(--mono); font-size: 11.5px;
+                       margin-bottom: 4px; }
+  .details .actions { margin-top: 8px; display: flex; gap: 8px; }
+  .details button { background: #2c2440; color: var(--parchment); border: 1px solid var(--line);
+                    border-radius: 6px; padding: 4px 12px; font: 12px var(--mono); cursor: pointer; }
+  .details button:hover { border-color: var(--arcane); }
+
+  .slotrow { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 6px;
+             border: 1px solid var(--line); border-radius: 8px; background: #1e1830; cursor: pointer; }
+  .slotrow.selected { border-color: var(--arcane); box-shadow: 0 0 8px #8f7bff44; }
+  .slotrow .key { font: bold 13px var(--mono); color: var(--ember); width: 18px; }
+  .slotrow .sname { flex: 1; font-size: 14px; }
+  .slotrow .sname.empty { color: #55506b; font-style: italic; }
+  .slotrow .clear { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 14px; }
+  .spellbook .item { cursor: pointer; }
+  .spellbook .cost { font: 11px var(--mono); color: var(--arcane-glo); }
+  .hint { font-size: 11.5px; color: var(--dim); font-style: italic; margin: 10px 0; }
+
+  /* ---------- Hotbar ---------- */
+  #hotbar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 10px; pointer-events: none; }
+  .hslot { width: 46px; height: 46px; transform: rotate(45deg); border: 1px solid var(--line);
+           border-radius: 8px; background: #171226cc; position: relative; }
+  .hslot .in { position: absolute; inset: 0; transform: rotate(-45deg);
+               display: grid; place-items: center; font-size: 18px; color: var(--arcane-glo); }
+  .hslot .k { position: absolute; top: -7px; left: -7px; transform: rotate(-45deg);
+              font: bold 10px var(--mono); color: var(--ember); }
+  .hslot.filled { border-color: var(--arcane); box-shadow: 0 0 10px #8f7bff33; }
+
+  /* ---------- Messages ---------- */
+  #log { position: absolute; left: 16px; bottom: 16px; width: 380px; pointer-events: none;
+         font-size: 14px; text-shadow: 0 1px 3px #000; }
+  #log div { margin-top: 3px; opacity: 0; animation: msg 6s forwards; }
+  @keyframes msg { 0% {opacity:0; transform: translateY(6px);} 6% {opacity:1; transform:none;}
+                   75% {opacity:1;} 100% {opacity:0;} }
+
+  /* ---------- Modals ---------- */
+  .modal-back { position: absolute; inset: 0; background: #0e0c16aa; display: none;
+                place-items: center; }
+  .modal-back.open { display: grid; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+           padding: 26px 30px; width: 430px; max-width: 92vw; }
+  .modal h2 { margin-bottom: 6px; }
+  .modal .sub { font: 12px var(--mono); color: var(--dim); margin-bottom: 16px; }
+  .statrow { display: flex; align-items: center; gap: 10px; padding: 5px 0;
+             border-bottom: 1px solid #ffffff0d; font-size: 14px; }
+  .statrow .sn { flex: 1; }
+  .statrow .sv { font: 13px var(--mono); color: var(--arcane-glo); width: 40px; text-align: right; }
+  .statrow button { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line);
+                    background: #2c2440; color: var(--ember); cursor: pointer; font-size: 15px; }
+  .statrow button:disabled { opacity: .25; cursor: default; }
+  .modal .close, .modal .restart { margin-top: 18px; width: 100%; padding: 9px;
+      background: #2c2440; border: 1px solid var(--line); color: var(--parchment);
+      border-radius: 8px; font: 14px var(--serif); letter-spacing: .06em; cursor: pointer; }
+  .modal .close:hover, .modal .restart:hover { border-color: var(--arcane); }
+  #endtitle { font-size: 26px; } #endtext { color: var(--dim); margin-top: 8px; font-size: 14px; }
+  .modal .restart.secondary { background: none; border-color: #ffffff22; color: var(--dim); }
+
+  #pausechip { position: absolute; top: 72px; right: 16px; display: none;
+               background: #171226dd; border: 1px solid var(--arcane); color: var(--arcane-glo);
+               font: 12px var(--mono); letter-spacing: .2em; padding: 6px 14px; border-radius: 8px; }
+  #mini { position: absolute; right: 16px; bottom: 16px; border: 1px solid var(--line);
+          border-radius: 8px; background: #12101cd8; image-rendering: pixelated; }
+
+  .statbar { flex: 0 0 90px; height: 7px; border-radius: 4px; background: #0008;
+             border: 1px solid var(--line); overflow: hidden; }
+  .statbar > i { display: block; height: 100%; background: linear-gradient(90deg, #5a4bb8, var(--arcane)); }
+  .derived { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .derived .drow { display: flex; justify-content: space-between; font-size: 13px;
+                   padding: 3px 0; color: var(--dim); }
+  .derived .drow b { color: var(--parchment); font-weight: normal; font-family: var(--mono); font-size: 12px; }
+  .pts { background: #2c2440; border: 1px solid var(--ember); color: var(--ember);
+         font: 12px var(--mono); border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; }
+  .count { font: 11px var(--mono); color: var(--ember); margin-left: 4px; }
+  .crit { font: 10.5px var(--mono); color: var(--dim); padding: 2px 12px 8px 48px; }
+
+  /* Boot diagnostics: a black canvas should never be the only symptom. */
+  #boot { position: absolute; inset: 0; display: none; place-items: center;
+          background: #0e0c16; padding: 24px; }
+  #boot.show { display: grid; }
+  #boot .box { max-width: 620px; border: 1px solid var(--blood); border-radius: 12px;
+               background: #1a1020; padding: 24px 28px; }
+  #boot h2 { color: var(--blood); font-size: 20px; margin-bottom: 10px; }
+  #boot p { font-size: 14px; color: var(--parchment); margin-bottom: 10px; }
+  #boot code { display: block; font: 12px/1.6 var(--mono); color: var(--ember);
+               background: #0b0812; border: 1px solid var(--line); border-radius: 6px;
+               padding: 10px 12px; margin: 10px 0; white-space: pre-wrap; }
+  #boot .why { font-size: 12.5px; color: var(--dim); }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="hud">
+  <div class="title"><b>WizardCrisis</b> · <span id="hud-depth">Depth 1</span> · <span id="hud-lvl">Lv 1</span></div>
+  <div class="bar" id="hpbar"><i></i><span class="lbl"></span></div>
+  <div class="bar" id="mpbar"><i></i><span class="lbl"></span></div>
+  <div class="bar" id="xpbar"><i></i></div>
+  <div id="fx"></div>
+</div>
+<button id="lvlup">✨ Level up — spend stat points</button>
+
+<div id="icons">
+  <button class="iconbtn" id="btn-inv" title="Inventory (I)">🎒</button>
+  <button class="iconbtn" id="btn-spl" title="Spells (P)">📜</button>
+  <button class="iconbtn" id="btn-chr" title="Character (C)">✨</button>
+  <button class="iconbtn" id="btn-pse" title="Pause (Esc)">⏸</button>
+</div>
+
+<div id="pausechip">❚❚ &nbsp;PAUSED</div>
+<canvas id="mini"></canvas>
+
+<div id="panel"></div>
+<div id="hotbar"></div>
+<div id="log"></div>
+
+<div class="modal-back" id="endmodal">
+  <div class="modal" style="text-align:center">
+    <h2 id="endtitle"></h2>
+    <div id="endtext"></div>
+    <button class="restart" id="end-primary"></button>
+    <button class="restart secondary" id="end-secondary"></button>
+  </div>
+</div>
+
+<div id="boot"><div class="box">
+  <h2 id="boot-title">The engine did not load.</h2>
+  <p id="boot-msg"></p>
+  <div class="why" id="boot-why"></div>
+</div></div>
+
+<script>
+var Module = { onRuntimeInitialized: () => initGame() };
+function bootFail(title, msg, why) {
+  document.getElementById("boot-title").textContent = title;
+  document.getElementById("boot-msg").innerHTML = msg;
+  document.getElementById("boot-why").textContent = why || "";
+  document.getElementById("boot").classList.add("show");
+}
+// If the wasm never initializes, say so instead of showing a black canvas.
+var bootTimer = setTimeout(() => bootFail(
+  "The engine did not load.",
+  "<code>web/wizardcrisis.js</code> is missing, stale, or failed to start. Build it first:" +
+  "<code>./build.sh      # needs emcc on PATH (emsdk activated)</code>" +
+  "Then reload this page. Check the browser console for the underlying error.",
+  "This page is only the interface; all game state lives in the WebAssembly module."
+), 4000);
+</script>
+<script src="wizardcrisis.js"
+        onerror="bootFail('The engine did not load.',
+                 'The browser could not fetch <code>wizardcrisis.js</code> (404). Run <code>./build.sh</code> to produce it, then reload.',
+                 'build.sh needs --no-entry: this module has no main().')"></script>
+<script>
+"use strict";
+const STAT_NAMES = ["Mental Capacity","Mental Power","Mental Quickness","Mental Precision",
+                    "Physical Capacity","Physical Power","Physical Quickness","Physical Precision"];
+const STAT_HINTS = ["spell slots","spell power","mana regen","spell duration",
+                    "max health","melee damage","move speed","dodge chance"];
+
+let api = null, map = null, state = null;
+let panelMode = "none";           // "none" | "inv" | "spells"
+let expandedItem = -1, selectedSlot = -1, dragId = -1;
+let lastMsgSerial = 0, lastStatPoints = 0, victoryShown = false;
+let manualPause = false, enginePaused = false;
+
+// The engine owns the pause flag; the interface derives the desired value:
+// an explicit pause (Esc / ⏸) OR any open panel/modal freezes the fight, so
+// browsing your backpack never gets you stabbed.
+function endOpen() { return document.getElementById("endmodal").classList.contains("open"); }
+function syncPause() {
+  if (!api) return;
+  const want = manualPause || panelMode !== "none" || endOpen();
+  if (want !== enginePaused) { enginePaused = want; api.setPause(want ? 1 : 0); }
+  document.getElementById("btn-pse").classList.toggle("active", manualPause);
+}
+
+const cv = document.getElementById("view"), ctx = cv.getContext("2d");
+const TILE = 40;
+// Canvas needs an explicit emoji stack; bare "serif" doesn't reliably fall
+// back to a color emoji face on every platform.
+const GLYPH_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",serif';
+
+function initGame() {
+  clearTimeout(bootTimer);
+  try {
+    initGameInner();
+  } catch (e) {
+    bootFail("The engine loaded, but failed to start.",
+             "<code>" + e.message + "</code>", "See the browser console for a stack trace.");
+    throw e;
+  }
+}
+function initGameInner() {
+  const F = (n, r, a) => Module.cwrap(n, r, a);
+  api = {
+    init:        F("wc_init", null, ["number"]),
+    update:      F("wc_update", null, ["number"]),
+    state:       F("wc_state", "number", []),
+    map:         F("wc_map", "number", []),
+    setMove:     F("wc_set_move", null, ["number","number"]),
+    attack:      F("wc_attack", null, ["number"]),
+    cast:        F("wc_cast", null, ["number"]),
+    equipToggle: F("wc_equip_toggle", null, ["number"]),
+    useItem:     F("wc_use_item", null, ["number"]),
+    dropItem:    F("wc_drop_item", null, ["number"]),
+    moveItem:    F("wc_move_item", null, ["number","number"]),
+    assignSpell: F("wc_assign_spell", null, ["number","number"]),
+    clearSlot:   F("wc_clear_slot", null, ["number"]),
+    allocStat:   F("wc_alloc_stat", null, ["number"]),
+    setPause:    F("wc_set_pause", null, ["number"]),
+    restartLevel:F("wc_restart_level", null, []),
+    loadLevel:   F("wc_load_level", "number", ["string"]),
+  };
+  // Level authoring hooks: call wcLoadLevel(text) from the console, or drop
+  // a level .txt file anywhere on the page. Format: src/level.hpp.
+  globalThis.wcLoadLevel = text => {
+    const errors = api.loadLevel(text);
+    if (errors) console.warn("Level rejected: " + errors +
+                             " error(s) — see the in-game message log.");
+    return errors;
+  };
+  addEventListener("dragover", e => e.preventDefault());
+  addEventListener("drop", e => {
+    e.preventDefault();
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) f.text().then(t => wcLoadLevel(t));
+  });
+  api.init((Date.now() ^ (Math.random() * 1e9)) >>> 0);
+  requestAnimationFrame(frame);
+}
+
+function restart() {
+  api.init((Date.now() ^ (Math.random() * 1e9)) >>> 0);
+  map = null; lastMsgSerial = 0; lastStatPoints = 0; victoryShown = false;
+  manualPause = false; enginePaused = false;
+  document.getElementById("endmodal").classList.remove("open");
+  document.getElementById("log").innerHTML = "";
+  syncPause();
+}
+
+/* ================= Input ================= */
+const held = new Set();
+function moveVec() {
+  let dx = 0, dy = 0;
+  if (held.has("ArrowLeft")  || held.has("KeyA")) dx -= 1;
+  if (held.has("ArrowRight") || held.has("KeyD")) dx += 1;
+  if (held.has("ArrowUp")    || held.has("KeyW")) dy -= 1;
+  if (held.has("ArrowDown")  || held.has("KeyS")) dy += 1;
+  return [dx, dy];
+}
+addEventListener("keydown", e => {
+  if (!api || e.repeat) return;
+  if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
+  if (e.code === "Space") { api.attack(1); return; }
+  if (e.code >= "Digit1" && e.code <= "Digit9") { api.cast(+e.code.slice(5) - 1); return; }
+  if (e.code === "KeyI") { togglePanel("inv"); return; }
+  if (e.code === "KeyP") { togglePanel("spells"); return; }
+  if (e.code === "KeyC") { togglePanel("char"); return; }
+  if (e.code === "Escape") {
+    if (endOpen()) return;                                  // Modal has its own buttons.
+    if (panelMode !== "none") { togglePanel("none"); return; }
+    manualPause = !manualPause; syncPause(); return;
+  }
+  held.add(e.code); api.setMove(...moveVec());
+});
+addEventListener("keyup", e => {
+  if (!api) return;
+  if (e.code === "Space") { api.attack(0); return; }
+  held.delete(e.code); api.setMove(...moveVec());
+});
+addEventListener("blur", () => { held.clear(); if (api) api.setMove(0, 0); });
+
+/* ================= Frame loop ================= */
+let lastT = 0;
+function frame(t) {
+  try {
+    step(t);
+  } catch (e) {
+    // A throw here would silently break the rAF chain and freeze to black.
+    bootFail("The render loop stopped.", "<code>" + e.message + "</code>",
+             "See the browser console for a stack trace.");
+    throw e;
+  }
+  requestAnimationFrame(frame);
+}
+function step(t) {
+  const dt = Math.min(0.1, (t - lastT) / 1000 || 0.016);
+  lastT = t;
+  api.update(dt);
+  state = JSON.parse(Module.UTF8ToString(api.state()));
+  if (!map || map.v !== state.mapV) {
+    map = JSON.parse(Module.UTF8ToString(api.map()));
+    buildFloorPattern();
+    buildMini();
+  }
+  render();
+  drawMini();
+  updateHud();
+  if (panelMode !== "none") renderPanel();
+}
+
+/* ================= Canvas rendering ================= */
+let floorNoise = null;
+function buildFloorPattern() {
+  floorNoise = [];
+  let s = map.v * 2654435761 >>> 0;
+  const rnd = () => (s = (s * 1103515245 + 12345) >>> 0) / 4294967296;
+  for (let y = 0; y < map.h; ++y) { floorNoise.push(Array.from({length: map.w}, rnd)); }
+}
+
+function resize() { cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio;
+                    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); }
+addEventListener("resize", resize); resize();
+
+function render() {
+  const W = innerWidth, H = innerHeight, p = state.player;
+  ctx.fillStyle = "#0e0c16"; ctx.fillRect(0, 0, W, H);
+  const camX = p.x * TILE - W / 2, camY = p.y * TILE - H / 2;
+  const x0 = Math.max(0, Math.floor(camX / TILE)), x1 = Math.min(map.w, Math.ceil((camX + W) / TILE));
+  const y0 = Math.max(0, Math.floor(camY / TILE)), y1 = Math.min(map.h, Math.ceil((camY + H) / TILE));
+
+  for (let y = y0; y < y1; ++y) {
+    const row = map.rows[y];
+    for (let x = x0; x < x1; ++x) {
+      const sx = x * TILE - camX, sy = y * TILE - camY, c = row[x];
+      if (c === "#") {
+        // Only draw walls that border open space (keeps solid rock black).
+        let edge = false;
+        for (const [ox, oy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]) {
+          const r = map.rows[y + oy];
+          if (r && r[x + ox] && r[x + ox] !== "#") { edge = true; break; }
+        }
+        if (!edge) continue;
+        ctx.fillStyle = "#262033"; ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.fillStyle = "#2f2941"; ctx.fillRect(sx, sy, TILE, 5);
+        ctx.strokeStyle = "#1c1729"; ctx.strokeRect(sx + .5, sy + .5, TILE - 1, TILE - 1);
+      } else if (c === "*") {
+        // Sliding slab: a raised block with grip pocks. Lean on it to shove.
+        ctx.fillStyle = "#1a1626"; ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.fillStyle = "#4a4060"; ctx.fillRect(sx + 3, sy + 3, TILE - 6, TILE - 6);
+        ctx.fillStyle = "#5d5178"; ctx.fillRect(sx + 3, sy + 3, TILE - 6, 5);
+        ctx.strokeStyle = "#2c2440"; ctx.lineWidth = 2;
+        ctx.strokeRect(sx + 4, sy + 4, TILE - 8, TILE - 8);
+        ctx.fillStyle = "#372f4d";
+        for (const [ox, oy] of [[13,15],[TILE-13,15],[13,TILE-11],[TILE-13,TILE-11]]) {
+          ctx.beginPath(); ctx.arc(sx + ox, sy + oy, 2.5, 0, 7); ctx.fill();
+        }
+      } else if (c === "-") {
+        // Pit: open darkness with a shadowed rim. Bolts cross it; feet don't.
+        ctx.fillStyle = "#1a1626"; ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.fillStyle = "#050409"; ctx.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
+        const pg = ctx.createLinearGradient(sx, sy, sx, sy + 14);
+        pg.addColorStop(0, "#000c"); pg.addColorStop(1, "#0000");
+        ctx.fillStyle = pg; ctx.fillRect(sx + 2, sy + 2, TILE - 4, 12);
+        ctx.strokeStyle = "#2c2440"; ctx.lineWidth = 1;
+        ctx.strokeRect(sx + 2.5, sy + 2.5, TILE - 5, TILE - 5);
+      } else {
+        const n = floorNoise[y][x];
+        ctx.fillStyle = n < 0.5 ? "#1a1626" : (n < 0.85 ? "#1c1829" : "#211c31");
+        ctx.fillRect(sx, sy, TILE, TILE);
+        if (c === ">") {
+          ctx.fillStyle = "#0a0812"; ctx.fillRect(sx + 5, sy + 5, TILE - 10, TILE - 10);
+          ctx.fillStyle = "#e8a34c"; ctx.font = "22px serif";
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText("▼", sx + TILE / 2, sy + TILE / 2 + 1);
+        }
+      }
+    }
+  }
+
+  // Lure points: a pulsing violet whisper-mark on the floor.
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
+  for (const l of state.lures) {
+    const lx = l.x * TILE - camX, ly = l.y * TILE - camY;
+    ctx.strokeStyle = `rgba(143,123,255,${0.25 + 0.45 * pulse})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(lx, ly, 10 + 5 * pulse, 0, 7); ctx.stroke();
+    ctx.fillStyle = "#8f7bff";
+    ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, 7); ctx.fill();
+  }
+  // Area blasts: an expanding ring of fire.
+  for (const ef of state.effects) {
+    const ex = ef.x * TILE - camX, ey = ef.y * TILE - camY, er = ef.r * TILE;
+    ctx.fillStyle = "rgba(232,140,60,0.22)";
+    ctx.beginPath(); ctx.arc(ex, ey, er, 0, 7); ctx.fill();
+    ctx.strokeStyle = "rgba(255,190,90,0.85)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(ex, ey, er, 0, 7); ctx.stroke();
+  }
+
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const drawGlyph = (g, x, y, size) => {
+    // A missing glyph is an engine bug, not something to paint as "undefined".
+    if (typeof g !== "string" || !g) { g = "?"; console.warn("missing glyph"); }
+    ctx.font = size + "px " + GLYPH_FONT;
+    ctx.fillStyle = "#fff";
+    ctx.fillText(g, x * TILE - camX, y * TILE - camY);
+  };
+  const hpBar = (x, y, frac, w = 30) => {
+    const sx = x * TILE - camX - w / 2, sy = y * TILE - camY - 27;
+    ctx.fillStyle = "#000a"; ctx.fillRect(sx, sy, w, 4);
+    ctx.fillStyle = frac > 0.5 ? "#6fae7c" : (frac > 0.25 ? "#e8a34c" : "#d4544a");
+    ctx.fillRect(sx, sy, w * frac, 4);
+  };
+  const shieldRing = (x, y, r) => {
+    ctx.strokeStyle = "#8f7bffaa"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x * TILE - camX, y * TILE - camY, r, 0, 7); ctx.stroke();
+  };
+
+  for (const e of state.entities) {
+    if (e.agent) {
+      drawGlyph(e.glyph, e.x, e.y, e.boss ? 34 : 26);
+      hpBar(e.x, e.y, e.hp / e.maxHp, e.boss ? 44 : 30);
+      if (e.shield) shieldRing(e.x, e.y, e.boss ? 26 : 20);
+      if (e.boss) {
+        ctx.font = "12px " + getComputedStyle(document.body).fontFamily;
+        ctx.fillStyle = "#e8a34c";
+        ctx.fillText(e.name, e.x * TILE - camX, e.y * TILE - camY - 34);
+      }
+    } else {
+      drawGlyph(e.glyph, e.x, e.y, 20);
+    }
+  }
+
+  for (const pr of state.projectiles) {
+    ctx.shadowColor = "#b7a8ff"; ctx.shadowBlur = 10;
+    drawGlyph(pr.glyph, pr.x, pr.y, 18);
+    ctx.shadowBlur = 0;
+  }
+
+  // The player, their facing tick, and status rings.
+  const px = W / 2, py = H / 2;
+  if (p.invis > 0) ctx.globalAlpha = 0.4;
+  drawGlyph(state.player.glyph, p.x, p.y, 28);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "#e8dfc8"; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(px + p.fx * 17, py + p.fy * 17);
+  ctx.lineTo(px + p.fx * 24, py + p.fy * 24);
+  ctx.stroke();
+  if (p.shield > 0) shieldRing(p.x, p.y, 21);
+  if (p.windup >= 0.35) {          // Charged: releasing space throws.
+    ctx.strokeStyle = "#e8a34c"; ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.arc(px, py, 26, 0, 7); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Torchlight vignette.
+  const g = ctx.createRadialGradient(px, py, TILE * 3, px, py, TILE * 9);
+  g.addColorStop(0, "#0000"); g.addColorStop(1, "#0e0c16f2");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+/* ================= HUD ================= */
+function setBar(id, val, max, label) {
+  const el = document.getElementById(id);
+  el.querySelector("i").style.width = (100 * val / max) + "%";
+  const l = el.querySelector(".lbl");
+  if (l) l.textContent = label;
+}
+function updateHud() {
+  const p = state.player;
+  document.getElementById("hud-depth").textContent = "Depth " + state.depth;
+  document.getElementById("hud-lvl").textContent = "Lv " + p.charLevel;
+  setBar("hpbar", p.hp, p.maxHp, Math.ceil(p.hp) + " / " + p.maxHp + " HP");
+  setBar("mpbar", p.mana, p.maxMana, Math.floor(p.mana) + " / " + p.maxMana + " mana");
+  setBar("xpbar", p.xp, p.xpNext, "");
+  const fx = [];
+  if (p.shield > 0) fx.push("◈ shield " + p.shield.toFixed(0) + "s");
+  if (p.haste > 0)  fx.push("≫ haste " + p.haste.toFixed(0) + "s");
+  if (p.slow > 0)   fx.push("❆ slowed");
+  if (p.invis > 0)  fx.push("○ unseen " + p.invis.toFixed(0) + "s");
+  if (p.windup >= 0.35) fx.push("🗡 throw ready");
+  document.getElementById("fx").textContent = fx.join("   ");
+
+  // Hotbar.
+  const hb = document.getElementById("hotbar");
+  const cells = p.slots.map((s, i) => {
+    const sp = s >= 0 ? p.knownSpells[s] : null;
+    return `<div class="hslot ${sp ? "filled" : ""}"><span class="k">${i + 1}</span>` +
+           `<span class="in">${sp ? sp.glyph : ""}</span></div>`;
+  }).join("");
+  if (hb.dataset.prev !== cells) { hb.innerHTML = cells; hb.dataset.prev = cells; }
+
+  // Messages.
+  const log = document.getElementById("log");
+  for (const m of state.messages) {
+    if (m.n > lastMsgSerial) {
+      lastMsgSerial = m.n;
+      const div = document.createElement("div");
+      div.textContent = m.t;
+      log.appendChild(div);
+      while (log.children.length > 6) log.removeChild(log.firstChild);
+      setTimeout(() => div.remove(), 6100);
+    }
+  }
+
+  // Level-up flow.
+  // Level-up: surface the button and let the player open it when they're
+  // safe. Auto-opening mid-fight blocks the screen while monsters keep
+  // swinging, which is exactly when you least want a modal.
+  const btn = document.getElementById("lvlup");
+  const n = p.statPoints;
+  btn.style.display = n > 0 ? "block" : "none";
+  const label = "✨ Level up — spend " + n + " point" + (n === 1 ? "" : "s");
+  if (btn.textContent !== label) btn.textContent = label;
+  lastStatPoints = n;
+
+  document.getElementById("pausechip").style.display = state.paused ? "block" : "none";
+
+  // Endings. Death offers a level restart from the auto-save taken when you
+  // entered this depth; victory lets you keep exploring or start fresh.
+  if (state.gameOver && !endOpen()) {
+    showEnd("You have fallen.",
+            "The level resets to the moment you entered depth " + state.depth +
+            " — same halls, same possessions.",
+            "Rise again — restart this level",
+            () => { api.restartLevel(); closeEnd(); },
+            "Abandon run — new dungeon", () => restart());
+  } else if (state.victory && !victoryShown && !endOpen()) {
+    victoryShown = true;
+    showEnd("The Crisis is over.",
+            "The Archmage lies defeated at depth " + state.depth +
+            ". The dungeon's magic grows quiet.",
+            "Continue exploring", () => closeEnd(),
+            "Enter the dungeon again", () => restart());
+  }
+}
+
+function showEnd(title, text, primLabel, primFn, secLabel, secFn) {
+  document.getElementById("endtitle").textContent = title;
+  document.getElementById("endtext").textContent = text;
+  const prim = document.getElementById("end-primary"), sec = document.getElementById("end-secondary");
+  prim.textContent = primLabel; prim.onclick = primFn;
+  sec.textContent = secLabel;  sec.onclick = secFn;
+  document.getElementById("endmodal").classList.add("open");
+  syncPause();
+}
+function closeEnd() {
+  document.getElementById("endmodal").classList.remove("open");
+  syncPause();
+}
+
+/* ================= Side panel ================= */
+document.getElementById("btn-inv").onclick = () => togglePanel("inv");
+document.getElementById("btn-spl").onclick = () => togglePanel("spells");
+document.getElementById("btn-chr").onclick = () => togglePanel("char");
+document.getElementById("btn-pse").onclick = () => { manualPause = !manualPause; syncPause(); };
+function togglePanel(mode) {
+  panelMode = (panelMode === mode || mode === "none") ? "none" : mode;
+  document.getElementById("panel").classList.toggle("open", panelMode !== "none");
+  document.getElementById("btn-inv").classList.toggle("active", panelMode === "inv");
+  document.getElementById("btn-spl").classList.toggle("active", panelMode === "spells");
+  document.getElementById("btn-chr").classList.toggle("active", panelMode === "char");
+  expandedItem = -1; selectedSlot = -1;
+  if (panelMode !== "none") renderPanel();
+  syncPause();   // Any open panel pauses the fight.
+}
+
+function renderPanel() {
+  const html = panelMode === "inv" ? invHtml()
+             : panelMode === "char" ? charHtml() : spellHtml();
+  const panel = document.getElementById("panel");
+  if (panel.dataset.prev === html) return;
+  panel.dataset.prev = html;
+  panel.innerHTML = html;
+  wirePanel();
+}
+
+function esc(s) { return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function invHtml() {
+  const inv = state.player.inventory;
+  let h = `<h2>🎒 Inventory</h2><div class="sub">${inv.length} item${inv.length === 1 ? "" : "s"} · drag to sort</div>`;
+  if (!inv.length) h += `<div class="hint">Empty. The dungeon provides — walk over items to take them.</div>`;
+  for (const it of inv) {
+    h += `<div class="item ${expandedItem === it.id ? "expanded" : ""}" draggable="true" data-id="${it.id}">
+      <div class="row">
+        <span class="glyph">${it.glyph}</span>
+        <span class="name">${esc(it.name)}${it.count > 1 ? `<span class="count">×${it.count}</span>` : ""}</span>
+        ${it.equipable ? `<button class="star ${it.equipped ? "lit" : ""}" data-eq="${it.id}"
+            title="${it.equipped ? "Unequip" : "Equip"}">${it.equipped ? "★" : "☆"}</button>` : ""}
+      </div>
+      <div class="details">
+        <div class="statline">${esc(it.statLine)}</div>
+        <div>${esc(it.desc)}</div>
+        <div class="actions">
+          ${it.usable ? `<button data-use="${it.id}">Use</button>` : ""}
+          <button data-drop="${it.id}">Drop</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  h += `<div class="hint">★ marks equipped gear — click a lit star to unequip.</div>`;
+  return h;
+}
+
+function spellHtml() {
+  const p = state.player;
+  let h = `<h2>📜 Spells</h2><div class="sub">${p.slots.length} active slots (Mental Capacity)</div>`;
+  p.slots.forEach((s, i) => {
+    const sp = s >= 0 ? p.knownSpells[s] : null;
+    h += `<div class="slotrow ${selectedSlot === i ? "selected" : ""}" data-slot="${i}">
+      <span class="key">${i + 1}</span>
+      <span class="sname ${sp ? "" : "empty"}">${sp ? esc(sp.name) : "— empty slot —"}</span>
+      ${sp ? `<button class="clear" data-clear="${i}" title="Clear slot">✕</button>` : ""}
+    </div>`;
+  });
+  h += `<div class="hint">Click a slot, then a spell below, to assign it. Number keys cast in-game.</div>`;
+  h += `<div class="spellbook"><h2 style="font-size:15px;margin:14px 0 8px">Grimoire</h2>`;
+  p.knownSpells.forEach((sp, i) => {
+    h += `<div class="item" data-known="${i}">
+      <div class="row">
+        <span class="glyph">${sp.glyph}</span>
+        <span class="name">${esc(sp.name)} <span class="cost">· ${sp.domain} · ${sp.cost} mana</span></span>
+      </div>
+      ${sp.attack ? `<div class="crit">⚔ ${sp.dmg} dmg · ${sp.range} range · ${Math.round(sp.acc)}% acc${sp.special ? " · " + esc(sp.special) : ""}</div>`
+                  : sp.special ? `<div class="crit">${esc(sp.special)}</div>` : ""}
+      <div class="details" style="display:block;padding:0 12px 10px">${esc(sp.desc)}</div>
+    </div>`;
+  });
+  h += `</div><div class="hint">Scrolls found in the dungeon teach new spells.</div>`;
+  return h;
+}
+
+function wirePanel() {
+  const panel = document.getElementById("panel");
+  panel.querySelectorAll("[data-eq]").forEach(b => b.onclick = ev => {
+    ev.stopPropagation(); api.equipToggle(+b.dataset.eq); });
+  panel.querySelectorAll("[data-use]").forEach(b => b.onclick = () => api.useItem(+b.dataset.use));
+  panel.querySelectorAll("[data-drop]").forEach(b => b.onclick = () => api.dropItem(+b.dataset.drop));
+  panel.querySelectorAll("[data-stat]").forEach(b => b.onclick = () => api.allocStat(+b.dataset.stat));
+  panel.querySelectorAll(".item[data-id] .row").forEach(r => r.onclick = () => {
+    const id = +r.parentElement.dataset.id;
+    expandedItem = (expandedItem === id) ? -1 : id;
+    document.getElementById("panel").dataset.prev = ""; renderPanel();
+  });
+  // Drag to sort.
+  panel.querySelectorAll(".item[data-id]").forEach(el => {
+    el.ondragstart = () => { dragId = +el.dataset.id; el.classList.add("dragging"); };
+    el.ondragend = () => { dragId = -1; el.classList.remove("dragging"); };
+    el.ondragover = ev => ev.preventDefault();
+    el.ondrop = ev => {
+      ev.preventDefault();
+      if (dragId < 0) return;
+      const ids = state.player.inventory.map(i => i.id);
+      let idx = ids.indexOf(+el.dataset.id);
+      if (idx >= 0 && dragId !== +el.dataset.id) api.moveItem(dragId, idx);
+    };
+  });
+  // Spell slot assignment.
+  panel.querySelectorAll(".slotrow").forEach(r => r.onclick = () => {
+    selectedSlot = (selectedSlot === +r.dataset.slot) ? -1 : +r.dataset.slot;
+    document.getElementById("panel").dataset.prev = ""; renderPanel();
+  });
+  panel.querySelectorAll("[data-clear]").forEach(b => b.onclick = ev => {
+    ev.stopPropagation(); api.clearSlot(+b.dataset.clear); selectedSlot = -1; });
+  panel.querySelectorAll("[data-known]").forEach(el => el.onclick = () => {
+    const known = +el.dataset.known;
+    let slot = selectedSlot;
+    if (slot < 0) slot = state.player.slots.indexOf(-1);      // First empty.
+    if (slot < 0) slot = 0;                                    // All full: replace slot 1.
+    api.assignSpell(known, slot);
+    selectedSlot = -1;
+  });
+}
+
+/* ================= Character panel ================= */
+// The level-up button and the ✨ icon both open the same paused side panel:
+// one place to inspect stats, spend points, and read the derived numbers.
+document.getElementById("lvlup").onclick = () => { if (panelMode !== "char") togglePanel("char"); };
+
+function charHtml() {
+  const p = state.player, d = p.derived;
+  let h = `<h2>✨ Character</h2><div class="sub">Level ${p.charLevel} · ${p.xp} / ${p.xpNext} XP</div>`;
+  if (p.statPoints > 0) {
+    h += `<div class="pts">${p.statPoints} stat point${p.statPoints === 1 ? "" : "s"} to spend — click [+]</div>`;
+  }
+  p.stats.forEach((v, i) => {
+    h += `<div class="statrow" title="${STAT_HINTS[i]}">
+      <span class="sn">${STAT_NAMES[i]}</span>
+      <span class="statbar"><i style="width:${10 * v}%"></i></span>
+      <span class="sv">${v}</span>
+      ${p.statPoints > 0 ? `<button data-stat="${i}" ${v >= 10 ? "disabled" : ""}>+</button>` : ""}
+    </div>`;
+  });
+  const rows = [
+    ["Move speed", d.speed.toFixed(1) + " cells/s"],
+    ["Melee damage", d.melee.toFixed(1)],
+    ["Spell power", "×" + d.spellMult.toFixed(2)],
+    ["Dodge chance", Math.round(d.dodge) + "%"],
+    ["Mana regen", d.regen.toFixed(1) + " /s"],
+    ["Focus (buff time)", d.focus.toFixed(1) + "s"],
+    ["Spell slots", d.slots + " (Mental Capacity)"],
+  ];
+  h += `<div class="derived">` +
+       rows.map(([k, v]) => `<div class="drow"><span>${k}</span><b>${v}</b></div>`).join("") +
+       `</div><div class="hint">Each level grants 2 points. Stats cap at 10.</div>`;
+  return h;
+}
+
+/* ================= Minimap ================= */
+const mini = document.getElementById("mini"), mtx = mini.getContext("2d");
+const MSCALE = 3;
+let miniBase = null;   // Tiles pre-rendered once per map version.
+function buildMini() {
+  mini.width = map.w * MSCALE; mini.height = map.h * MSCALE;
+  miniBase = document.createElement("canvas");
+  miniBase.width = mini.width; miniBase.height = mini.height;
+  const b = miniBase.getContext("2d");
+  for (let y = 0; y < map.h; ++y) {
+    for (let x = 0; x < map.w; ++x) {
+      const c = map.rows[y][x];
+      if (c === "#" || c === " ") continue;          // Rock stays transparent.
+      b.fillStyle = c === ">" ? "#e8a34c"
+                  : c === "*" ? "#6b5e8f"
+                  : c === "-" ? "#08060e" : "#332c4a";
+      b.fillRect(x * MSCALE, y * MSCALE, MSCALE, MSCALE);
+    }
+  }
+}
+function drawMini() {
+  if (!miniBase) return;
+  mtx.clearRect(0, 0, mini.width, mini.height);
+  mtx.drawImage(miniBase, 0, 0);
+  const dot = (x, y, color, r) => {
+    mtx.fillStyle = color;
+    mtx.beginPath(); mtx.arc(x * MSCALE, y * MSCALE, r, 0, 7); mtx.fill();
+  };
+  for (const e of state.entities) if (e.boss) dot(e.x, e.y, "#d4544a", 3);
+  dot(state.player.x, state.player.y, "#b7a8ff", 3.5);
+}
+</script>
+</body>
+</html>
