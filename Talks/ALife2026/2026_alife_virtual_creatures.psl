@@ -1,0 +1,470 @@
+% EVOLVING VIRTUAL CREATURES — Virtual Creatures Workshop, ALife 2026
+% Main path: ~28 slides. Pocket slides (introduced with !---) are optional detail and are skipped by normal advancing.
+
+!set bg #07111F
+!set color #F4F1E8
+!set accent #55E6C1
+!set font Avenir Next, Inter, Helvetica, Arial, sans-serif
+!set headfont Avenir Next, Inter, Helvetica, Arial, sans-serif
+!set transition fade 0.28
+
+@(0,0) {w=0.31, h=1} ![Digital evolution texture](assets/digital-evolution-texture.png)
+@(0.38,0.20) {size=59px, color=#F4F1E8, w=0.56} Evolving Virtual Creatures
+@(0.38,0.39) {size=31px, color=#55E6C1, w=0.54} How environments generate complex traits & behaviors
+@(0.38,0.69) {size=24px, color=#F4F1E8} Charles Ofria
+@(0.38,0.76) {size=18px, color=#9FB0C5} Michigan State University · BEACON Center
+@(0.38,0.83) {size=17px, color=#9FB0C5} Virtual Creatures Workshop · ALife 2026
+
+% SPEAKER: Open with the design question: if we want interesting virtual creatures, what evolutionary conditions make interesting complexity likely?
+% SOURCE: Title texture from the user-provided 2026 ALife.pptx.
+
+---
+### I came to evolution through artificial intelligence
+
+@(0.08,0.23) {w=0.15} ![Robot](assets/robot.jpg)
+@(0.25,0.26) {w=0.15} ![HAL 9000](assets/hal-eye.jpg)
+@(0.12,0.65) {size=24px, color=#51C8F4, anchor=center} BUILD INTELLIGENCE
+
+{color=#38516C, thick=5} !arrow (0.43,0.40) (0.56,0.40)
+
+@(0.60,0.20) {w=0.12} ![Darwin](assets/darwin-engraving.jpg)
+@(0.75,0.19) {w=0.14} ![Darwin's finches](assets/darwin-finches.png)
+@(0.69,0.65) {size=24px, color=#FFB36A, anchor=center} UNDERSTAND ITS ORIGIN
+
+...
+@(0.50,0.73) {size=35px, color=#F4F1E8, anchor=center} Evolution built natural intelligence.
+@(0.50,0.81) {size=24px, color=#9FB0C5, anchor=center} My computer skills became a way to study the process.
+
+% SPEAKER: Brief personal story: AI first, then fascination with the process that produced natural intelligence. Digital evolution joined the two interests.
+% SOURCE: Images from the user-provided 2026 ALife.pptx.
+
+---
+### Evolution is a powerful, creative algorithm
+
+@(0.53,0.55) {w=0.58, anchor=center} ![Tree of life](assets/tree-of-life.jpg)
+@(0.07,0.38) {size=23px, color=#55E6C1, w=0.17} One process. Uncountable forms, strategies, and behaviors.
+
+% SPEAKER: Stress the generative power of biology. Evolution does not merely tune one solution; it continually discovers different ways of being viable.
+% SOURCE: Tree-of-life collage from the user-provided 2026 ALife.pptx.
+
+---
+# The question is not whether complexity can evolve
+## It is: what makes complex, interesting outcomes likely?
+
+@(0.50,0.72) {size=24px, color=#FFB36A, anchor=center} The environment is part of the algorithm.
+
+% SPEAKER: This is the thesis. Selection can only work with the pathways, interactions, and units of individuality that the environment makes available.
+
+!---
+@(0.50,0.50) {w=0.75, anchor=center} ![Evolution is hard to study](assets/optional-evolution-hard-1.png)
+@(0.05,0.05) {size=16px, color=#FFCB6B} OPTIONAL DETAIL · WHY DIGITAL EVOLUTION?
+
+% SPEAKER: Optional: living organisms reproduce slowly. Set up the methodological barriers without dwelling on them.
+% SOURCE: Source slide 4 from the user-provided 2026 ALife.pptx.
+
+!---
+@(0.50,0.50) {w=0.75, anchor=center} ![Challenges of biological evolution experiments](assets/optional-evolution-hard-2.png)
+@(0.05,0.05) {size=16px, color=#FFCB6B} OPTIONAL DETAIL · WHY DIGITAL EVOLUTION?
+
+% SPEAKER: Optional: fragility, confounds, multilevel interactions, and the burden of replication motivate artificial evolving systems.
+% SOURCE: Source slide 5 from the user-provided 2026 ALife.pptx.
+
+---
+@(0.08,0.20) {size=38px, color=#D8FAFF, w=0.82} “So far, we have been able to study only one evolving system, and we cannot wait for interstellar flight to provide us with a second.”
+
+...
+@(0.08,0.52) {size=38px, color=#55E6C1, w=0.82} “If we want to discover generalizations about evolving systems, we will have to look at artificial ones.”
+
+@(0.60,0.77) {size=24px, color=#F4F1E8} John Maynard Smith
+@(0.60,0.83) {size=19px, color=#9FB0C5} *Nature* 355: 772–773 (1992)
+
+% SPEAKER: Use this as the bridge from natural evolution to digital organisms.
+% SOURCE: John Maynard Smith, Nature 355: 772–773 (1992); quotation retained from the user-provided deck.
+
+---
+### Digital organisms make evolution visible
+
+@(0.07,0.21) {w=0.27} ![Digital organisms](assets/digital-organisms-red.jpg)
+@(0.37,0.21) {w=0.27} ![Diversifying digital organisms](assets/digital-organisms-mixed.jpg)
+@(0.67,0.21) {w=0.27} ![Digital organisms after selection](assets/digital-organisms-blue.jpg)
+
+@(0.11,0.69) {size=25px, color=#51C8F4} SELF-REPLICATION
+@(0.40,0.69) {size=25px, color=#FFB36A} MUTATION
+@(0.69,0.69) {size=25px, color=#55E6C1} SELECTION
+
+@(0.50,0.82) {size=23px, color=#F4F1E8, anchor=center} Thousands of generations · many replicates · every ancestor recorded
+
+% SPEAKER: Define the experimental object just enough for the rest of the talk. Programs copy, mutate, compete, and earn CPU cycles by performing logic functions.
+% SOURCE: Digital-organism images from the user-provided 2026 ALife.pptx.
+
+!---
+@(0.50,0.50) {w=0.75, anchor=center} ![Core War and Tierra history](assets/optional-digital-history.png)
+@(0.05,0.05) {size=16px, color=#FFCB6B} OPTIONAL DETAIL · A SHORT HISTORY
+
+% SPEAKER: Optional history: Core War inspired Tierra; mutations turned competitive programs into an open-ended evolving system; Avida made the system experimental.
+% SOURCE: Source slide 7 from the user-provided 2026 ALife.pptx.
+
+!---
+### Early digital evolution already produced ecological change
+
+@(0.07,0.22) {w=0.27} ![Early state](assets/digital-organisms-red.jpg)
+@(0.37,0.22) {w=0.27} ![Diversification](assets/digital-organisms-mixed.jpg)
+@(0.67,0.22) {w=0.27} ![Later state](assets/digital-organisms-blue.jpg)
+@(0.50,0.76) {size=26px, color=#9FB0C5, anchor=center} Variation spreads, competes, and reorganizes the population.
+
+% SPEAKER: Optional visual sequence standing in for the old slides 8–10.
+% SOURCE: Source slides 8–10 from the user-provided 2026 ALife.pptx.
+
+---
+@(0.08,0.13) {size=21px, color=#55E6C1} DESIGN LEVER 1
+@(0.08,0.25) {size=58px, color=#F4F1E8, w=0.80} Supply stepping stones—without prescribing the path
+@(0.08,0.56) {size=28px, color=#9FB0C5, w=0.76} Complex traits are easier to discover when simpler functions can accumulate as reusable building blocks.
+
+% SPEAKER: This is the first and most foundational result. Keep the language tied to virtual-creature design: reward useful capabilities that can be recombined.
+
+---
+### A complex target can be assembled from simpler functions
+
+@(0.08,0.23) {size=22px, color=#9FB0C5} SIMPLER FUNCTIONS
+@(0.08,0.32) {size=35px, color=#51C8F4} NOT · NAND · AND · OR
+@(0.08,0.43) {size=35px, color=#51C8F4} NOR · XOR · AND-NOT · OR-NOT
+
+{color=#38516C, thick=6} !arrow (0.47,0.49) (0.63,0.49)
+
+@(0.74,0.33) {size=23px, color=#9FB0C5, anchor=center} COMPLEX TARGET
+@(0.74,0.46) {size=92px, color=#FFB36A, anchor=center} EQU
+@(0.74,0.62) {size=23px, color=#F4F1E8, anchor=center} nearly 20 interacting instructions
+
+@(0.50,0.81) {size=24px, color=#55E6C1, anchor=center} Selection can retain pieces before the final trait exists.
+
+% SPEAKER: Explain EQU as a clearly measurable complex trait. The exact logic is less important than the architecture: intermediate capabilities can be immediately useful and later reused.
+% SOURCE: Complexity definition and EQU description summarized from Lenski et al. (2003) and the user-provided slides; see https://doi.org/10.1038/nature01568
+
+---
+### Rewarded stepping stones made the complex trait reachable
+
+@(0.07,0.23) {w=0.25} ![Reward-all population](assets/reward-all-grid.png)
+@(0.37,0.27) {size=24px, color=#55E6C1} REWARD ALL FUNCTIONS
+@(0.37,0.39) {size=58px, color=#F4F1E8} 67 / 200
+@(0.37,0.51) {size=24px, color=#9FB0C5} populations evolved EQU
+
+{color=#38516C, thick=3} !line (0.61,0.20) (0.61,0.73)
+
+@(0.69,0.24) {w=0.21} ![Control population](assets/control-grid.png)
+@(0.69,0.64) {size=22px, color=#FF667D} REWARD EQU ALONE
+@(0.69,0.72) {size=42px, color=#F4F1E8} 0 / 200
+
+@(0.50,0.86) {size=24px, color=#FFB36A, anchor=center} The final objective was not enough.
+
+% SPEAKER: Make the comparison quickly. Rewarding intermediate functions gave evolution a foothold; selecting only on the final target yielded no successes.
+% SOURCE: Results and images from the user-provided 2026 ALife.pptx; Lenski et al., Nature 423, 139–144 (2003), https://doi.org/10.1038/nature01568
+
+---
+### Evolution did not follow one privileged route
+
+@(0.08,0.25) {size=74px, color=#55E6C1} 67
+@(0.24,0.28) {size=29px, color=#F4F1E8} successful populations
+
+...
+@(0.08,0.45) {size=74px, color=#FFB36A} 59
+@(0.24,0.48) {size=29px, color=#F4F1E8, w=0.63} lost another function while acquiring EQU or just before
+
+...
+@(0.08,0.66) {size=31px, color=#51C8F4, w=0.82} Every critical mutation was unique. So was every solution.
+
+% SPEAKER: This is the part to connect to creature evolution. If many repertoires are viable, populations can approach the same functional challenge through different bodies, controllers, and tradeoffs.
+% SOURCE: Results from the user-provided 2026 ALife.pptx; Lenski et al. (2003), https://doi.org/10.1038/nature01568
+
+---
+### The lineage reveals how the outcome was built
+
+@(0.08,0.22) {w=0.40} ![Avida lineage](assets/lineage-example.png)
+@(0.64,0.24) {size=28px, color=#55E6C1} Population view
+@(0.64,0.32) {size=23px, color=#9FB0C5, w=0.29} shows branching, persistence, and the final dominant genotype
+
+...
+@(0.64,0.51) {size=28px, color=#FFB36A} Line-of-descent view
+@(0.64,0.59) {size=23px, color=#9FB0C5, w=0.29} identifies which mutations added, repurposed, or discarded traits
+
+@(0.64,0.78) {size=22px, color=#F4F1E8} Analyze ancestors—not only winners.
+
+% SPEAKER: This is a methodological takeaway for the workshop. Final phenotypes hide the sequence of enabling steps and tradeoffs; lineage analysis exposes mechanism.
+% SOURCE: Lineage image from the user-provided 2026 ALife.pptx.
+
+!---
+@(0.50,0.50) {w=0.75, anchor=center} ![Traits along a lineage](assets/optional-lineage-traits.png)
+@(0.05,0.05) {size=16px, color=#FFCB6B} OPTIONAL DETAIL · TRAITS ALONG THE LINE OF DESCENT
+
+% SPEAKER: Optional: point out the staggered acquisition of T1, T2, and T3 and how changes persist or disappear across generations.
+% SOURCE: Source slide 26 from the user-provided 2026 ALife.pptx.
+
+!---
+### Optional lineage detail: where functions live in the genome
+
+@(0.50,0.49) {w=0.68, anchor=center} ![Genome task map](assets/genome-task-map.png)
+@(0.50,0.85) {size=21px, color=#9FB0C5, anchor=center} Mutations can affect several functions at once—building blocks are reused and entangled.
+
+% SPEAKER: Optional: this is why gain and loss often coincide. A single instruction participates in multiple computations.
+% SOURCE: Genome analysis from the user-provided 2026 ALife.pptx.
+
+!---
+### Darwin anticipated reuse and multiple routes
+
+@(0.08,0.22) {w=0.22} ![Charles Darwin](assets/darwin-portrait.png)
+@(0.36,0.22) {size=29px, color=#D8FAFF, w=0.57} “Bear in mind the probability of conversion from one function to another.”
+@(0.36,0.48) {size=29px, color=#55E6C1, w=0.57} “Different kinds of modification would … serve for the same general purpose.”
+@(0.36,0.74) {size=20px, color=#9FB0C5} Charles Darwin, *On the Origin of Species* (1859)
+
+% SPEAKER: Optional historical framing. New functions often emerge by repurposing existing structures; different modifications can solve the same general problem.
+% SOURCE: Quotations and portrait retained from the user-provided 2026 ALife.pptx.
+
+---
+@(0.08,0.13) {size=21px, color=#FFB36A} DESIGN LEVER 2
+@(0.08,0.25) {size=59px, color=#F4F1E8, w=0.78} Make resources scarce enough to create niches
+@(0.08,0.58) {size=28px, color=#9FB0C5, w=0.74} When common strategies exhaust their own resources, rare alternatives become valuable.
+
+% SPEAKER: Transition from stepping stones to ecology. The same capabilities now interact through shared, limited resource pools.
+
+---
+### Common strategies make their own opportunity disappear
+
+@(0.07,0.24) {w=0.50} ![Limited resource supply](assets/resource-supply.png)
+
+@(0.66,0.25) {size=27px, color=#51C8F4} A task consumes its resource
+@(0.66,0.39) {size=27px, color=#FFB36A} Common tasks become less profitable
+@(0.66,0.53) {size=27px, color=#55E6C1} Rare tasks gain an advantage
+
+...
+@(0.66,0.72) {size=25px, color=#F4F1E8, w=0.28} Negative frequency dependence keeps alternatives in play.
+
+% SPEAKER: Explain the feedback, not the implementation details. A strategy's success reduces the benefit of repeating it and opens space for alternatives.
+% SOURCE: Resource-supply visualization from the user-provided 2026 ALife.pptx.
+
+---
+### Scarcity made the complex trait far more likely
+
+@(0.08,0.22) {w=0.18} ![Control](assets/control-grid.png)
+@(0.41,0.22) {w=0.18} ![Reward all](assets/reward-all-grid.png)
+@(0.74,0.22) {w=0.18} ![Limited resources](assets/limited-grid.png)
+
+@(0.17,0.58) {size=22px, color=#9FB0C5, anchor=center} CONTROL
+@(0.17,0.67) {size=46px, color=#FF667D, anchor=center} 0 / 200
+
+@(0.50,0.58) {size=22px, color=#9FB0C5, anchor=center} REWARD ALL
+@(0.50,0.67) {size=46px, color=#51C8F4, anchor=center} 67 / 200
+
+@(0.83,0.58) {size=22px, color=#9FB0C5, anchor=center} LIMITED RESOURCES
+@(0.83,0.67) {size=46px, color=#55E6C1, anchor=center} 167 / 200
+
+@(0.50,0.84) {size=25px, color=#F4F1E8, anchor=center} Diversity became an engine of discovery.
+
+% SPEAKER: Same target, same number of replicate populations. Limiting resource supply raised the number of EQU-evolving populations from 67 to 167.
+% SOURCE: Results and images from the user-provided 2026 ALife.pptx.
+
+---
+### Scarcity opened many sustained evolutionary paths
+
+@(0.08,0.22) {w=0.40} ![Resource-limited lineages](assets/resource-lineages.png)
+@(0.70,0.25) {size=28px, color=#55E6C1} More coexistence
+@(0.70,0.37) {size=28px, color=#51C8F4} More exploration
+@(0.70,0.49) {size=28px, color=#FFB36A} More chances to recombine building blocks
+
+@(0.70,0.68) {size=23px, color=#F4F1E8, w=0.25} The fastest route is often a portfolio of routes.
+
+% SPEAKER: The plot shows multiple long-lived lineages. Connect this to maintaining alternative morphologies or controllers in a creature population.
+% SOURCE: Lineage visualization from the user-provided 2026 ALife.pptx.
+
+---
+@(0.08,0.13) {size=21px, color=#51C8F4} DESIGN LEVER 3
+@(0.08,0.25) {size=58px, color=#F4F1E8, w=0.82} Let selection change what counts as an individual
+@(0.08,0.58) {size=28px, color=#9FB0C5, w=0.75} Major transitions unlock traits that no solitary organism can express.
+
+% SPEAKER: This lever is structurally different. Instead of only changing which trait wins, evolution changes the unit that reproduces and competes.
+
+---
+### Major transitions create new design spaces
+
+@(0.50,0.51) {w=0.72, anchor=center} ![Major transitions in individuality](assets/major-transitions-map.png)
+@(0.50,0.88) {size=20px, color=#9FB0C5, anchor=center} groups · division of labor · coordination · development · ecological complexification
+
+% SPEAKER: Walk only the main loop: independent individuals → groups → specialist groups → coordinated developmental patterns. Each transition changes what traits can evolve next.
+% SOURCE: Major-transitions diagram from the user-provided 2026 ALife.pptx.
+
+---
+### Group reproduction reorganized the world
+
+@(0.10,0.25) {w=0.31} ![Single-celled digital organisms](assets/single-cell-organisms.png)
+@(0.59,0.25) {w=0.31} ![Multicellular digital organisms](assets/multicellular-organisms.png)
+
+@(0.26,0.20) {size=22px, color=#9FB0C5, anchor=center} independent cells
+@(0.74,0.20) {size=22px, color=#55E6C1, anchor=center} heritable collectives
+
+@(0.50,0.89) {size=22px, color=#F4F1E8, anchor=center} New individuality enables coordination, development, and division of labor.
+
+% SPEAKER: The visual contrast carries the slide. Once collectives reproduce as collectives, selection can shape organization within them.
+% SOURCE: Images from the user-provided 2026 ALife.pptx; multicellular image credit in the source deck: Matthew Moreno.
+
+---
+### To evolve collective behavior, make the collective consequential
+
+@(0.09,0.31) {size=24px, color=#55E6C1} 1 · HERITABLE GROUPS
+@(0.47,0.31) {size=23px, color=#F4F1E8} offspring inherit group organization
+
+@(0.09,0.47) {size=24px, color=#51C8F4} 2 · GROUP-LEVEL SUCCESS
+@(0.47,0.47) {size=23px, color=#F4F1E8} collectives differ in survival or reproduction
+
+@(0.09,0.63) {size=24px, color=#FFB36A} 3 · INTERNAL SPECIALIZATION
+@(0.47,0.63) {size=23px, color=#F4F1E8} members can trade autonomy for division of labor
+
+...
+@(0.50,0.82) {size=29px, color=#D8FAFF, anchor=center} Change the unit of selection; change the reachable traits.
+
+% SPEAKER: Phrase these as design conditions, not a taxonomy lecture. A group must persist, vary, and matter to reproduction before complex coordination can accumulate.
+
+---
+@(0.08,0.13) {size=21px, color=#FF667D} DESIGN LEVER 4
+@(0.08,0.25) {size=58px, color=#F4F1E8, w=0.80} Add opponents that keep changing—and remember
+@(0.08,0.58) {size=28px, color=#9FB0C5, w=0.75} Antagonistic coevolution turns yesterday’s solution into today’s vulnerability.
+
+% SPEAKER: Introduce the Red Queen idea, but preview the surprising mechanism: diversity in the parasite population stores a memory of previous hosts.
+
+---
+### Parasites steal the CPU cycles hosts earn
+
+@(0.06,0.19) {w=0.32} ![Host-parasite Avida system](assets/coevolution-system.png)
+
+@(0.52,0.22) {size=25px, color=#51C8F4} Hosts perform logic functions to obtain resources
+@(0.52,0.38) {size=25px, color=#FF667D} Parasites infect hosts that share a function
+@(0.52,0.54) {size=25px, color=#FFB36A} Infection transfers 80% of host CPU cycles
+
+...
+@(0.52,0.72) {size=27px, color=#55E6C1, w=0.40} Escape requires a different phenotype—not merely a better score.
+
+% SPEAKER: Keep this setup concrete. Matching functions create infection; successful parasites take CPU time. Hosts can escape by changing which function they use.
+% SOURCE: Zaman et al. (2014), Figure 1, PLOS Biology 12(12): e1002023, https://doi.org/10.1371/journal.pbio.1002023 (CC BY).
+
+---
+### Parasites drove host complexity higher and faster
+
+@(0.06,0.19) {w=0.61} ![Parasites promote host complexity](assets/parasites-complexity.png)
+
+@(0.72,0.24) {size=24px, color=#FF667D} COEVOLVING PARASITES
+@(0.72,0.34) {size=48px, color=#F4F1E8} 17 / 50
+@(0.72,0.44) {size=21px, color=#9FB0C5} evolved EQU
+
+@(0.72,0.57) {size=24px, color=#51C8F4} NO PARASITES
+@(0.72,0.67) {size=48px, color=#F4F1E8} 0 / 50
+
+@(0.72,0.80) {size=19px, color=#9FB0C5} curing parasites reduced complexity
+
+% SPEAKER: Red = coevolution; blue = no parasites; green = parasites experimentally removed halfway through. The push came from ongoing interaction.
+% SOURCE: Zaman et al. (2014), Figure 2 and results, https://doi.org/10.1371/journal.pbio.1002023 (CC BY).
+
+---
+### Parasite diversity created a memory of past hosts
+
+@(0.06,0.21) {w=0.58} ![Adaptive landscape shaped by parasite memory](assets/parasite-memory-landscape.png)
+
+@(0.68,0.23) {size=28px, color=#FF667D} Parasites broadened their host range
+@(0.68,0.39) {size=28px, color=#FFB36A} old host strategies stayed vulnerable
+@(0.68,0.55) {size=28px, color=#55E6C1} the fitness peak shifted toward novelty
+
+...
+@(0.68,0.73) {size=24px, color=#F4F1E8, w=0.27} Negative frequency dependence became directional exploration.
+
+% SPEAKER: This is more than a two-state arms race. Diverse parasites collectively retain previously successful host targets, so hosts must explore previously unused—and typically more complex—functions.
+% SOURCE: Zaman et al. (2014), Figure 4 and “Parasites Retain Memory of Previous Hosts,” https://doi.org/10.1371/journal.pbio.1002023 (CC BY).
+
+---
+### Coevolution selected for the ability to keep evolving
+
+@(0.08,0.30) {size=36px, color=#F4F1E8, w=0.82} Hosts evolved genomes in which resistance-conferring mutations arose at high rates.
+
+...
+@(0.08,0.56) {size=38px, color=#55E6C1, w=0.82} Selection favored evolvability—not only the current solution.
+
+@(0.08,0.80) {size=23px, color=#9FB0C5, w=0.79} A changing opponent rewards genotypes that can generate useful variation on demand.
+
+% SPEAKER: This is the payoff beyond complexity. Coevolution changed the genotype–phenotype map so resistant phenotypes were easier to generate.
+% SOURCE: Zaman et al. (2014), abstract and “Coevolution Promotes Evolvability,” https://doi.org/10.1371/journal.pbio.1002023
+
+!---
+### Optional example: evolved virtual navigation
+
+@(0.08,0.21) {w=0.42} ![Evolved navigation trails](assets/navigation-trails.png)
+@(0.70,0.25) {size=28px, color=#55E6C1} Behavior can be the phenotype
+@(0.70,0.42) {size=25px, color=#9FB0C5, w=0.25} foraging trails · obstacle avoidance · spatial strategies
+@(0.70,0.67) {size=23px, color=#F4F1E8, w=0.25} The same evolutionary levers apply to controllers and bodies.
+
+% SPEAKER: Optional bridge to workshop examples. The point is not the specific path; it is that rich environmental feedback can shape behavior.
+% SOURCE: Navigation visualization from the user-provided 2026 ALife.pptx.
+
+!---
+### Virtual navigation code controlled real robots
+
+@(0.07,0.17) {w=0.70} ![Robots following evolved navigation](assets/robot-navigation.png)
+@(0.81,0.25) {size=25px, color=#55E6C1, anchor=center} SIMULATION
+@(0.81,0.36) {size=34px, color=#F4F1E8, anchor=center} →
+@(0.81,0.46) {size=25px, color=#FFB36A, anchor=center} EMBODIMENT
+@(0.81,0.65) {size=20px, color=#9FB0C5, anchor=center, w=0.18} evolved control can transfer into the physical world
+
+% SPEAKER: Optional example only; avoid letting it become a separate story.
+% SOURCE: Robot photograph from the user-provided 2026 ALife.pptx.
+
+!---
+### Optional analysis: digital evolution records the full phylogeny
+
+@(0.50,0.46) {w=0.84, anchor=center} ![Avida phylogeny](assets/avida-phylogeny.png)
+@(0.50,0.84) {size=22px, color=#9FB0C5, anchor=center} every branch · every genome · every spatial lineage
+
+% SPEAKER: Optional: unlike most biological phylogenies, this is not reconstructed from sparse samples. It is the known history.
+% SOURCE: Phylogeny image from the user-provided 2026 ALife.pptx; image credit in source: Emily Dolson.
+
+---
+### Four levers that make interesting complexity more likely
+
+@(0.08,0.29) {size=24px, color=#55E6C1} 1 · STEPPING STONES
+@(0.35,0.29) {size=24px, color=#F4F1E8} reward reusable capabilities; preserve many routes
+
+@(0.08,0.43) {size=24px, color=#FFB36A} 2 · SCARCE RESOURCES
+@(0.35,0.43) {size=24px, color=#F4F1E8} make common strategies create opportunities for rare ones
+
+@(0.08,0.57) {size=24px, color=#51C8F4} 3 · NEW INDIVIDUALS
+@(0.35,0.57) {size=24px, color=#F4F1E8} let heritable collectives reproduce and specialize
+
+@(0.08,0.71) {size=24px, color=#FF667D} 4 · CHANGING OPPONENTS
+@(0.35,0.71) {size=24px, color=#F4F1E8} couple success to a diverse, responsive antagonist
+
+@(0.50,0.86) {size=21px, color=#9FB0C5, anchor=center} In every case: inspect the lineage, not only the champion.
+
+% SPEAKER: This is the synthesis slide to linger on. Each lever changes the topology of what evolution can discover.
+
+---
+# Design the conditions,
+## not the creature.
+
+@(0.50,0.68) {size=22px, color=#55E6C1, anchor=center} Complexity emerges from accessible paths and persistent diversity.
+@(0.50,0.76) {size=22px, color=#55E6C1, anchor=center} New levels of selection—and worlds that keep changing.
+
+% SPEAKER: Resolve the opening question. We do not need to specify the interesting creature; we need to construct evolutionary conditions that make discovery cumulative and open-ended.
+
+---
+### What will your virtual creatures discover?
+
+@(0.08,0.26) {size=29px, color=#F4F1E8} Which stepping stones can they reuse?
+@(0.08,0.39) {size=29px, color=#F4F1E8} Which alternatives can coexist?
+@(0.08,0.52) {size=29px, color=#F4F1E8} Can groups become individuals?
+@(0.08,0.65) {size=29px, color=#F4F1E8} What keeps the world from standing still?
+
+@(0.76,0.29) {size=26px, color=#55E6C1} Charles Ofria
+@(0.76,0.39) {size=21px, color=#9FB0C5} ofria.com
+@(0.76,0.47) {size=21px, color=#9FB0C5} ofria@msu.edu
+
+% SPEAKER: Leave this up for questions. Use a question as the close rather than a generic thank-you.
+
+!---
+@(0.50,0.50) {w=0.75, anchor=center} ![Acknowledgements](assets/acknowledgements.png)
+@(0.05,0.05) {size=16px, color=#FFCB6B} OPTIONAL DETAIL · ACKNOWLEDGEMENTS
+
+% SPEAKER: Optional acknowledgements slide. Mention Luis Zaman for the parasite work and Matthew Moreno for the multicellularity example if those sections are emphasized.
+% SOURCE: Source slide 41 from the user-provided 2026 ALife.pptx.
