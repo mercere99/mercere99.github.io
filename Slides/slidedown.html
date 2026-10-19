@@ -270,10 +270,14 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 .present.phone-ui.phone-portrait .pnav-back{grid-column:1;justify-self:end;margin-right:10px}
 .present.phone-ui.phone-portrait .pnav-forward{grid-column:2;justify-self:start;margin-left:10px}
 .hud{position:absolute;right:18px;bottom:14px;display:flex;align-items:center;gap:12px;background:rgba(17,21,28,.82);border:1px solid var(--line);border-radius:20px;padding:6px 14px;z-index:5;transition:opacity .3s}
-.hud .count{font-family:var(--mono);font-size:12.5px;color:var(--chrome-text)}
-.hud .dots{display:flex;gap:5px}
-.hud .dot{width:7px;height:7px;border-radius:50%;background:#3a4556}
-.hud .dot.done{background:var(--amber)}
+.hud .count{font-family:var(--mono);font-size:12.5px;color:var(--chrome-text);padding:0;border:0;background:transparent;cursor:pointer}
+.hud .count:hover{color:var(--amber)}
+.hud .dots{display:flex;gap:0}
+.hud .dot{display:grid;place-items:center;width:12px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer}
+.hud .dot::before{content:"";width:7px;height:7px;border-radius:50%;background:#3a4556}
+.hud .dot.done::before{background:var(--amber)}
+.hud .dot:hover::before{box-shadow:0 0 0 2px var(--amber-dim)}
+.hud .count:focus-visible,.hud .dot:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .hudbtn{width:26px;height:26px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--panel2);color:var(--chrome-text);font-size:14px;line-height:1;cursor:pointer}
 .hudbtn:hover{border-color:var(--amber-dim);color:#fff}
 .hudbtn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
@@ -465,7 +469,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
   </div>
   <div class="blackout" id="blackout"></div>
   <div class="overview" id="overview"><h4>Slides — click to jump</h4><div id="overviewList"></div></div>
-  <div class="hud" id="hud"><span class="count" id="hudCount"></span><span class="dots" id="hudDots"></span><button class="hudbtn" id="hudFs" title="Fullscreen (f)">⛶</button></div>
+  <div class="hud" id="hud"><button class="count" id="hudCount" type="button" title="Slide overview (v)" aria-label="Toggle slide overview"></button><span class="dots" id="hudDots"></span><button class="hudbtn" id="hudFs" title="Fullscreen (f)">⛶</button></div>
 </div>
 
 <div class="pconsole" id="pconsole"></div>
@@ -507,7 +511,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>---</td><td>Start a new slide.</td></tr>
       <tr><td>!---</td><td>Start a <b>pocket</b> slide: rendered in the editor and reachable by direct navigation (overview, thumbnails, <code>?slide=N</code>), but skipped when advancing with space/n. It still <i>executes</i>, so <code>!set</code> and <code>\${…}</code> math there affect later slides. Built-in <code>slide_hidden</code> is 1 on these slides.</td></tr>
       <tr><td>!if expr … !else … !endif</td><td>Conditional lines (nestable). Truthy = non-zero number or non-empty string; combine with comparisons, e.g. <code>!if slide_num > 3</code> or <code>!if \${x*2} == 10</code>.</td></tr>
-      <tr><td>!import(theme.psl)</td><td>Splice a PSL template file in at this point — perfect for shared <code>!set</code>/<code>!all</code> house styles. Fetched relative to the page (CORS applies); imports may nest but cannot add slides.</td></tr>
+      <tr><td>!import(theme.psl)</td><td>Splice a PSL template into this slide. Use <code>!import("shared files/theme.psl")</code> for spaces. Imports resolve relative to the declaring file; imported images/media/backgrounds use the template folder. Imports may nest but cannot add slides; cycles warn. Template palette declarations join the document palette. Browser imports require reachable URLs (CORS applies); the VS Code extension reads local files.</td></tr>
       <tr><td>[shown text](https://…)<br>[](https://…)</td><td>Inline link, opens in a new tab. Leave the shown text blank to display the URL. Balanced parentheses are allowed inside the URL.</td></tr>
       <tr><td>first line{{br}}second line</td><td>Force a line break without starting a new text item or bullet. Other safe inline controls: <code>{{wbr}}</code>, <code>{{nbsp}}</code>, and <code>{{sub|text}}</code>, <code>{{sup|text}}</code>, <code>{{mark|text}}</code>, <code>{{u|text}}</code>, <code>{{s|text}}</code>, <code>{{small|text}}</code>, <code>{{nobr|text}}</code>.</td></tr>
       <tr><td>{{color=#d33|red text}}<br>{{color=warning|named color}}</td><td>Color part of a line with any CSS color or a document-palette name. Use <b>Insert ▸ Text Color…</b> to apply a color to highlighted editor text.</td></tr>
@@ -639,7 +643,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
 const SW = 1280, SH = 720;
 const DEFAULT_DUR = 0.7;
 let documentBaseUrl=null, documentImportScope="";
+// Optional companion-host adapter (the portable browser app uses the default).
+let documentResourceResolver=null;
 function resolveDocumentUrl(raw){
+  if(documentResourceResolver) return documentResourceResolver(raw,documentBaseUrl);
   if(!documentBaseUrl) return raw;
   try{
     const url=new URL(raw,documentBaseUrl);
@@ -866,6 +873,18 @@ const mixColor=(A,B,t)=>`rgba(${Math.round(A.r+(B.r-A.r)*t)},${Math.round(A.g+(B
    can map caret position -> slide with identical logic. */
 // A fence may open after position/label/style prefixes, e.g.  {w=0.5} ```cpp
 const FENCE_OPEN=/^(?:@\([^)]*\)\s*|\[(?:[A-Za-z_][\w-]*)?(?::[A-Za-z_][\w-]*(?:\s*,\s*[A-Za-z_][\w-]*)*)?\]\s*|\{[^}]*\}\s*)*```/;
+// Shared by browser storage and companion hosts.
+function explicitDocumentBase(text){
+  let fence=false;
+  for(const line of text.split("\n")){
+    const t=line.trim(); if(fence){if(t.startsWith("```"))fence=false;continue;}
+    if(FENCE_OPEN.test(t)){fence=true;continue;}
+    const m=/^!set\s+baseurl\s+(https?:\/\/\S+)\s*$/i.exec(t);
+    if(m)return m[1];
+  }
+  return null;
+}
+
 function splitSlides(text){
   const lines=text.replace(/\r\n?/g,"\n").split("\n");
   const slabs=[]; let buf=[], slabStart=0, off=0, inFence=false, hidden=false;
@@ -936,17 +955,21 @@ function styleLen(v, span, vars){
    Imports may not add slides (a --- inside is dropped with a warning) so the
    editor's caret->slide mapping stays exact. */
 const PSL_IMPORTS={cache:new Map(), onUpdate:null, fetcher:null};
-const RE_IMPORT=/^!import\s*\(?\s*([^)\s]+)\s*\)?\s*$/i;
-function expandImports(bodyText, warnings, slideIndex, depth, base=documentBaseUrl){
-  if(depth>4){ warnings.push(`slide ${slideIndex+1}: !import nesting too deep`); return bodyText; }
-  const out=[]; let inF=false;
+const RE_IMPORT=/^!import\s*(?:\(\s*(.+?)\s*\)|([^\s]+))\s*$/i;
+function expandImports(bodyText, warnings, slideIndex, depth, base=documentBaseUrl, bases=[], ancestors=[], locations=null, initialLocations=null){
+  if(depth>4){ warnings.push(`slide ${slideIndex+1}: !import nesting too deep`); return ""; }
+  const out=[]; let inF=false, lineIndex=-1;
+  const push=(line,origin=base,location=initialLocations?.[lineIndex]||{uri:base,line:lineIndex})=>{ out.push(line); bases.push(origin); if(locations)locations.push(location); };
   for(const L of bodyText.split("\n")){
+    lineIndex++;
     const t=L.trim();
-    if(inF){ out.push(L); if(t.startsWith("```")) inF=false; continue; }
-    if(FENCE_OPEN.test(t)){ inF=true; out.push(L); continue; }
+    if(inF){ push(L); if(t.startsWith("```")) inF=false; continue; }
+    if(FENCE_OPEN.test(t)){ inF=true; push(L); continue; }
     const m=t.match(RE_IMPORT);
-    if(!m){ out.push(L); continue; }
-    let url=m[1]; try{if(base) url=new URL(url,base).href;}catch(_){}
+    if(!m){ push(L); continue; }
+    let url=(m[1]||m[2]).replace(/^(["'])(.*)\1$/,"$2");
+    try{if(base) url=new URL(url,base).href;}catch(_){}
+    if(ancestors.includes(url)||url===base){ warnings.push(`slide ${slideIndex+1}: !import cycle at ${url}`); continue; }
     const cacheKey=url.startsWith("dropbox:")?url+"|"+documentImportScope:url;
     const entry=PSL_IMPORTS.cache.get(cacheKey);
     if(!entry){
@@ -958,18 +981,19 @@ function expandImports(bodyText, warnings, slideIndex, depth, base=documentBaseU
     }else if(entry.error){
       warnings.push(`slide ${slideIndex+1}: !import ${url} failed — ${entry.error}`);
     }else{
-      let txt=expandImports(entry.text, warnings, slideIndex, depth+1,url);
+      const importedBases=[], importedLocations=locations?[]:null;
+      const txt=expandImports(entry.text.replace(/\r\n?/g,"\n"), warnings, slideIndex, depth+1,url,importedBases,[...ancestors,url],importedLocations);
       let importedFence=false;
-      for(const IL of txt.split("\n")){
+      txt.split("\n").forEach((IL,i)=>{
         const t=IL.trim();
-        if(importedFence){ out.push(IL); if(t.startsWith("```")) importedFence=false; continue; }
+        if(importedFence){ push(IL,importedBases[i],importedLocations?.[i]); if(t.startsWith("```")) importedFence=false; return; }
         if(FENCE_OPEN.test(t)) importedFence=true;
         if(t==="---"||t==="!---"){
           warnings.push(`slide ${slideIndex+1}: !import cannot add slides — “---” in ${url} ignored`);
-          continue;
+          return;
         }
-        out.push(IL);
-      }
+        push(IL,importedBases[i],importedLocations?.[i]);
+      });
     }
   }
   return out.join("\n");
@@ -998,9 +1022,12 @@ function readDocumentPalette(text,warnings=[]){
   return entries;
 }
 
-function parseScript(text){
-  const warnings=[];
-  const vars={ __labels:Object.create(null), __styles:Object.create(null), __palette:readDocumentPalette(text,warnings),
+function parseScript(text,options={}){
+  const warnings=[], capture=!!options.sourceMap, paletteSourceMap=capture?[]:null;
+  const sourceUri=options.uri||documentBaseUrl;
+  // Palette declarations in templates participate in the same document-wide palette.
+  const paletteSource=/^\s*!import\b/im.test(text)?expandImports(text,[],0,0,documentBaseUrl,[],[],paletteSourceMap,capture?text.replace(/\r\n?/g,"\n").split("\n").map((_,line)=>({uri:sourceUri,line})):null):text;
+  const vars={ __labels:Object.create(null), __styles:Object.create(null), __palette:readDocumentPalette(paletteSource,warnings),
     slide_w:SW, slide_h:SH, aspect:SW/SH, pi:Math.PI, nbsp:"\u00A0" };
   // Hidden (!---) "pocket" slides ARE parsed and executed — their variable
   // math affects later slides — but presentation skips them when advancing.
@@ -1012,7 +1039,12 @@ function parseScript(text){
   // so ${slide_num} etc. evaluate with each slide's own values. The declaring
   // slide keeps its original body (the block simply runs in place there, in
   // written order, with accurate line numbers). One block per deck.
-  const allLines=[]; let allSlab=-1;
+  const allLines=[], allLocations=[]; let allSlab=-1;
+  const rootLineCache=new Map();
+  const rootLineAt=offset=>{
+    if(!rootLineCache.has(offset))rootLineCache.set(offset,text.replace(/\r\n?/g,"\n").slice(0,offset).split("\n").length-1);
+    return rootLineCache.get(offset);
+  };
   slabs.forEach((sl,si)=>{
     const lines=sl.body.split("\n"); let inF=false;
     for(let k=0;k<lines.length;k++){
@@ -1023,8 +1055,8 @@ function parseScript(text){
         if(allSlab<0){
           allSlab=si;
           const m=t.match(/^!all\b\s*(.*)$/i);
-          if(m[1]) allLines.push(m[1]);
-          for(let j=k+1;j<lines.length;j++) allLines.push(lines[j]);
+          if(m[1]){ allLines.push(m[1]); if(capture)allLocations.push({uri:sourceUri,line:rootLineAt(sl.start)+k}); }
+          for(let j=k+1;j<lines.length;j++){ allLines.push(lines[j]); if(capture)allLocations.push({uri:sourceUri,line:rootLineAt(sl.start)+j}); }
         }else{
           warnings.push(`slide ${si+1}: only one !all block per deck — extra !all ignored (its lines run on this slide only)`);
         }
@@ -1039,12 +1071,18 @@ function parseScript(text){
     vars.slide_hidden=sl.hidden?1:0;
     const prepend = allText && si!==allSlab;
     let body = prepend ? allText+"\n"+sl.body : sl.body;
-    if(/^\s*!import\b/im.test(body)) body=expandImports(body, warnings, si, 0);
-    const slide=parseSlide(body, si, warnings, vars, prepend?allLines.length:0);
+    const sourceBases=[], sourceMap=capture?[]:null;
+    const originalLocations=capture?[...(prepend?allLocations:[]),...sl.body.split("\n").map((_,line)=>({uri:sourceUri,line:rootLineAt(sl.start)+line}))]:null;
+    const imports=/^\s*!import\b/im.test(body);
+    if(imports) body=expandImports(body, warnings, si, 0, documentBaseUrl, sourceBases,[],sourceMap,originalLocations);
+    const slide=parseSlide(body, si, warnings, vars, prepend?allLines.length:0, sourceBases);
+    if(capture){Object.defineProperty(slide,"sourceMap",{value:imports?sourceMap:originalLocations});Object.defineProperty(slide,"sourceLineOffset",{value:prepend?allLines.length:0});}
     slide.hidden=!!sl.hidden;
     return slide;
   });
-  return {slides, settings:vars, warnings};
+  const result={slides, settings:vars, warnings};
+  if(capture)Object.defineProperty(result,"paletteSourceMap",{value:paletteSourceMap.length?paletteSourceMap:text.replace(/\r\n?/g,"\n").split("\n").map((_,line)=>({uri:sourceUri,line}))});
+  return result;
 }
 
 /* ---------- variables & expressions ----------
@@ -1252,19 +1290,20 @@ const PROPERTY_LENGTH=new RegExp(`^${NUM_PATTERN}(?:px|em)?$`,"i");
 function propertyApplies(spec,item){
   return spec.kinds==="all" || (spec.kinds==="text" ? TEXT_KINDS.includes(item.kind)||["rect","textbox","circle","ellipse","polygon"].includes(item.kind)||!!item.text : spec.kinds.includes(item.kind));
 }
+const PROPERTY_ENUMS={
+  align:["left","center","right","justify"], valign:["top","middle","bottom"],
+  anchor:["center","top-left"], rules:["all","rows","columns","none"],
+  boolean:["0","1","on","off","true","false"]
+};
 function propertyValueValid(spec,value,palette){
   const v=String(value).trim(), n=Number(v);
+  if(PROPERTY_ENUMS[spec.type]) return PROPERTY_ENUMS[spec.type].includes(v);
   switch(spec.type){
     case "opacity": return v!==""&&Number.isFinite(n)&&n>=0&&n<=1;
     case "number": return v!==""&&Number.isFinite(n);
     case "integer": return v!==""&&Number.isInteger(n);
     case "length": return PROPERTY_LENGTH.test(v)&&Number.isFinite(parseFloat(v))&&parseFloat(v)>=0;
     case "color": case "paint": return (spec.type==="paint"&&v==="none")||isCssColor(resolvePaletteColor(v,palette));
-    case "align": return ["left","center","right","justify"].includes(v);
-    case "valign": return ["top","middle","bottom"].includes(v);
-    case "anchor": return ["center","top-left"].includes(v);
-    case "rules": return ["all","rows","columns","none"].includes(v);
-    case "boolean": return value===true||["0","1","on","off","true","false"].includes(v);
     case "widths": return propertyList(v).every(x=>/^(?:auto|(?:\d+(?:\.\d+)?|\.\d+)(?:px|%)?)$/.test(x)&& (x==="auto"||Number.isFinite(parseFloat(x))&&parseFloat(x)>0));
     case "aligns": return propertyList(v).every(x=>["left","center","right","justify"].includes(x));
     default: return v.length>0;
@@ -1348,10 +1387,14 @@ function backgroundDef(value,palette){
   return isCssColor(resolvePaletteColor(value,palette))?{color:value}:{image:value};
 }
 
-function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
+function parseSlide(body, slideIndex, warnings, vars, lnOff=0, sourceBases=[]){
   const slide={items:[], steps:[[newPhase()]], bg:null, hasH1:false, hasH3:false};
   let step=0, phase=0, nextId=0;
-  let itemWhere="slide "+(slideIndex+1);
+  let itemWhere="slide "+(slideIndex+1), itemBase=documentBaseUrl;
+  const resourceAtSource=value=>{
+    if(!itemBase || itemBase===documentBaseUrl) return value;
+    try{ return new URL(value,itemBase).href; }catch(_){ return value; }
+  };
   let loopBudget=20000;                    // total foreach iterations per slide
   function cur(){ return slide.steps[step][phase]; }
   // Warning locations account for a prepended !all block.
@@ -1362,6 +1405,8 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
   // THIS point in the script), stamp the mode, register its label for
   // ${label.member} access, and reveal it in the current step/phase.
   function addItem(item){
+    if(item.src && item.kind!=="embed") item.src=resourceAtSource(item.src);
+    if(item.style.poster) item.style={...item.style,poster:resourceAtSource(item.style.poster)};
     validateItemProperties(item,warnings,itemWhere,vars.__palette);
     if(item.pos) item.pos={x:cvx(item.pos.x,vars), y:cvy(item.pos.y,vars)};
     item.abs=isAbs(vars);
@@ -1382,7 +1427,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     return {endIdx:-1, elseIdx};
   }
 
-  const srcLines=body.split("\n").map((text,i)=>({text, n:i+1}));
+  const srcLines=body.split("\n").map((text,i)=>({text, n:i+1, base:sourceBases[i]||documentBaseUrl}));
   processLines(srcLines);
   validateSlideAnimations(slide, warnings, slideIndex);
   // Effective transition for ENTERING this slide: a per-slide !transition line
@@ -1394,7 +1439,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
 
   function processLines(L){
   for(let k=0; k<L.length; k++){
-    const raw=L[k].text, lnNo=L[k].n; itemWhere=where(lnNo);
+    const raw=L[k].text, lnNo=L[k].n; itemWhere=where(lnNo); itemBase=L[k].base;
     if(!raw.trim()) continue;
     const indent=(raw.match(/^ */)[0].length);
     let line=raw.trim();
@@ -1533,6 +1578,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
       if(isReservedVariable(m[1])){ warnings.push(`${where(lnNo)}: reserved variable name “${m[1]}”`); continue; }
       const val=m[2].trim().replace(/^["']|["']$/g,"");
       vars[m[1]] = /^-?\d+(\.\d+)?$/.test(val) ? parseFloat(val) : val;
+      if(m[1]==="bg" && backgroundDef(val,vars.__palette)?.image) vars.bg=resourceAtSource(val);
       continue;
     }
 
@@ -1573,6 +1619,7 @@ function parseSlide(body, slideIndex, warnings, vars, lnOff=0){
     if((m=line.match(/^!bg\((.+)\)\s*$/i))){
       const v=m[1].trim(), prev=slide.bg;
       slide.bg = backgroundDef(v,vars.__palette);
+      if(slide.bg.image) slide.bg.image=resourceAtSource(slide.bg.image);
       if(style.dim!=null)       slide.bg.dim  = clamp(parseFloat(style.dim),0,1);
       else if(prev&&prev.dim!=null) slide.bg.dim = prev.dim;
       if(style.tint!=null)      slide.bg.tint = style.tint;
@@ -3771,8 +3818,13 @@ function updateHud(){
   hudDots.innerHTML="";
   if(player.stepCount>1)
     for(let s=0;s<player.stepCount;s++){
-      const d=document.createElement("span");
+      const d=document.createElement("button");
+      d.type="button";
       d.className="dot"+(s<=player.step?" done":"");
+      d.dataset.step=s;
+      d.title=`Jump to phase ${s+1}`;
+      d.setAttribute("aria-label",`Jump to phase ${s+1} of ${player.stepCount}`);
+      if(s===player.step) d.setAttribute("aria-current","step");
       hudDots.appendChild(d);
     }
   pnavBack.disabled=player.step<=0&&prevVisible(curSlide)<0;
@@ -4014,6 +4066,17 @@ $("#miPresent").addEventListener("click",()=>startPresent(selected,{fs:true,exac
 $("#miPresentBeginning").addEventListener("click",()=>startPresent(0,{fs:true}));
 $("#miPresent2").addEventListener("click",presentOnSecondScreen);
 $("#hudFs").addEventListener("click",toggleFullscreen);
+hudCount.addEventListener("click",toggleOverview);
+hudDots.addEventListener("click",e=>{
+  const dot=e.target.closest("button[data-step]");
+  if(!dot||!player) return;
+  const step=Number(dot.dataset.step), focused=document.activeElement===dot;
+  // Rebuild to undo later reveals and cancel any in-flight animation or delay.
+  gotoSlide(curSlide);
+  player.jumpToStep(step);
+  updateHud();
+  if(focused) hudDots.children[step]?.focus({preventScroll:true});
+});
 pnavBack.addEventListener("click",backStep);
 pnavForward.addEventListener("click",advance);
 $("#btnPresenterQ").addEventListener("click",openPresenterView);
@@ -4409,6 +4472,9 @@ const DEMO_IMG="data:image/svg+xml;utf8,"+encodeURIComponent(
 </svg>`);
 
 const SAMPLE=`% Use Wrap text above the editor to fit long source lines without changing the deck.
+% Local authoring: install the VS Code companion and run SlideDown: Open Preview.
+% Template example: !import("shared files/theme.psl") — assets use the template folder.
+% Palette definitions in imported templates are available throughout the deck.
 % ===== A tour of the Portable Slide Language (PSL) =====
 !set transition fade 0.35
 # SlideDown
@@ -5287,14 +5353,7 @@ function setDocumentBase(doc,text=doc?.text||""){
   const binding=doc?.resourceDropbox||doc?.dropbox;
   documentImportScope=[binding?.appKey,binding?.accountId].join("|");
   documentBaseUrl=doc?.sourceUrl||(binding?.path?"dropbox://"+binding.path:null);
-  // An explicit source base makes remotely loaded decks portable to Dropbox.
-  let fence=false;
-  for(const line of text.split("\n")){
-    const t=line.trim(); if(fence){if(t.startsWith("```"))fence=false;continue;}
-    if(FENCE_OPEN.test(t)){fence=true;continue;}
-    const m=/^!set\s+baseurl\s+(https?:\/\/\S+)\s*$/i.exec(t);
-    if(m){documentBaseUrl=m[1];break;}
-  }
+  documentBaseUrl=explicitDocumentBase(text)||documentBaseUrl;
 }
 async function readDropboxResource(url,binary){
   const binding=currentDoc?.resourceDropbox||currentDoc?.dropbox;
