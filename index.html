@@ -25,7 +25,7 @@
 <div class="tab">
   <button class="tablinks" onclick="openTab(event, 'About')" id="defaultOpen" >About</button>
   <button class="tablinks" onclick="openTab(event, 'Research')">Research Interests</button>
-  <button class="tablinks" onclick="openTab(event, 'Software')">Software Projects</button>
+  <button class="tablinks" onclick="openTab(event, 'Software')" id="softwareOpen">Software Projects</button>
   <button class="tablinks" onclick="openTab(event, 'Students')">Students</button>
   <button class="tablinks" onclick="openTab(event, 'Blog')">Blog Posts</button>
   <button class="tablinks" onclick="openTab(event, 'Links')">Other Links</button>
@@ -159,8 +159,9 @@
 
 <div id="Software" class="tabcontent">
   <h3>Software Projects</h3>
-  In addition to a broad range of reseach projects, the Digital Evolution Lab develops and maintains
-  a broad range of academic software.  These include:<br><br>
+  In addition to a broad range of research projects, the Digital Evolution Lab develops and maintains
+  a broad range of academic software. I also develop tools for teaching and presentations, along with
+  games and other experiments. These include:<br><br>
 
   <table>
   <tr><td align="center" bgcolor="white"><a href="https://github.com/devosoft/avida">
@@ -169,7 +170,8 @@
     Avida is a free, open source scientific software platform for conducting and analyzing
     experiments with self-replicating and evolving computer programs. It provides detailed control
     over experimental settings and protocols, a large array of measurement tools, and sophisticated
-    methods to analyze and post-process experimental data.</td>
+    methods to analyze and post-process experimental data.
+    <p class="project-links"><a href="Avida/">Run Avida in your browser</a></p></td>
   </tr>
 
   <tr><td align="center" bgcolor="white"><a href="https://github.com/devosoft/Empirical">
@@ -206,7 +208,28 @@
     to generate exams in a desired format.  Questions can be picked completely at random, or
     following guidelines provided in tags (e.g., to limit categories, ensure only one question of
     a given type, etc).  Questions can also have many possible answers that are carefully selected
-    based on configuration.</td>
+    based on configuration.
+    <p class="project-links"><a href="QBL/">Open the QBL web interface</a></p></td>
+  </tr>
+
+  <tr><td align="center" bgcolor="white"><a class="project-label" href="Slides/slidedown.html">SlideDown</a></td>
+  <td valign="top"><b><a href="Slides/slidedown.html">SlideDown.</a></b>
+    SlideDown is a presentation editor powered by the plain-text Portable Slide Language (PSL).
+    Write slides with a live preview, build diagrams and animations, and present your deck
+    directly in the browser.
+    <p class="project-links"><a href="Slides/slidedown.html">Open SlideDown</a></p>
+    <p class="project-links">Sample talks:<br>
+      <a href="Slides/slidedown.html?present=../Talks/AI/2026-FacultyRetreatAI.psl">AI: CS Curricula in the Age of AI</a><br>
+      <a href="Slides/slidedown.html?present=../Talks/ALife2026/2026_alife_virtual_creatures.psl">ALife 2026: Evolving Virtual Creatures</a>
+    </p></td>
+  </tr>
+
+  <tr><td align="center" bgcolor="white"><a class="project-label" href="Games/">Games</a></td>
+  <td valign="top"><b><a href="Games/">Games and Puzzles in Development.</a></b>
+    A collection of browser games and puzzles I'm working on, including the ring-merging puzzle Ring Charge,
+    the dungeon crawler Wizard Crisis, the cat physics puzzle Knock It Off, and logic puzzles
+    Sudoku, Kakuro, Slitherlink, and ShepherdLink.
+    <p class="project-links"><a href="Games/">Explore and play the games</a></p></td>
   </tr>
   </table>
 
@@ -243,8 +266,9 @@
   </div>
 
 <script>
-  // Open the "About" tab by default.
-  document.getElementById("defaultOpen").click();
+  // Let project subpages link back to the Software Projects tab.
+  const initialTab = window.location.hash === "#Software" ? "softwareOpen" : "defaultOpen";
+  document.getElementById(initialTab).click();
 </script>
 
 </html>
