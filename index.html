@@ -26,7 +26,7 @@
   <button class="tablinks" onclick="openTab(event, 'About')" id="defaultOpen" >About</button>
   <button class="tablinks" onclick="openTab(event, 'Research')">Research Interests</button>
   <button class="tablinks" onclick="openTab(event, 'Software')" id="softwareOpen">Software Projects</button>
-  <button class="tablinks" onclick="openTab(event, 'Students')">Students</button>
+  <button class="tablinks" onclick="openTab(event, 'Students')" id="studentsOpen">Students</button>
   <button class="tablinks" onclick="openTab(event, 'Blog')">Blog Posts</button>
   <button class="tablinks" onclick="openTab(event, 'Links')">Other Links</button>
 </div>
@@ -236,8 +236,71 @@
 </div>
 
 <div id="Students" class="tabcontent">
-  <h3>Students</h3>
-  <p>To Be Added</p>
+  <h2>Students and Postdocs</h2>
+
+  <section class="student-group" aria-labelledby="current-phd-students">
+    <h3 id="current-phd-students">Current PhD Students</h3>
+    <ul>
+      <li>Thaddeus Greiner</li>
+      <li>Jackson Kiino-Terburg</li>
+      <li>Karen Suzue</li>
+      <li>Katherine Skocelas</li>
+    </ul>
+  </section>
+
+  <section class="student-group" aria-labelledby="former-phd-students">
+    <h3 id="former-phd-students">Former PhD Students</h3>
+    <ul>
+      <li>Austin Fergusson</li>
+      <li>Jose Hernandez</li>
+      <li>Matthew Moreno</li>
+      <li>Anselmo Pontes</li>
+      <li>Alex Lalejini</li>
+      <li>Emily Dolson</li>
+      <li>Rosangela Canino-Koning</li>
+      <li>Anya Vostinar</li>
+      <li>Anuraag Pakanati</li>
+      <li>Luis Zaman</li>
+      <li>Bess Walker</li>
+      <li>David Bryson</li>
+      <li>Matthew Rupp</li>
+      <li>Heather Goldsby</li>
+      <li>Jeff Clune</li>
+      <li>Sherri Goings</li>
+      <li>Arthur Covert</li>
+      <li>Laura Grabowski</li>
+      <li>Gabriel Yedid</li>
+      <li>Dusan Misevic</li>
+      <li>Wei Huang</li>
+      <li>Dehua Hang</li>
+      <li>Elizabeth Ostrowski</li>
+    </ul>
+  </section>
+
+  <section class="student-group" aria-labelledby="masters-students">
+    <h3 id="masters-students">Master's Students</h3>
+    <ul>
+      <li>Steven Jorgensen</li>
+      <li>Michelle Vogel</li>
+      <li>Jason Stredwick</li>
+      <li>Jinghua Zhang</li>
+      <li>James Vanderhyde</li>
+    </ul>
+  </section>
+
+  <section class="student-group" aria-labelledby="postdocs">
+    <h3 id="postdocs">Postdocs</h3>
+    <ul>
+      <li>Heather Goldsby</li>
+      <li>Rosangela Canino-Koning</li>
+      <li>Michael Wiser</li>
+      <li>Joshua Nahum</li>
+      <li>Aaron Wagner</li>
+      <li>Jeffrey Barrick</li>
+      <li>Christopher Strelioff</li>
+      <li>Wesley Elsberry</li>
+    </ul>
+  </section>
 </div>
 
 <div id="Blog" class="tabcontent">
@@ -266,8 +329,9 @@
   </div>
 
 <script>
-  // Let project subpages link back to the Software Projects tab.
-  const initialTab = window.location.hash === "#Software" ? "softwareOpen" : "defaultOpen";
+  // Support direct links to the Software Projects and Students tabs.
+  const linkedTabs = { "#Software": "softwareOpen", "#Students": "studentsOpen" };
+  const initialTab = linkedTabs[window.location.hash] || "defaultOpen";
   document.getElementById(initialTab).click();
 </script>
 

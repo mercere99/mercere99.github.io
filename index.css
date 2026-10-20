@@ -189,6 +189,19 @@ footer {
     margin-top: 24px;
 }
 
+.student-group {
+    margin: 20px 0;
+}
+
+.student-group ul {
+    margin-top: 8px;
+    padding-left: 24px;
+}
+
+.student-group li {
+    margin-top: 4px;
+}
+
 @media only screen and (max-width: 600px) {
     .container {
         width: 100%;
