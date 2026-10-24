@@ -1,0 +1,265 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+
+!set palette neon_blue #40C0FF
+!set palette neon_pink #FF40C0
+!set palette neon_green #C0FF40
+!set palette warn red
+!set palette math yellow
+!set palette emp #80FF80
+
+!set palette id lightblue
+!set palette keyword #FF00FF
+!set palette quote green
+!set palette num tan
+!set palette bright #73FDFF
+!set palette bg #08111F
+
+# CSE450 Translation of Programming Languages
+## Lecture 4 : Symbol Tables
+---
+### Symbol Tables
+...
+- A **{{color=orange|symbol table}}** is a data structure that associates identifiers (names) with the user-defined data they refer to.
+...
+- Programming languages have many kinds of symbols:
+...
+    - {{color=id|Variables}}
+...
+    - {{color=id|Function names}}
+...
+    - {{color=id|Constants}}
+...
+    - {{color=id|Template names}}
+...
+- Other programs may have {{color=yellow|position labels}}, {{color=magenta|user-defined types}}, {{color=cyan|enumerations}}, etc.
+---
+[title] ### Symbol Table Example
+!style code {
+  font=Menlo, size=28px, w=1112px
+}
+!set start 215
+!set spacing 43
+...
+[l0] Consider the following pseudocode:
+...
+@(84, ${start}) [l1] {$code} String Duplicate(String input, Int num_copies):
+@(84, ${start+spacing}) [l2] {$code} &nbsp;&nbsp;String out
+@(84, ${start+spacing*2}) [l3] {$code} &nbsp;&nbsp;for (Int i in 0 to num_copies):
+@(84, ${start+spacing*3}) [l4] {$code} &nbsp;&nbsp;&nbsp;&nbsp;out += input
+@(84, ${start+spacing*4}) [l5] {$code} &nbsp;&nbsp;return out
+@(84, ${start+spacing*6}) [l6] {$code} main:
+@(84, ${start+spacing*7}) [l7] {$code} &nbsp;&nbsp;String hello = "hello"
+@(84, ${start+spacing*8}) [l8] {$code} &nbsp;&nbsp;print(Duplicate(hello))
+...
+!anim l1 text String Duplicate(String {{color=orange|input}}, Int num_copies):
+...
+!anim l4 text &nbsp;&nbsp;&nbsp;&nbsp;out += {{color=orange|input}}
+...
+!anim l1 text String Duplicate(String {{color=orange|input}}, Int {{color=math|num_copies}}):
+!anim l3 text &nbsp;&nbsp;for (Int i in 0 to {{color=math|num_copies}}):
+...
+!anim l2 text &nbsp;&nbsp;String {{color=emp|out}}
+!anim l4 text &nbsp;&nbsp;&nbsp;&nbsp;{{color=emp|out}} += {{color=orange|input}}
+!anim l5 text &nbsp;&nbsp;return {{color=emp|out}}
+...
+!anim l3 text &nbsp;&nbsp;for (Int {{color=warn|i}} in 0 to {{color=math|num_copies}}):
+...
+!anim l7 text &nbsp;&nbsp;String {{color=bright|hello}} = "hello"
+!anim l8 text &nbsp;&nbsp;print(Duplicate({{color=bright|hello}}))
+...
+!anim l1 text String {{color=pink|Duplicate}}(String {{color=orange|input}}, Int {{color=math|num_copies}}):
+!anim l8 text &nbsp;&nbsp;print({{color=pink|Duplicate}}({{color=bright|hello}}))
+...
+% ==== Shrink program and move to top! ====
+
+!set start 50
+!set spacing 35
+
+!anim title exit fade 0.7s
+!anim l0 exit fade 0.7s
+
+!foreach i 1 8
+!anim l${i} move (0,${start+(i-1)*spacing}) 2s
+!anim l${i} scale 0.8 2s
+!endfor
+>>>
+!foreach i 1 8
+@(65,${15+i*35.2}) {{color=num|${i}}}:
+!endfor
+
+
+...
+[table1] @(80, 356) {font=Menlo, w=250, size=28px, pad=6px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233} | Name |
+|:---:|
+| {{color=pink|Duplicate}} |
+| {{color=orange|input}} |
+| {{color=math|num_copies}} |
+| {{color=emp|out}} |
+| {{color=warn|i}} |
+| {{color=cyan|hello}} |
+
+...
+[table2] @(330, 356) {w=300, size=28px, pad=6px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233} | Type |
+|:---:|
+| String(String, Int) |
+| String |
+| Int |
+| String |
+| Int |
+| String |
+
+...
+[table3] @(630, 356) {w=350, size=28px, pad=6px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233} | Scope |
+|:---:|
+| Global |
+| Duplicate:parameter |
+| Duplicate:parameter |
+| Duplicate:body |
+| For-loop-1 |
+| main body |
+
+...
+[table4] @(980, 356) {w=200, size=28px, pad=6px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233} | Line Number |
+|:---:|
+| 1 |
+| 1 |
+| 1 |
+| 2 |
+| 3 |
+| 8 |
+
+...
+[:circ] {color=red, thick=4} !ellipse (470,74) (50,35)
+[:circ] {color=red, thick=4} !ellipse (295,176) (50,35)
+[:circ] {color=red, thick=4} !ellipse (203,480) (60,35)
+...
+!anim @circ exit fade 0.7
+!anim l1 text String {{color=pink|Duplicate}}(String {{color=orange|str}}, Int {{color=math|num_copies}}):
+!anim l4 text &nbsp;&nbsp;&nbsp;&nbsp;{{color=emp|out}} += {{color=orange|str}}
+
+!anim table1 exit fade
+[table1b] @(80, 356) {font=Menlo, w=250, size=28px, pad=6px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233} | Name |
+|:---:|
+| {{color=pink|Duplicate}} |
+| {{color=orange|str}} |
+| {{color=math|num_copies}} |
+| {{color=emp|out}} |
+| {{color=warn|i}} |
+| {{color=cyan|hello}} |
+
+...
+[:circ] {color=red, thick=4} !ellipse (265,278) (50,35)
+[:circ] {color=red, thick=4} !ellipse (385,315) (50,35)
+[:circ] {color=red, thick=4} !ellipse (203,677) (60,35)
+
+...
+!anim @circ exit fade 0.7
+
+!anim l7 text &nbsp;&nbsp;String {{color=bright|str}} = "hello"
+!anim l8 text &nbsp;&nbsp;print({{color=pink|Duplicate}}({{color=bright|str}}))
+!anim table1b exit fade
+[table1c] @(80, 356) {font=Menlo, w=250, size=28px, pad=6px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233} | Name |
+|:---:|
+| {{color=pink|Duplicate}} |
+| {{color=orange|**str**}} |
+| {{color=math|num_copies}} |
+| {{color=emp|out}} |
+| {{color=warn|i}} |
+| {{color=cyan|**str**}} |
+
+---
+### Goals of a Symbol Table
+...
+{{color=math|Fast lookup}}
+- If a lookup takes $O(n)$ time, compilation time becomes $O(n^2)$.
+...
+{{color=math|Mimics the structure of your programs}}
+- If a variable is declared in a particular scope, that variable should{{br}}go away when you exit the scope.
+...
+{{color=math|Detailed Information about the symbols}}
+- When you look up a symbol, it should give you all information you {{br}}might need about that symbol.
+
+...
+{size=60, rotate=30, color=#40C0FF} @(950,180) **Map?**
+...
+{size=60, rotate=30, color=#FF40C0} @(950,320) **Stack?**
+...
+{size=60, rotate=30, color=#C0FF40} @(950,500) **Structure?**
+---
+!style code {
+  font=Menlo, size=28px, w=1112px
+}
+
+{$code} struct {{color=yellow|SymbolInfo}} {
+{$code} &nbsp; {{color=num|std::string}} {{color=emp|name}};
+{$code} &nbsp; {{color=num|value_type}} {{color=emp|value}};
+{$code} &nbsp; {{color=num|size_t}} {{color=emp|line_num}};
+{$code} &nbsp; …
+{$code} };
+...
+{size=180} @(460,85) }
+{size=60} @(560,120) Info about indiviudals identifiers goes here!
+&nbsp;
+
+...
+{$code} class SymbolTable {
+...
+{$code} &nbsp; using {{color=orange|var_map_t}} = {{color=#ff80ff|std::unordered_map}}<{{color=num|std::string}}, {{color=yellow|SymbolInfo}}>;
+...
+{size=50, color=lightblue} @(760,340) Map of names to ID info (ONE scope)
+{color=lightblue, thick=4} !arrow (600,500) (740,420)
+...
+{$code} &nbsp; {{color=cyan|std::vector}}<{{color=orange|var_map_t}}> {{color=emp|var_maps}};
+{$code} };
+...
+{size=50, color=lightblue} @(720,600) Stack of scopes!
+{color=lightblue, thick=4} !arrow (300,600) (710,630)
+
+---
+### Symbol Table Entries
+What information do we need in a symbol table entry for a **variable**?
+...
+[p1a] - {{color=emp|Name}}
+...
+[p1b] - {{color=emp|Current Value}} (if we are interpreting the code)
+...
+[p2a] - {{color=emp|Line Number}} (for reporting errors)
+...
+[p2b] - {{color=emp|Scope}} (so we know when to deactivate it)
+...
+[p3a] - {{color=emp|Type}} (so we know where it can be used)
+...
+[p4a] - {{color=emp|Memory Size}} (How much memory to allocate)
+...
+[p4b] - {{color=emp|Memory Position}} (for compiling to assembly)
+...
+[p5a] - {{color=emp|Initialized?}} (for compile-time error checking)
+...
+{size=90px, color=cyan} @(750,200) }
+{size=60px, color=cyan} @(800,225) Project 1
+!anim p1a text {{color=cyan|Name}}
+!anim p1b text {{color=cyan|Current Value}} (if we are interpreting the code)
+...
+{size=90px, color=orange} @(750,320) }
+{size=60px, color=orange} @(800,345) Project 2
+!anim p2a text {{color=orange|Line Number}} (for reporting errors)
+!anim p2b text {{color=orange|Scope}} (so we know when to deactivate it)
+...
+{size=50px, color=magenta} @(750,430) **}**
+{size=60px, color=magenta} @(800,426) Project 3
+!anim p3a text {{color=magenta|Type}} (so we know where it can be used)
+...
+{size=90px, color=#00A000} @(750,490) }
+{size=60px, color=#00A000} @(800,515) Project 4
+!anim p4a text {{color=#00A000|Memory Size}} (How much memory to allocate)
+!anim p4b text {{color=#00A000|Memory Position}} (for compiling to assembly)
+...
+{size=50px, color=yellow} @(750,600) **}**
+{size=60px, color=yellow} @(800,596) Project 5
+!anim p5a text {{color=yellow|Initialized?}} (for compile-time error checking)

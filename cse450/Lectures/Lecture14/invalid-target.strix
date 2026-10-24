@@ -1,0 +1,5 @@
+// INVALID: a sum cannot be an assignment target.
+function Bad(double a, double b) : double {
+  (a + b) = 7;
+  return a;
+}

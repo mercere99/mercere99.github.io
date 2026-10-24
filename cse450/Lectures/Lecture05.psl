@@ -1,0 +1,958 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+
+!set palette neon_blue #40C0FF
+!set palette neon_pink #FF40C0
+!set palette neon_green #C0FF40
+!set palette warn red
+!set palette math yellow
+!set palette emp #80FF80
+
+!set palette id lightblue
+!set palette keyword #FF00FF
+!set palette quote green
+!set palette num tan
+!set palette bright #73FDFF
+!set palette bg #08111F
+
+% Adapted from Lecture-05 - Parsing.pptx. Repeated animation frames are combined.
+% ... pauses for a click; >>> sequences changes within the same click.
+
+# CSE450 Translation of Programming Languages
+## Lecture 5 : Syntax Analysis
+---
+{textcolor=white, w=260, size=44} @(99, 61) Structure of a Compiler
+[source] {thick=1, fill=#bf1e4cbf, textcolor=black, size=32} !rect (448, 32) (384, 60) **Source Language**
+[target] {thick=1, fill=#00bf42bf, textcolor=black, size=32} !rect (448, 627) (384, 60) **Target Language**
+{thick=0, fill=#e07000bf, textcolor=black, size=32} !rect (448, 393) (384, 60) **Intermediate Code**
+[front] {color=#0097eb80, thick=5, fill=#0097eb59, round=40} !rect (450, 110) (379, 264)
+[lex] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 120) (340, 55) **Lexical Analyzer**
+[parse] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 183) (340, 55) **Syntax Analyzer**
+[semantic] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 246) (340, 55) **Semantic Analyzer**
+[int_code] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 309) (340, 55) **Int. Code Generator**
+[back] {color=#0097eb80, thick=5, fill=#0097eb59, round=20} !rect (450, 471) (379, 136)
+[opt] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (458, 480) (364, 55) **Code Optimizer**
+[target_gen] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (458, 543) (364, 55) **Target Code Generator**
+...
+{thick=12, color=#ffff60} !arrow (950, 212) (850, 212)
+@(980,165) {size=68,color=yellow} **TODAY!**
+!anim parse color gold
+!anim parse stroke gold
+!anim parse thick 5
+
+---
+### Where Is Syntax Analysis?
+...
+[src] @(640, 184) {size=32px, w=900px, align=center, anchor=center} `if (idx == 0) idx = 750;`
+...
+[scan] {stroke=neon_blue, fill=#102638, textcolor=#F4F1E8, size=30px, thick=2, round=8, align=center} !textbox (390, 227) (500, 52) Lexical analysis / scanner
+[a1] {color=#8AA5B5, thick=2} !arrow (640, 205) (640, 225)
+...
+[tokens] @(640, 322) {size=32px, w=1000px, align=center, anchor=center} {{color=neon_blue|[ if ]}} &nbsp; [ ( ] &nbsp; {{color=orange|[ idx ]}} &nbsp; {{color=math|[ == ]}} &nbsp; {{color=num|[ 0 ]}} &nbsp; [ ) ] &nbsp; {{color=orange|[ idx ]}} &nbsp; [ = ] &nbsp; {{color=num|[ 750 ]}} &nbsp; [ ; ]
+[a2] {color=#8AA5B5, thick=2} !arrow (640, 280) (640, 301)
+...
+[parse] {stroke=neon_blue, fill=#102638, textcolor=#F4F1E8, size=26px, thick=2, round=8, align=center} !textbox (390, 363) (500, 52) Syntax analysis / parsing
+[a3] {color=#8AA5B5, thick=2} !arrow (640, 342) (640, 361)
+...
+[treecaption] @(84, 502) {size=25px, w=340px, color=emp} Abstract syntax tree
+...
+[a4] {color=#8AA5B5, thick=2} !arrow (640, 416) (640, 444)
+[ast_if:ast_nodes] @(640, 466) {size=28px, w=180px, color=neon_blue, align=center, anchor=center} if
+[ast_e_eq:ast_edges] {color=#8AA5B5, thick=2} !line (640, 486) (410, 526)
+[ast_eq:ast_nodes] @(410, 546) {size=28px, w=180px, color=math, align=center, anchor=center} IsEq
+[ast_e_assign:ast_edges] {color=#8AA5B5, thick=2} !line (640, 486) (870, 526)
+[ast_assign:ast_nodes] @(870, 546) {size=28px, w=180px, color=neon_pink, align=center, anchor=center} Assign
+[ast_e_id1:ast_edges] {color=#8AA5B5, thick=2} !line (410, 566) (300, 606)
+[ast_id1:ast_nodes] @(300, 626) {size=28px, w=180px, color=orange, align=center, anchor=center} idx
+[ast_e_zero:ast_edges] {color=#8AA5B5, thick=2} !line (410, 566) (510, 606)
+[ast_zero:ast_nodes] @(510, 626) {size=28px, w=180px, color=num, align=center, anchor=center} 0
+[ast_e_id2:ast_edges] {color=#8AA5B5, thick=2} !line (870, 566) (770, 606)
+[ast_id2:ast_nodes] @(770, 626) {size=28px, w=180px, color=orange, align=center, anchor=center} idx
+[ast_e_n:ast_edges] {color=#8AA5B5, thick=2} !line (870, 566) (990, 606)
+[ast_n:ast_nodes] @(990, 626) {size=28px, w=180px, color=num, align=center, anchor=center} 750
+---
+### Syntax analysis for natural languages
+...
+- Identify the {{color=emp|function}} of each word.
+...
+- Recognize whether a sentence is {{color=emp|grammatically correct}}.
+...
+[w1] @(500, 450) {size=36px, color=orange} I
+[w2] @(520, 450) {size=36px, color=orange} sent
+[w3] @(600, 450) {size=36px, color=orange} Jim
+[w4] @(670, 450) {size=36px, color=orange} the
+[w5] @(730, 450) {size=36px, color=orange} meme
+[w6] @(830, 450) {size=36px, color=orange} .
+
+!style words {
+  size=25px, color=id, align=center, anchor=center
+}
+
+...
+% Move words into place.
+!anim w1 move (160, 620) 2s
+!anim w2 move (380, 620) 2s
+!anim w3 move (624, 620) 2s
+!anim w4 move (880, 620) 2s
+!anim w5 move (1090, 620) 2s
+!anim w6 hide 0.7s
+...
+% PRONOUN
+@(165, 542) {$words} pronoun
+{color=#8AA5B5, thick=2} !line (165, 562) (165, 620)
+...
+% VERB
+@(410, 542) {$words} verb
+{color=#8AA5B5, thick=2} !line (410, 562) (410, 620)
+
+...
+% PROPER NOUN
+@(650, 542) {$words} proper noun
+{color=#8AA5B5, thick=2} !line (650, 562) (650, 620)
+
+...
+% ARTICLE
+@(900, 542) {$words} article
+{color=#8AA5B5, thick=2} !line (900, 562) (900, 620)
+...
+% NOUN
+@(1140, 542) {$words} noun
+{color=#8AA5B5, thick=2} !line (1140, 562) (1140, 620)
+
+...
+% VERB PHRASE
+@(620, 430) {$words} verb phrase
+{color=#8AA5B5, thick=2} !line (620, 450) (410, 522)
+{color=#8AA5B5, thick=2} !line (620, 450) (650, 522)
+...
+% NOUN PHRASE
+@(1020, 430) {$words} noun phrase
+{color=#8AA5B5, thick=2} !line (1020, 450) (900, 522)
+{color=#8AA5B5, thick=2} !line (1020, 450) (1140, 522)
+
+...
+% SENTENCE
+@(650, 338) {$words} sentence
+{color=#8AA5B5, thick=2} !line (650, 358) (165, 522)
+{color=#8AA5B5, thick=2} !line (650, 358) (620, 410)
+{color=#8AA5B5, thick=2} !line (650, 358) (1020, 410)
+
+...
+[subj] @(350, 411) {size=28px, w=190px, color=emp, align=center, anchor=center} subject
+[act] @(680, 390) {size=28px, w=190px, color=emp, align=center, anchor=center} action
+[obj] @(884, 360) {size=28px, w=190px, color=emp, align=center, anchor=center} object
+[ind] @(700, 485) {size=28px, w=190px, color=emp, align=center, anchor=center} indirect{{br}}object
+
+---
+% PowerPoint slides 6.
+### Syntax Analysis Overview
+...
+**Goal:** Determine whether the input token stream satisfies the program’s syntax.
+...
+What do we need?
+...
+- An expressive way to {{color=emp|describe the syntax}}.
+...
+- A {{color=emp|mechanism}} that determines whether a token stream satisfies that description.
+...
+For lexical analysis:
+...
+- {{color=emp|Regular expressions}} describe tokens.
+...
+- {{color=emp|Finite automata}} recognize tokens in the input stream. Emplex generates this mechanism.
+---
+% PowerPoint slides 7.
+### Just Use Regular Expressions?
+- Regular expressions describe tokens.
+  - Easy to implement using DFAs.
+...
+- Can we also use them to describe a programming language’s syntax?
+...
+- {{color=neon_pink|NO!}} They cannot express arbitrary nesting.
+...
+For example, nested blocks, expressions, and statements require balanced braces.
+{w=1112px, size=28px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F} ```
+{{} {} {{} { }}}
+```
+...
+[count] @(84, 548) {size=30px, w=650px} We need {{color=neon_pink|unbounded counting}}.
+[finite] @(84, 605) {size=26px, w=640px} FSAs can count modulo a fixed number, but cannot track arbitrary nesting depth.
+[state0] {color=id, fill=#102638, thick=2} !circle (825, 563) 22
+[state1] {color=id, fill=#102638, thick=2} !circle (920, 563) 22
+[up1] {color=id, thick=2} !arrow (847, 552) (896, 552)
+[ob1] @(871, 522) {size=22px, w=55px, color=id, align=center, anchor=center} `{`
+[down1] {color=emp, thick=2} !arrow (896, 577) (847, 577)
+[cb1] @(871, 610) {size=22px, w=55px, color=emp, align=center, anchor=center} `}`
+[state2] {color=id, fill=#102638, thick=2} !circle (1015, 563) 22
+[up2] {color=id, thick=2} !arrow (942, 552) (991, 552)
+[ob2] @(966, 522) {size=22px, w=55px, color=id, align=center, anchor=center} `{`
+[down2] {color=emp, thick=2} !arrow (991, 577) (942, 577)
+[cb2] @(966, 610) {size=22px, w=55px, color=emp, align=center, anchor=center} `}`
+[state3] {color=id, fill=#102638, thick=2} !circle (1110, 563) 22
+[up3] {color=id, thick=2} !arrow (1037, 552) (1086, 552)
+[ob3] @(1061, 522) {size=22px, w=55px, color=id, align=center, anchor=center} `{`
+[down3] {color=emp, thick=2} !arrow (1086, 577) (1037, 577)
+[cb3] @(1061, 610) {size=22px, w=55px, color=emp, align=center, anchor=center} `}`
+[dots] @(1202, 563) {size=34px, w=50px, align=center, anchor=center} …
+
+---
+### Context-Free Grammars
+Four components, written using **Backus–Naur Form (BNF)**:
+...
+{size=27px} - **{{color=neon_blue|Terminal symbols}}:** tokens. The symbol ε denotes the empty string.
+...
+{size=27px} - **{{color=neon_blue|Nonterminal symbols}}:** syntactic variables.
+...
+{size=27px} - **{{color=neon_blue|Start symbol S}}:** a distinguished nonterminal.
+...
+{size=27px} - **{{color=neon_blue|Production rules}}:** LHS → RHS.
+...
+  {size=25px} - LHS: a single nonterminal.
+  {size=25px} - RHS: a string of terminals and nonterminals.
+  {size=25px} - A production specifies how to expand a nonterminal.
+@(880, 300) {w=310px, size=25px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F} ```
+S → a S a
+S → T
+T → b S b
+T → ε
+```
+...
+[language] @(84, 582) {size=25px, w=1090px} The language generated by a grammar is the set of terminal strings derived from the start symbol by repeatedly applying productions.
+[lg] @(84, 669) {size=24px, w=1090px, color=id} $L(G)$ = the language generated by grammar $G$
+---
+% PowerPoint slides 9.
+### Context-Free Grammar Example
+Grammar for balanced parentheses:
+{w=1112px, size=29px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F} ```
+S → ( S ) S
+S → ε
+```
+...
+{size=27px} One nonterminal: **{{color=neon_pink|S}}**. Two terminals: **{{color=neon_green|(}}** and **{{color=neon_green|)}}**. Start symbol: **{{color=neon_pink|S}}**. Two productions.
+...
+{size=27px} An accepted string has a derivation using these production rules.
+...
+How do we produce **{{color=neon_green|(())}}**?
+...
+[derive] @(84, 540) {size=34px, w=1110px, color=id} {{color=neon_pink|S}}
+...
+!anim derive text {{color=neon_green|(}} {{color=neon_pink|S}} {{color=neon_green|)}} {{color=neon_pink|S}}
+...
+!anim derive text {{color=neon_green|(}} {{color=neon_pink|S}} {{color=neon_green|)}} {{color=neon_blue|ε}}
+...
+!anim derive text {{color=neon_green|( (}} {{color=neon_pink|S}} {{color=neon_green|)}} {{color=neon_pink|S}} {{color=neon_green|)}} {{color=neon_blue|ε}}
+...
+!anim derive text {{color=neon_green|( (}} ε {{color=neon_green|)}} {{color=neon_blue|ε}} {{color=neon_green|)}} {{color=neon_blue|ε}}
+...
+!anim derive text {{color=neon_green|(())}}
+---
+### More on Context-Free Grammars
+...
+Use a vertical bar `|` as shorthand for alternative productions:
+{w=1112px, size=30px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F} ```
+S → a S a | T
+T → b T b | ε
+```
+...
+- {{color=emp|CFGs}} can express the syntax of most programming languages.
+...
+- **{{color=emp|Derivation}}:** successive application of productions, starting from S.
+...
+- **{{color=emp|Acceptance}}:** determine whether an input token stream has a derivation.
+
+---
+### A Parser
+[parser] {stroke=neon_blue, fill=#102638, textcolor=#F4F1E8, size=26px, thick=2, round=8, align=center} !textbox (540, 260) (210, 200) Parser
+...
+@(150, 260) {size=29px, w=350px, color=id} Context-free{{br}}grammar G
+[g_in] {color=neon_pink, thick=5} !arrow (390, 310) (520, 310)
+...
+@(150, 375) {size=29px, w=350px, color=id} Token stream s{{br}}(from the lexer)
+{color=neon_pink, thick=5} !arrow (390, 402) (520, 402)
+...
+[yes] {color=emp, thick=5} !arrow (770, 360) (860, 360)
+[result] @(882, 320) {size=29px, w=310px, color=emp} Yes, if $s ∈ L(G)$.{{br}}No, otherwise.
+...
+!anim yes color #004000 2s
+!anim result color #004000 2s
+>>>
+{color=emp, thick=5} !arrow (770, 290) (860, 290)
+@(882, 265) {size=29px, w=310px, color=emp} Abstract Syntax Tree
+...
+{color=warn, thick=5} !arrow (770, 430) (860, 430)
+@(882, 410) {size=29px, w=310px, color=warn} Error Messages
+...
+
+@(84, 540) {size=32px, w=1112px} A syntax analyzer (parser) is a {{color=emp|context-free grammar acceptor}} that also outputs the corresponding {{color=id|derivation}} when the token stream is accepted.
+---
+% PowerPoint slides 12.
+### Regular Expressions Are a Subset of CFGs
+{size=27px} We can inductively build a context-free grammar for every regular expression.
+...
+{w=1112px, size=27px, pad=10px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233} | Regular expression | Equivilent production |  |
+|:---|:---|:---|
+| ε | S → ε | |
+| a | S → a | |
+| R₁ R₂ | S → S₁ S₂ | |
+| R₁ &#124; R₂ | S → S₁ &#124; S₂ | |
+| R₁* | S → S₁′ | S₁′ → S₁ S₁′ &#124; ε |
+...
+{size=26px} G₁ is the grammar for R₁, with start symbol S₁.{{br}}G₂ is the grammar for R₂, with start symbol S₂.
+
+---
+% PowerPoint slides 13–27.
+### Reverse Derivation
+[lex0] @(84, 177) {size=24px, w=570px} {{color=emp|Op}} = `'+' | '-' | '*' | '/'`
+[lex1] @(84, 215) {size=24px, w=570px} {{color=emp|Int}} = `[0-9]+`
+[lex2] @(84, 253) {size=24px, w=570px} {{color=emp|Open}} = `'('`
+[lex3] @(84, 291) {size=24px, w=570px} {{color=emp|Close}} = `')'`
+[r1] @(710, 177) {size=24px, w=485px, color=id} 1) Start → Expr
+[r2] @(710, 215) {size=24px, w=485px, color=id} 2) Expr → Expr Op Expr
+[r3] @(710, 253) {size=24px, w=485px, color=id} 3) Expr → Int
+[r4] @(710, 291) {size=24px, w=485px, color=id} 4) Expr → Open Expr Close
+...
+[row0] @(484, 365) {size=60px, w=750px} (2 - 1) + 1
+[q] @(84, 560) {size=42px, w=1070px} Could this string have been produced by the grammar?
+...
+!anim row0 move (-104, 345) 2s
+!anim row0 scale 0.5 2s
+>>>
+!anim q hide 0.7s
+...
+[next] @(880, 410) {size=28px, w=310px} Next step: {{color=neon_pink|??}}
+...
+!anim next text Next step: {{color=orange|Tokenize}}
+!anim lex0 color orange
+!anim lex1 color orange
+!anim lex2 color orange
+!anim lex3 color orange
+...
+[row1] @(84, 408) {size=27px, w=790px, color=orange} Open Int Op Int Close Op Int
+!anim lex0 color #F4F1E8
+!anim lex1 color #F4F1E8
+!anim lex2 color #F4F1E8
+!anim lex3 color #F4F1E8
+!anim next text Next step: {{color=neon_pink|??}}
+...
+!anim next text Next step: {{color=orange|Production 3}}
+!anim r3 color orange
+...
+[row2] @(84, 451) {size=27px, w=790px, color=orange} Open Expr Op Expr Close Op Expr
+!anim row1 color #F4F1E8
+!anim r3 color id
+!anim next text Next step: {{color=neon_pink|??}}
+...
+!anim next text Next step: {{color=orange|Production 2}}
+!anim r2 color orange
+...
+[row3] @(84, 494) {size=27px, w=790px, color=orange} Open Expr Close Op Expr
+!anim row2 color #F4F1E8
+!anim r2 color id
+!anim next text Next step: {{color=neon_pink|??}}
+...
+!anim next text Next step: {{color=orange|Production 4}}
+!anim r4 color orange
+...
+[row4] @(84, 537) {size=27px, w=790px, color=orange} Expr Op Expr
+!anim row3 color #F4F1E8
+!anim r4 color id
+!anim next text Next step: {{color=neon_pink|??}}
+...
+!anim next text Next step: {{color=orange|Production 2}}
+!anim r2 color orange
+...
+[row5] @(84, 580) {size=27px, w=790px, color=orange} Expr
+!anim row4 color #F4F1E8
+!anim r2 color id
+!anim next text Next step: {{color=neon_pink|??}}
+...
+!anim next text Next step: {{color=orange|Production 1}}
+!anim r1 color orange
+...
+[row6] @(84, 623) {size=27px, w=790px, color=orange} Start
+!anim row5 color #F4F1E8
+!anim r1 color id
+!anim next text Next step: {{color=neon_pink|??}}
+...
+!anim next text {{color=emp|Done!}}
+!anim row6 color #F4F1E8
+...
+!anim row0 move (-104,600)
+!anim row1 move (83,580)
+!anim row2 move (83,540)
+!anim row4 move (83,450)
+!anim row5 move (83,405)
+!anim row6 move (83,370)
+
+...
+!anim next text &nbsp;
+[question] @(915, 470) {size=31px, w=285px, color=emp} Can we convert this{{br}}to a parse tree?
+---
+% PowerPoint slides 29.
+### Parse Tree
+...
+- **{{color=emp|Internal nodes}}:** nonterminals.
+...
+- **{{color=emp|Leaves}}:** terminals (or ε for an empty production).
+...
+- **{{color=emp|Edges}}:**
+...
+  - From the nonterminal on the LHS of a production.
+...
+  - To the nodes on the RHS of that production.
+...
+A parse tree captures a derivation of the string.
+---
+% PowerPoint slides 30–42.
+### Parse Tree Construction
+[r1] {size=23px, w=520px, color=id} 1) Start → Expr
+[r2] {size=23px, w=520px, color=id} 2) Expr → Expr Op Expr
+[r3] {size=23px, w=520px, color=id} 3) Expr → Int
+[r4] {size=23px, w=520px, color=id} 4) Expr → Open Expr Close
+
+[d0] @(84, 374) {size=22px, w=530px} Start
+[d1] @(84, 413) {size=22px, w=530px} Expr
+[d2] @(84, 452) {size=22px, w=530px} Expr Op Expr
+[d3] @(84, 491) {size=22px, w=530px} Open Expr Close Op Expr
+[d4] @(84, 530) {size=22px, w=530px} Open Expr Op Expr Close Op Expr
+[d5] @(84, 569) {size=22px, w=530px} Open Int Op Int Close Op Int
+[d6] @(84, 608) {size=22px, w=530px} (2 - 1) + 1
+
+[build_start:build_nodes] @(925, 185) {size=23px, w=104px, color=id, align=center, anchor=center} Start
+...
+!anim build_start color emp
+!anim d0 color orange
+...
+!anim r1 color orange
+!anim r1 textsize 32 0.7s
+...
+!anim r1 textsize 23 0.7s
+!anim r1 color id
+!anim d0 color #F4F1E8
+!anim d1 color orange
+!anim build_start color id
+[build_e_root:build_edges] {color=#8AA5B5, thick=2} !line (925, 205) (925, 243)
+[build_root:build_nodes] @(925, 263) {size=23px, w=104px, color=orange, align=center, anchor=center} Expr
+...
+!anim r2 color orange
+!anim r2 textsize 32 0.7s
+...
+!anim r2 textsize 23 0.7s
+!anim r2 color id
+!anim d1 color #F4F1E8
+!anim d2 color orange
+!anim build_start color id
+!anim build_root color id
+[build_e_left:build_edges] {color=#8AA5B5, thick=2} !line (925, 283) (760, 322)
+[build_left:build_nodes] @(760, 342) {size=23px, w=104px, color=orange, align=center, anchor=center} Expr
+[build_e_plus:build_edges] {color=#8AA5B5, thick=2} !line (925, 283) (990, 322)
+[build_plus:build_nodes] @(990, 342) {size=23px, w=104px, color=orange, align=center, anchor=center} Op
+[build_e_right:build_edges] {color=#8AA5B5, thick=2} !line (925, 283) (1150, 322)
+[build_right:build_nodes] @(1150, 342) {size=23px, w=104px, color=orange, align=center, anchor=center} Expr
+...
+!anim r4 color orange
+!anim r4 textsize 32 0.7s
+...
+!anim r4 textsize 23 0.7s
+!anim r4 color id
+!anim d2 color #F4F1E8
+!anim d3 color orange
+!anim build_start color id
+!anim build_root color id
+!anim build_left color id
+!anim build_plus color id
+!anim build_right color id
+[build_e_open:build_edges] {color=#8AA5B5, thick=2} !line (760, 362) (635, 408)
+[build_open:build_nodes] @(635, 428) {size=23px, w=104px, color=orange, align=center, anchor=center} Open
+[build_e_mid:build_edges] {color=#8AA5B5, thick=2} !line (760, 362) (760, 408)
+[build_mid:build_nodes] @(760, 428) {size=23px, w=104px, color=orange, align=center, anchor=center} Expr
+[build_e_close:build_edges] {color=#8AA5B5, thick=2} !line (760, 362) (900, 408)
+[build_close:build_nodes] @(900, 428) {size=23px, w=104px, color=orange, align=center, anchor=center} Close
+...
+!anim r2 color orange
+!anim r2 textsize 32 0.7s
+...
+!anim r2 textsize 23 0.7s
+!anim r2 color id
+!anim d3 color #F4F1E8
+!anim d4 color orange
+!anim build_start color id
+!anim build_root color id
+!anim build_left color id
+!anim build_plus color id
+!anim build_right color id
+!anim build_open color id
+!anim build_mid color id
+!anim build_close color id
+[build_e_a:build_edges] {color=#8AA5B5, thick=2} !line (760, 448) (665, 494)
+[build_a:build_nodes] @(665, 514) {size=23px, w=104px, color=orange, align=center, anchor=center} Expr
+[build_e_minus:build_edges] {color=#8AA5B5, thick=2} !line (760, 448) (760, 494)
+[build_minus:build_nodes] @(760, 514) {size=23px, w=104px, color=orange, align=center, anchor=center} Op
+[build_e_b:build_edges] {color=#8AA5B5, thick=2} !line (760, 448) (855, 494)
+[build_b:build_nodes] @(855, 514) {size=23px, w=104px, color=orange, align=center, anchor=center} Expr
+...
+!anim r3 color orange
+!anim r3 textsize 32 0.7s
+...
+!anim r1 textsize 23 0.7s
+!anim r3 color id
+!anim d4 color #F4F1E8
+!anim d5 color orange
+!anim build_start color id
+!anim build_root color id
+!anim build_left color id
+!anim build_plus color id
+!anim build_right color id
+!anim build_open color id
+!anim build_mid color id
+!anim build_close color id
+!anim build_a color id
+!anim build_minus color id
+!anim build_b color id
+[build_e_ia:build_edges] {color=#8AA5B5, thick=2} !line (665, 534) (665, 578)
+[build_ia:build_nodes] @(665, 598) {size=23px, w=104px, color=orange, align=center, anchor=center} Int
+[build_e_ib:build_edges] {color=#8AA5B5, thick=2} !line (855, 534) (855, 578)
+[build_ib:build_nodes] @(855, 598) {size=23px, w=104px, color=orange, align=center, anchor=center} Int
+[build_e_ir:build_edges] {color=#8AA5B5, thick=2} !line (1150, 362) (1150, 408)
+[build_ir:build_nodes] @(1150, 428) {size=23px, w=104px, color=orange, align=center, anchor=center} Int
+...
+[done] @(1075, 632) {size=31px, w=210px, color=emp, align=center, anchor=center} Done!
+---
+% PowerPoint slides 43–73.
+### Processing the Tree
+[eval_start:eval_nodes] @(810, 168) {size=28px, w=180px, color=id, align=center, anchor=center} Start
+[eval_e_root:eval_edges] {color=#8AA5B5, thick=2} !line (810, 188) (810, 225)
+[eval_root:eval_nodes] @(810, 245) {size=28px, w=180px, color=id, align=center, anchor=center} Expr
+[eval_e_left:eval_edges] {color=#8AA5B5, thick=2} !line (810, 265) (470, 305)
+[eval_left:eval_nodes] @(470, 325) {size=28px, w=180px, color=id, align=center, anchor=center} Expr
+[eval_e_plus:eval_edges] {color=#8AA5B5, thick=2} !line (810, 265) (810, 305)
+[eval_plus:eval_nodes] @(810, 325) {size=28px, w=180px, color=id, align=center, anchor=center} Op
+[eval_e_right:eval_edges] {color=#8AA5B5, thick=2} !line (810, 265) (1110, 305)
+[eval_right:eval_nodes] @(1110, 325) {size=28px, w=180px, color=id, align=center, anchor=center} Expr
+[eval_e_open:eval_edges] {color=#8AA5B5, thick=2} !line (470, 345) (220, 388)
+[eval_open:eval_nodes] @(220, 408) {size=28px, w=180px, color=id, align=center, anchor=center} Open
+[eval_e_mid:eval_edges] {color=#8AA5B5, thick=2} !line (470, 345) (470, 388)
+[eval_mid:eval_nodes] @(470, 408) {size=28px, w=180px, color=id, align=center, anchor=center} Expr
+[eval_e_close:eval_edges] {color=#8AA5B5, thick=2} !line (470, 345) (700, 388)
+[eval_close:eval_nodes] @(700, 408) {size=28px, w=180px, color=id, align=center, anchor=center} Close
+[eval_e_a:eval_edges] {color=#8AA5B5, thick=2} !line (470, 428) (345, 472)
+[eval_a:eval_nodes] @(345, 492) {size=28px, w=180px, color=id, align=center, anchor=center} Expr
+[eval_e_minus:eval_edges] {color=#8AA5B5, thick=2} !line (470, 428) (470, 472)
+[eval_minus:eval_nodes] @(470, 492) {size=28px, w=180px, color=id, align=center, anchor=center} Op
+[eval_e_b:eval_edges] {color=#8AA5B5, thick=2} !line (470, 428) (595, 472)
+[eval_b:eval_nodes] @(595, 492) {size=28px, w=180px, color=id, align=center, anchor=center} Expr
+[eval_e_ia:eval_edges] {color=#8AA5B5, thick=2} !line (345, 512) (345, 548)
+[eval_ia:eval_nodes] @(345, 568) {size=28px, w=180px, color=id, align=center, anchor=center} Int
+[eval_e_ib:eval_edges] {color=#8AA5B5, thick=2} !line (595, 512) (595, 548)
+[eval_ib:eval_nodes] @(595, 568) {size=28px, w=180px, color=id, align=center, anchor=center} Int
+[eval_e_ir:eval_edges] {color=#8AA5B5, thick=2} !line (1110, 345) (1110, 388)
+[eval_ir:eval_nodes] @(1110, 408) {size=28px, w=180px, color=id, align=center, anchor=center} Int
+...
+[eval_e_lp:eval_edges] {color=#8AA5B5, thick=2} !line (220, 428) (220, 620)
+[eval_lp:eval_nodes] @(220, 640) {size=28px, w=180px, color=orange, align=center, anchor=center} (
+[eval_e_v2:eval_edges] {color=#8AA5B5, thick=2} !line (345, 588) (345, 620)
+[eval_v2:eval_nodes] @(345, 640) {size=28px, w=180px, color=orange, align=center, anchor=center} 2
+[eval_e_lm:eval_edges] {color=#8AA5B5, thick=2} !line (470, 512) (470, 620)
+[eval_lm:eval_nodes] @(470, 640) {size=28px, w=180px, color=orange, align=center, anchor=center} −
+[eval_e_v1:eval_edges] {color=#8AA5B5, thick=2} !line (595, 588) (595, 620)
+[eval_v1:eval_nodes] @(595, 640) {size=28px, w=180px, color=orange, align=center, anchor=center} 1
+[eval_e_rp:eval_edges] {color=#8AA5B5, thick=2} !line (700, 428) (700, 620)
+[eval_rp:eval_nodes] @(700, 640) {size=28px, w=180px, color=orange, align=center, anchor=center} )
+[eval_e_la:eval_edges] {color=#8AA5B5, thick=2} !line (810, 345) (810, 620)
+[eval_la:eval_nodes] @(810, 640) {size=28px, w=180px, color=orange, align=center, anchor=center} +
+[eval_e_vr:eval_edges] {color=#8AA5B5, thick=2} !line (1110, 428) (1110, 620)
+[eval_vr:eval_nodes] @(1110, 640) {size=28px, w=180px, color=orange, align=center, anchor=center} 1
+...
+!anim eval_start color emp
+!anim eval_start textsize 36 0.7s
+...
+!anim eval_start textsize 28 0.7s
+!anim eval_root color emp
+!anim eval_root textsize 36 0.7s
+...
+!anim eval_root textsize 28 0.7s
+!anim eval_left color emp
+!anim eval_left textsize 36 0.7s
+...
+!anim eval_left textsize 28 0.7s
+!anim eval_open color emp
+!anim eval_open textsize 36 0.7s
+
+...
+!anim eval_open text Open({{color=orange|(}})
+!anim eval_open color id
+...
+!anim eval_open textsize 28 0.7s
+!anim eval_mid color emp
+!anim eval_mid textsize 36 0.7s
+...
+!anim eval_mid textsize 28 0.7s
+!anim eval_a color emp
+!anim eval_a textsize 36 0.7s
+
+...
+!anim eval_a textsize 28 0.7s
+!anim eval_ia color emp
+!anim eval_ia textsize 36 0.7s
+...
+!anim eval_ia text Int({{color=orange|2}})
+!anim eval_ia color id
+...
+!anim eval_ia textsize 28 0.7s
+!anim eval_a textsize 36 0.7s
+!anim eval_a text Expr({{color=orange|2}})
+!anim eval_a color id
+...
+!anim eval_a textsize 28 0.7s
+!anim eval_minus color emp
+!anim eval_minus textsize 36 0.7s
+...
+!anim eval_minus text Op({{color=orange|−}})
+!anim eval_minus color id
+...
+!anim eval_minus textsize 28 0.7s
+!anim eval_b color emp
+!anim eval_b textsize 36 0.7s
+...
+!anim eval_b textsize 28 0.7s
+!anim eval_ib color emp
+!anim eval_ib textsize 36 0.7s
+...
+!anim eval_ib text Int({{color=orange|1}})
+!anim eval_ib color id
+...
+!anim eval_ib textsize 28 0.7s
+!anim eval_b text Expr({{color=orange|1}})
+!anim eval_b color id
+!anim eval_b textsize 36 0.7s
+...
+!anim eval_b textsize 28 0.7s
+!anim eval_mid text Expr({{color=orange|1}})
+!anim eval_mid color id
+!anim eval_mid textsize 36 0.7s
+...
+!anim eval_mid textsize 28 0.7s
+!anim eval_close color emp
+!anim eval_close textsize 36 0.7s
+...
+!anim eval_close text Close({{color=orange|)}})
+!anim eval_close color id
+...
+!anim eval_close textsize 28 0.7s
+!anim eval_left text Expr({{color=orange|1}})
+!anim eval_left color id
+!anim eval_left textsize 36 0.7s
+...
+!anim eval_left textsize 28 0.7s
+!anim eval_plus color emp
+!anim eval_plus textsize 36 0.7s
+...
+!anim eval_plus text Op({{color=orange|+}})
+!anim eval_plus color id
+...
+!anim eval_plus textsize 28 0.7s
+!anim eval_right color emp
+!anim eval_right textsize 36 0.7s
+...
+!anim eval_right textsize 28 0.7s
+!anim eval_ir color emp
+!anim eval_ir textsize 36 0.7s
+...
+!anim eval_ir text Int({{color=orange|1}})
+!anim eval_ir color id
+...
+!anim eval_ir textsize 28 0.7s
+!anim eval_right text Expr({{color=orange|1}})
+!anim eval_right color id
+!anim eval_right textsize 36 0.7s
+...
+!anim eval_right textsize 28 0.7s
+!anim eval_root text Expr({{color=orange|2}})
+!anim eval_root color id
+!anim eval_root textsize 36 0.7s
+...
+!anim eval_root textsize 28 0.7s
+!anim eval_start text Start({{color=orange|2}})
+!anim eval_start color id
+!anim eval_start textsize 36 0.7s
+
+% ==== SIMPLIFY THE TREE!!! ====
+...
+!anim eval_open color emp
+!anim eval_close color emp
+...
+!anim eval_open hide 0.3s
+!anim eval_e_open hide 0.3s
+!anim eval_close hide 0.3s
+!anim eval_e_close hide 0.3s
+!anim eval_lp hide 0.3s
+!anim eval_e_lp hide 0.3s
+!anim eval_rp hide 0.3s
+!anim eval_e_rp hide 0.3s
+...
+!anim eval_left color emp
+...
+!anim eval_left hide 0.3s
+!anim eval_e_left hide 0.3s
+!anim eval_e_mid point 1 (810, 265) 0.6s
+...
+!anim eval_a color emp
+!anim eval_b color emp
+!anim eval_ia color emp
+!anim eval_ib color emp
+!anim eval_right color emp
+!anim eval_ir color emp
+...
+!anim eval_a hide 0.3s
+!anim eval_e_a hide 0.3s
+!anim eval_b hide 0.3s
+!anim eval_e_b hide 0.3s
+!anim eval_ia hide 0.3s
+!anim eval_e_ia hide 0.3s
+!anim eval_ib hide 0.3s
+!anim eval_e_ib hide 0.3s
+!anim eval_right hide 0.3s
+!anim eval_e_right hide 0.3s
+!anim eval_ir hide 0.3s
+!anim eval_e_ir hide 0.3s
+!anim eval_e_v2 point 1 (470, 428) 0.6s
+!anim eval_e_v1 point 1 (470, 428) 0.6s
+!anim eval_e_vr point 1 (810, 265) 0.6s
+...
+!anim eval_root color emp
+!anim eval_plus color emp
+!anim eval_mid color emp
+!anim eval_minus color emp
+...
+!anim eval_root hide 0.3s
+!anim eval_e_root hide 0.3s
+!anim eval_mid hide 0.3s
+!anim eval_e_mid hide 0.3s
+!anim eval_plus hide 0.3s
+!anim eval_e_plus hide 0.3s
+!anim eval_minus hide 0.3s
+!anim eval_e_minus hide 0.3s
+!anim eval_la move (810, 265) 0.7s
+!anim eval_lm move (470, 430) 0.7s
+!anim eval_e_la point 1 (810, 188) 0.7s
+!anim eval_e_la point 2 (810, 245) 0.7s
+!anim eval_e_lm point 1 (810, 285) 0.7s
+!anim eval_e_lm point 2 (470, 410) 0.7s
+!anim eval_e_v2 point 1 (470, 450) 0.7s
+!anim eval_e_v1 point 1 (470, 450) 0.7s
+!anim eval_e_vr point 1 (810, 285) 0.7s
+...
+!anim eval_start hide 0.3s
+!anim eval_e_la hide 0.3s
+[astlabel] @(84, 200) {size=30px, w=540px, color=emp} **Abstract syntax tree**{{br}}for `(2 - 1) + 1`
+---
+% PowerPoint slides 84.
+### Ambiguity Example: 2 - 1 + 1
+[r1] @(84, 166) {size=24px, w=1090px, color=id} 1) Start → Expr
+[r2] @(84, 204) {size=24px, w=1090px, color=id} 2) Expr → Expr Op Expr
+[r3] @(84, 242) {size=24px, w=1090px, color=id} 3) Expr → Int
+[r4] @(84, 280) {size=24px, w=1090px, color=id} 4) Expr → Open Expr Close
+...
+[leftcase] @(84, 345) {size=28px, w=540px, color=emp} Reduce the left operation first
+[rightcase] @(700, 345) {size=28px, w=510px, color=neon_pink} Reduce the right operation first
+[l0] @(84, 398) {size=26px, w=540px} 2 - 1 + 1
+[rpath0] @(700, 398) {size=26px, w=510px} 2 - 1 + 1
+...
+[l1] @(84, 444) {size=26px, w=540px} {{color=orange|Expr Op Expr}} Op Expr
+[rpath1] @(700, 444) {size=26px, w=510px} Expr Op {{color=orange|Expr Op Expr}}
+...
+[l2] @(84, 490) {size=26px, w=540px} Expr Op Expr
+[rpath2] @(700, 490) {size=26px, w=510px} Expr Op Expr
+...
+[l3] @(84, 536) {size=26px, w=540px} Expr
+[rpath3] @(700, 536) {size=26px, w=510px} Expr
+...
+[l4] @(84, 582) {size=26px, w=540px} Start
+[rpath4] @(700, 582) {size=26px, w=510px} Start
+---
+% PowerPoint slides 85–87.
+### Two Parse Trees for 2 - 1 + 1
+[lc] @(350, 205) {size=32px, w=500px, color=emp, align=center, anchor=center} (2 - 1) + 1
+[rc] @(950, 205) {size=32px, w=500px, color=neon_pink, align=center, anchor=center} 2 - (1 + 1)
+[left_s:left_nodes] @(320, 286) {size=21px, w=104px, color=id, align=center, anchor=center} Start
+[left_e_root:left_edges] {color=#8AA5B5, thick=2} !line (320, 306) (320, 324)
+[left_root:left_nodes] @(320, 344) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[left_e_left:left_edges] {color=#8AA5B5, thick=2} !line (320, 364) (195, 392)
+[left_left:left_nodes] @(195, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[left_e_op:left_edges] {color=#8AA5B5, thick=2} !line (320, 364) (320, 392)
+[left_op:left_nodes] @(320, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Op
+[left_e_right:left_edges] {color=#8AA5B5, thick=2} !line (320, 364) (455, 392)
+[left_right:left_nodes] @(455, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[left_e_a:left_edges] {color=#8AA5B5, thick=2} !line (195, 432) (95, 464)
+[left_a:left_nodes] @(95, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[left_e_iop:left_edges] {color=#8AA5B5, thick=2} !line (195, 432) (195, 464)
+[left_iop:left_nodes] @(195, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Op
+[left_e_b:left_edges] {color=#8AA5B5, thick=2} !line (195, 432) (295, 464)
+[left_b:left_nodes] @(295, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[left_e_ia:left_edges] {color=#8AA5B5, thick=2} !line (95, 504) (95, 530)
+[left_ia:left_nodes] @(95, 550) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[left_e_ib:left_edges] {color=#8AA5B5, thick=2} !line (295, 504) (295, 530)
+[left_ib:left_nodes] @(295, 550) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[left_e_io:left_edges] {color=#8AA5B5, thick=2} !line (455, 432) (455, 464)
+[left_io:left_nodes] @(455, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[left_e_a2:left_edges] {color=#8AA5B5, thick=2} !line (95, 570) (120, 595)
+[left_a2:left_nodes] @(120, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 2
+[left_e_innerop:left_edges] {color=#8AA5B5, thick=2} !line (195, 504) (220, 595)
+[left_innerop:left_nodes] @(220, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} −
+[left_e_b2:left_edges] {color=#8AA5B5, thick=2} !line (295, 570) (320, 595)
+[left_b2:left_nodes] @(320, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 1
+[left_e_outerop:left_edges] {color=#8AA5B5, thick=2} !line (320, 432) (420, 595)
+[left_outerop:left_nodes] @(420, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} +
+[left_e_oa:left_edges] {color=#8AA5B5, thick=2} !line (455, 504) (520, 595)
+[left_oa:left_nodes] @(520, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 1
+...
+[right_s:right_nodes] @(920, 286) {size=21px, w=104px, color=id, align=center, anchor=center} Start
+[right_e_root:right_edges] {color=#8AA5B5, thick=2} !line (920, 306) (920, 324)
+[right_root:right_nodes] @(920, 344) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[right_e_left:right_edges] {color=#8AA5B5, thick=2} !line (920, 364) (795, 392)
+[right_left:right_nodes] @(795, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[right_e_op:right_edges] {color=#8AA5B5, thick=2} !line (920, 364) (920, 392)
+[right_op:right_nodes] @(920, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Op
+[right_e_right:right_edges] {color=#8AA5B5, thick=2} !line (920, 364) (1055, 392)
+[right_right:right_nodes] @(1055, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[right_e_a:right_edges] {color=#8AA5B5, thick=2} !line (1055, 432) (955, 464)
+[right_a:right_nodes] @(955, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[right_e_iop:right_edges] {color=#8AA5B5, thick=2} !line (1055, 432) (1055, 464)
+[right_iop:right_nodes] @(1055, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Op
+[right_e_b:right_edges] {color=#8AA5B5, thick=2} !line (1055, 432) (1155, 464)
+[right_b:right_nodes] @(1155, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[right_e_ia:right_edges] {color=#8AA5B5, thick=2} !line (955, 504) (955, 530)
+[right_ia:right_nodes] @(955, 550) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[right_e_ib:right_edges] {color=#8AA5B5, thick=2} !line (1155, 504) (1155, 530)
+[right_ib:right_nodes] @(1155, 550) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[right_e_io:right_edges] {color=#8AA5B5, thick=2} !line (795, 432) (795, 464)
+[right_io:right_nodes] @(795, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[right_e_oa:right_edges] {color=#8AA5B5, thick=2} !line (795, 504) (720, 595)
+[right_oa:right_nodes] @(720, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 2
+[right_e_outerop:right_edges] {color=#8AA5B5, thick=2} !line (920, 432) (820, 595)
+[right_outerop:right_nodes] @(820, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} −
+[right_e_a2:right_edges] {color=#8AA5B5, thick=2} !line (955, 570) (920, 595)
+[right_a2:right_nodes] @(920, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 1
+[right_e_innerop:right_edges] {color=#8AA5B5, thick=2} !line (1055, 504) (1020, 595)
+[right_innerop:right_nodes] @(1020, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} +
+[right_e_b2:right_edges] {color=#8AA5B5, thick=2} !line (1155, 570) (1120, 595)
+[right_b2:right_nodes] @(1120, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 1
+...
+!anim left_left text Expr({{color=orange|1}})
+!anim left_root text Expr({{color=orange|2}})
+!anim left_s text Start({{color=orange|2}})
+[lv] @(84, 663) {size=25px, w=535px} First 2 − 1, then + 1: {{color=emp|2}}
+...
+!anim right_right text Expr({{color=orange|2}})
+!anim right_root text Expr({{color=orange|0}})
+!anim right_s text Start({{color=orange|0}})
+[rv] @(690, 663) {size=25px, w=530px} First 1 + 1, then 2 −: {{color=neon_pink|0}}
+---
+% PowerPoint slides 88–89.
+### Eliminating Ambiguity
+[intro] @(84, 174) {size=30px, w=1112px} Solution: change the grammar so operators associate left.
+[oldhead] @(84, 247) {size=30px, w=480px, color=id} Original grammar
+[newhead] @(700, 247) {size=30px, w=490px, color=emp} Revised grammar
+[old0] @(84, 303) {size=27px, w=540px} Start → Expr
+[old1] @(84, 349) {size=27px, w=540px} Expr → Expr Op Expr
+[old2] @(84, 395) {size=27px, w=540px} Expr → Int
+[old3] @(84, 441) {size=27px, w=540px} Expr → Open Expr Close
+...
+[new0] @(700, 303) {size=27px, w=515px} Start → Expr
+[new1] @(700, 349) {size=27px, w=515px} Expr → Expr Op {{color=emp|Num}}
+[new2] @(700, 395) {size=27px, w=515px} Expr → {{color=emp|Num}}
+[new3] @(700, 441) {size=27px, w=515px} {{color=emp|Num}} → Int
+[new4] @(700, 487) {size=27px, w=515px} {{color=emp|Num}} → Open Expr Close
+...
+[why] @(84, 600) {size=29px, w=1112px} The right operand is a {{color=emp|Num}}. An unparenthesized operator sequence can only grow on the left.
+...
+!anim intro hide 0.3s
+!anim oldhead hide 0.3s
+!anim newhead hide 0.3s
+!anim why hide 0.3s
+!anim old0 hide 0.3s
+!anim old1 hide 0.3s
+!anim old2 hide 0.3s
+!anim old3 hide 0.3s
+!anim new0 hide 0.3s
+!anim new1 hide 0.3s
+!anim new2 hide 0.3s
+!anim new3 hide 0.3s
+!anim new4 hide 0.3s
+>>>
+[good] @(340, 205) {size=31px, w=500px, color=emp, align=center, anchor=center} Left association
+[bad] @(940, 205) {size=31px, w=500px, color=neon_pink, align=center, anchor=center} Right association
+[ok_s:ok_nodes] @(320, 286) {size=21px, w=104px, color=id, align=center, anchor=center} Start
+[ok_e_root:ok_edges] {color=#8AA5B5, thick=2} !line (320, 306) (320, 324)
+[ok_root:ok_nodes] @(320, 344) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[ok_e_left:ok_edges] {color=#8AA5B5, thick=2} !line (320, 364) (195, 392)
+[ok_left:ok_nodes] @(195, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[ok_e_op:ok_edges] {color=#8AA5B5, thick=2} !line (320, 364) (320, 392)
+[ok_op:ok_nodes] @(320, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Op
+[ok_e_right:ok_edges] {color=#8AA5B5, thick=2} !line (320, 364) (455, 392)
+[ok_right:ok_nodes] @(455, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Num
+[ok_e_a:ok_edges] {color=#8AA5B5, thick=2} !line (195, 432) (95, 464)
+[ok_a:ok_nodes] @(95, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[ok_e_iop:ok_edges] {color=#8AA5B5, thick=2} !line (195, 432) (195, 464)
+[ok_iop:ok_nodes] @(195, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Op
+[ok_e_b:ok_edges] {color=#8AA5B5, thick=2} !line (195, 432) (295, 464)
+[ok_b:ok_nodes] @(295, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Num
+[ok_e_ia:ok_edges] {color=#8AA5B5, thick=2} !line (95, 504) (95, 530)
+[ok_ia:ok_nodes] @(95, 550) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[ok_e_ib:ok_edges] {color=#8AA5B5, thick=2} !line (295, 504) (295, 530)
+[ok_ib:ok_nodes] @(295, 550) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[ok_e_io:ok_edges] {color=#8AA5B5, thick=2} !line (455, 432) (455, 464)
+[ok_io:ok_nodes] @(455, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+!anim ok_ia text Num
+[ok_e_numint:ok_edges] {color=#8AA5B5, thick=2} !line (95, 570) (95, 567)
+[ok_numint:ok_nodes] @(95, 587) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[ok_e_a2:ok_edges] {color=#8AA5B5, thick=2} !line (95, 607) (120, 618)
+[ok_a2:ok_nodes] @(120, 638) {size=21px, w=104px, color=orange, align=center, anchor=center} 2
+[ok_e_innerop:ok_edges] {color=#8AA5B5, thick=2} !line (195, 504) (220, 618)
+[ok_innerop:ok_nodes] @(220, 638) {size=21px, w=104px, color=orange, align=center, anchor=center} −
+[ok_e_b2:ok_edges] {color=#8AA5B5, thick=2} !line (295, 570) (320, 618)
+[ok_b2:ok_nodes] @(320, 638) {size=21px, w=104px, color=orange, align=center, anchor=center} 1
+[ok_e_outerop:ok_edges] {color=#8AA5B5, thick=2} !line (320, 432) (420, 618)
+[ok_outerop:ok_nodes] @(420, 638) {size=21px, w=104px, color=orange, align=center, anchor=center} +
+[ok_e_oa:ok_edges] {color=#8AA5B5, thick=2} !line (455, 504) (520, 618)
+[ok_oa:ok_nodes] @(520, 638) {size=21px, w=104px, color=orange, align=center, anchor=center} 1
+[no_s:no_nodes] @(920, 286) {size=21px, w=104px, color=id, align=center, anchor=center} Start
+[no_e_root:no_edges] {color=#8AA5B5, thick=2} !line (920, 306) (920, 324)
+[no_root:no_nodes] @(920, 344) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[no_e_left:no_edges] {color=#8AA5B5, thick=2} !line (920, 364) (795, 392)
+[no_left:no_nodes] @(795, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[no_e_op:no_edges] {color=#8AA5B5, thick=2} !line (920, 364) (920, 392)
+[no_op:no_nodes] @(920, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Op
+[no_e_right:no_edges] {color=#8AA5B5, thick=2} !line (920, 364) (1055, 392)
+[no_right:no_nodes] @(1055, 412) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[no_e_a:no_edges] {color=#8AA5B5, thick=2} !line (1055, 432) (955, 464)
+[no_a:no_nodes] @(955, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[no_e_iop:no_edges] {color=#8AA5B5, thick=2} !line (1055, 432) (1055, 464)
+[no_iop:no_nodes] @(1055, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Op
+[no_e_b:no_edges] {color=#8AA5B5, thick=2} !line (1055, 432) (1155, 464)
+[no_b:no_nodes] @(1155, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Expr
+[no_e_ia:no_edges] {color=#8AA5B5, thick=2} !line (955, 504) (955, 530)
+[no_ia:no_nodes] @(955, 550) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[no_e_ib:no_edges] {color=#8AA5B5, thick=2} !line (1155, 504) (1155, 530)
+[no_ib:no_nodes] @(1155, 550) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[no_e_io:no_edges] {color=#8AA5B5, thick=2} !line (795, 432) (795, 464)
+[no_io:no_nodes] @(795, 484) {size=21px, w=104px, color=id, align=center, anchor=center} Int
+[no_e_oa:no_edges] {color=#8AA5B5, thick=2} !line (795, 504) (720, 595)
+[no_oa:no_nodes] @(720, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 2
+[no_e_outerop:no_edges] {color=#8AA5B5, thick=2} !line (920, 432) (820, 595)
+[no_outerop:no_nodes] @(820, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} −
+[no_e_a2:no_edges] {color=#8AA5B5, thick=2} !line (955, 570) (920, 595)
+[no_a2:no_nodes] @(920, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 1
+[no_e_innerop:no_edges] {color=#8AA5B5, thick=2} !line (1055, 504) (1020, 595)
+[no_innerop:no_nodes] @(1020, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} +
+[no_e_b2:no_edges] {color=#8AA5B5, thick=2} !line (1155, 570) (1120, 595)
+[no_b2:no_nodes] @(1120, 615) {size=21px, w=104px, color=orange, align=center, anchor=center} 1
+...
+[cross1] {color=neon_pink, thick=2} !line (716, 259) (1200, 640)
+[cross2] {color=neon_pink, thick=2} !line (1200, 259) (716, 640)
+[end] @(84, 670) {size=27px, w=1112px, color=emp} Without parentheses, the grammar forces `(2 - 1) + 1`.

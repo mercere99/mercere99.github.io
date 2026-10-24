@@ -1,0 +1,122 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+
+!set palette id lightblue
+!set palette keyword #FF00FF
+!set palette quote green
+!set palette num tan
+!set palette warn red
+!set palette math yellow
+!set palette emp #80FF80
+!set palette regex #73FDFF
+!set palette bg #08111F
+
+# CSE450: Translation of Programming Languages
+## Lecture 3 : Lexical Analysis with Emplex
+---
+### Designing Patterns
+...
+Designing the proper regular expressions for patterns can be tricky, but you are provided with a broad range of building blocks.
+...
+| Symbol | Description |
+|:---:|:---|
+| . | A dot will match any single character except a newline. |
+| `*`&nbsp;,&nbsp;`+` | Star and plus are used to match zero/one or more of the preceding expressions. |
+| `?` | Matches zero or one copy of the preceding expression. |
+| &#124; | A logical ' or ' statement - matches either the pattern before it, or the pattern after it. |
+| [&nbsp;] | Brackets denote a character class, matching one character. If first char is `^`, negate the brackets. Ranges can use a `-` |
+| "&nbsp;" | Match everything within the quotes literally - doesn't use special meanings for characters. |
+| (&nbsp;) | Group everything within the parentheses as a single unit for the rest of the expression. |
+---
+### Designing Patterns
+...
+| {x} | Match the preceding expression x times. |
+| {x,y} | Match the preceding expression x to y times (x < y) |
+| ^ | Matches the very beginning of a line. |
+| $ | Matches the end of a line. |
+| A/B | Matches the preceding regular expression A, but only if followed by the expression B. |
+---
+### Example Patterns
+...
+[0-9]
+...
+  - A single digit.
+...
+[0-9]+
+...
+  - An integer.
+...
+[0-9]+(\.[0-9]+)?
+...
+  - An integer or floating point number.
+...
+[+\-]?[0-9]+(\.[0-9]+)?([ eE ][+\-]?[0-9]+)?
+...
+  - Positive or negative integer, floating point, or scientific notation
+---
+### Problems for you
+What binary strings are defined by the following patterns :
+...
+- `0 (0|1)* 0`
+...
+  - same as: `0[01]*0`
+...
+- `(0|1)*0(0|1)*`
+...
+  - same as: `[01]*0[01]*`
+...
+  - same as: `1*0[01]*`
+...
+- `0?1+`
+...
+- `(0?1*)+`
+---
+### More problems for you
+Given the regular expressions:
+&nbsp;&nbsp;&nbsp;r1 = 0(10)*1+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r2 = (01)+0?
+...
+- Find a string corresponding to both r1 and r2.
+...
+- Find a string corresponding to r1 but not r2.
+...
+- Find a string corresponding to r2 but not r1.
+...
+- Find a string corresponding to neither r1 nor r2.
+---
+### Lexer and Parser Generators
+In structured programming, there are two tasks that occur over and over:
+...
+  - Divide input into meaningful units
+...
+  - Discovering the relationship among those units
+...
+These two operations turn out to be easy to automate.
+---
+### Oldschool techniques: Lex and Yacc
+...
+{{color=math|Lex}} reads in a collection of regular expression, and uses it to write a C or C++ program that will perform lexical analysis. This program is almost always *faster* than one you can write by hand.
+...
+{{color=math|Yacc}} reads in the output from Lex (a stream of tokens) and parses it using its own set of rules (based on grammars). This is almost always *slower* than a hand written parser, but *much faster* to implement. Yacc stands for " Yet Another Compiler Compiler ".
+---
+### Problems for you
+...
+Write a program using Emplex that will print out all of the hashtags found in a file, but will ignore everything else.
+...
+Write a program that will count all words in a file with a capital ' A ' in them, but **not** in the first or last position.
+...
+Write a program that will count the number of times people’s names appear in a file that is triggered by honorifics ( Mr , Ms , Senator, etc.).
+---
+### More patterns...
+...
+What regular expression can we use to detect comments?
+...
+- #.*
+What about literal strings?
+- Does this work? `\".*\"`
+- What about: `\"[^"]*\"`
+- We need to use: `\"[^"\n]*\"`

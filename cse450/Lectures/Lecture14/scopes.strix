@@ -1,0 +1,41 @@
+// Project 3 scope and initialization regression examples.
+function ScopeExample() : double {
+  double x = 10;
+  {
+    double x = x + 1;
+    x = 20;
+  }
+  return x;
+}
+function ShadowValue() : double {
+  double x = 10;
+  {
+    double x = x + 1;
+    return x;
+  }
+  return 0;
+}
+function Skipped(double flag) : double {
+  if (flag) double x = 7;
+  return x;
+}
+function ResetLocal(double n) : double {
+  double sum = 0;
+  while (n > 0) {
+    double t = 0;
+    t = t + 1;
+    sum = sum + t;
+    n = n - 1;
+  }
+  return sum;
+}
+function Nested() : double {
+  double sum = 0;
+  double i = 0;
+  while (i < 3) {
+    i = i + 1;
+    while (1) { sum = sum + 10; break; }
+    sum = sum + 1;
+  }
+  return sum;
+}

@@ -1,0 +1,6 @@
+// INVALID: a later function makes the complete module invalid.
+function Good() : double { return 1; }
+function Bad() : double {
+  break;
+  return 0;
+}

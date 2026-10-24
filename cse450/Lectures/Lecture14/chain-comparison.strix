@@ -1,0 +1,4 @@
+// INVALID: comparisons are non-associative.
+function Bad(double a, double b, double c) : double {
+  return a < b < c;
+}

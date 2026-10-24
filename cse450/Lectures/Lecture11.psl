@@ -1,0 +1,436 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #CCCCFF
+!set visitedlinkcolor #CCCCFF
+!set size 30
+
+!set palette focus #FFD166
+!set palette id #8CD9FF
+!set palette done #B6A0D6
+!set palette emp #80FF80
+!set palette explain #DF97FF
+
+!style note {size=27px, w=1112px}
+!style code {font=Menlo, size=23px, w=740px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+!style node {size=22px, pad=0px, align=center, fill=#173749, stroke=#8CD9FF, textcolor=#F4F1E8, thick=2}
+!style edge {color=#8AA5B5, thick=2}
+
+
+# CSE450 Translation of Programming Languages
+## Lecture 11:Generating and Running WebAssembly Text (WAT)
+
+---
+### The Generated WAT Program
+[full] @(70, 150) {$code, w=765px, size=18px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local $var2 f64)       ;; c_sqr
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (local.set $var2)
+    (local.get $var2)       ;; Assignment result
+    (drop)                ;; Unused by statement
+    (local.get $var2)
+    (f64.sqrt)
+    (return)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+[explain] @(870, 180) {$note, w=330px, size=27px, color=explain} Each operator follows its operands in the emitted instruction stream.
+...
+[assign] @(870, 335) {$note, w=330px, size=27px, color=explain} The assignment leaves a value. The enclosing statement discards it.
+...
+[implicit] @(870, 495) {$note, w=330px, size=25px, color=explain} At the function’s end, the final f64 can also be returned implicitly. The later source examples omit `(return)`.
+---
+### How Do I Run This WAT Code?
+[s1] @(84, 175) {$note, w=1112px, size=32px} **1. Convert WAT to Wasm.**
+[command] @(84, 250) {$code, w=1112px, size=28px, pad=6px} ```bash
+wat2wasm hypotenuse.wat -o hypotenuse.wasm
+```
+...
+[s2] @(84, 365) {$note, w=1112px, size=32px} **2. Write an HTML file that loads the Wasm module.**
+...
+[s3] @(84, 470) {$note, w=1112px, size=32px} **3. Serve the files and open the HTML page in a browser.**
+[serve] @(84, 550) {$note, w=1112px, size=27px, color=emp} Use an HTTP server so fetch can load hypotenuse.wasm.
+---
+### Installing wat2wasm
+[intro] @(70, 150) {$note, w=1140px, size=30px} `wat2wasm` is part of **WABT**, the WebAssembly Binary Toolkit.
+[mac] @(70, 245) {$note, w=540px, size=28px, color=emp} **macOS: use your package manager**
+[maccommands] @(70, 305) {$code, w=545px, size=23px} ```bash
+# Homebrew
+brew install wabt
+
+# Or MacPorts
+sudo port install wabt
+```
+...
+[linux] @(665, 245) {$note, w=545px, size=28px, color=emp} **Ubuntu / Ubuntu in Windows WSL**
+[linuxcommands] @(665, 305) {$code, w=545px, size=23px} ```bash
+sudo apt update
+sudo apt install wabt
+```
+[other] @(70, 565) {$note, w=1140px, size=26px} Other systems: [WABT releases and build instructions](https://github.com/WebAssembly/wabt).
+[source] @(70, 625) {$note, w=1140px, size=23px, color=id} Course instructions: [Project 3 tool setup](../project3.html).
+% Source: web/project3.md, "Set up the tools to test your compiler".
+% Verified: https://github.com/WebAssembly/wabt and https://formulae.brew.sh/formula/wabt
+---
+### Checking the Tools and Building the Binary
+[check] @(70, 160) {$code, w=1140px, size=27px} ```bash
+wat2wasm --version
+python3 --version
+```
+[explain] @(70, 300) {$note, w=1140px, size=29px} If `wat2wasm` is not found, check PATH or open a new terminal.
+...
+[compile] @(70, 405) {$code, w=1140px, size=27px} ```bash
+wat2wasm hypotenuse.wat -o hypotenuse.wasm
+```
+[binary] @(70, 510) {$note, w=1140px, size=29px, color=emp} This validates the WAT and writes the binary that the browser loads.
+[refresh] @(70, 600) {$note, w=1140px, size=27px} After a WAT edit: rebuild the `.wasm` file, then reload the page.
+---
+### Serving the Example over HTTP
+[folder] @(70, 155) {$note, w=1140px, size=28px} In `web/Lectures/hypotenuse`, keep these files together:
+[files] @(70, 225) {$code, w=1140px, size=25px} ```text
+hypotenuse.wat     hypotenuse.wasm     hypotenuse.html
+```
+...
+[server] @(70, 350) {$code, w=1140px, size=26px} ```bash
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+[url] @(70, 455) {$note, w=1140px, size=30px, color=emp} Open [http://localhost:8000/hypotenuse.html](http://localhost:8000/hypotenuse.html).
+[why] @(70, 540) {$note, w=1140px, size=27px} Use the HTTP URL so `fetch` can load the Wasm file. Leave the server running.
+[stop] @(70, 625) {$note, w=1140px, size=25px, color=id} Stop the server with Ctrl-C when you finish.
+---
+### Loading Wasm in JavaScript
+[fetch] @(70, 180) {$code, w=760px, size=23px, pad=6px} ```javascript
+fetch('hypotenuse.wasm');
+```
+[explain] @(870, 180) {$note, w=330px, size=27px, color=explain} fetch starts the request and returns a Promise.
+...
+!anim fetch hide 0.15s
+[await] @(70, 180) {$code, w=760px, size=23px, pad=6px} ```javascript
+await fetch('hypotenuse.wasm');
+```
+!anim explain text await waits for the response inside an async function.
+...
+!anim await hide 0.15s
+[js0] @(70, 180) {$code, w=760px, size=21px, pad=6px} ```javascript
+const wasm_file = await fetch('hypotenuse.wasm');
+```
+!anim explain text Keep the response object.
+...
+[js1] @(70, 235) {$code, w=760px, size=21px, pad=6px} ```javascript
+const buffer = await wasm_file.arrayBuffer();
+```
+!anim explain text Read the response body as binary bytes.
+...
+[js2] @(70, 290) {$code, w=760px, size=21px, pad=6px} ```javascript
+const module = await WebAssembly.instantiate(buffer);
+```
+!anim explain text Compile and instantiate the Wasm module.
+...
+[js3] @(70, 345) {$code, w=760px, size=21px, pad=6px} ```javascript
+const { CalcHypotenuse } = module.instance.exports;
+```
+!anim explain text Get the exported function by name.
+...
+[js4] @(70, 400) {$code, w=760px, size=21px, pad=6px} ```javascript
+const x = 3.0; const y = 4.0;
+```
+!anim explain text Choose the two side lengths.
+...
+[js5] @(70, 455) {$code, w=760px, size=21px, pad=6px} ```javascript
+const result = CalcHypotenuse(x, y);
+```
+!anim explain text Call the exported function just like a JavaScript function.
+...
+[js6] @(70, 510) {$code, w=760px, size=21px, pad=6px} ```javascript
+console.log('Side1 = ' + x + '; Side2 = ' + y);
+```
+!anim explain text Print the inputs.
+...
+[js7] @(70, 565) {$code, w=760px, size=21px, pad=6px} ```javascript
+console.log('hypot = ' + result);
+```
+!anim explain text The hypotenuse is 5.
+---
+### A Minimal HTML Page
+[page] @(70, 150) {$code, w=850px, size=21px} ```html
+<p id="result">Loading...</p>
+<script>
+  async function run_program() {
+    const response = await fetch('hypotenuse.wasm');
+    if (!response.ok) throw Error(response.status);
+    const bytes = await response.arrayBuffer();
+    const { instance } =
+      await WebAssembly.instantiate(bytes);
+    const { CalcHypotenuse } = instance.exports;
+    document.querySelector('#result').textContent =
+      CalcHypotenuse(3, 4);
+  }
+  run_program().catch(error => {
+    document.querySelector('#result').textContent =
+      'Could not run Wasm: ' + error.message;
+  });
+</script>
+```
+[explain] @(955, 175) {$note, w=245px, size=26px, color=explain} The async function waits for the binary before calling the export.
+...
+[result] @(955, 390) {$note, w=245px, size=27px, color=emp} The page displays 5.
+[demo] @(955, 490) {$note, w=245px, size=25px} The complete example adds inputs and a Calculate button.
+% API: https://developer.mozilla.org/en-US/docs/WebAssembly/Reference/JavaScript_interface/instantiate_static
+---
+### Live Example: CalcHypotenuse
+[open] @(70, 155) {$note, w=1140px, size=32px, color=emp} [Open the interactive example](hypotenuse/hypotenuse.html)
+[predict] @(70, 260) {$note, w=1140px, size=30px} Predict the return values before running each call:
+[calls] @(70, 325) {$code, w=670px, size=28px} ```javascript
+CalcHypotenuse(3, 4)
+CalcHypotenuse(5, 12)
+CalcHypotenuse(1.5, 2)
+```
+...
+[answer1] @(805, 337) {$note, w=350px, size=28px, color=emp} 5
+[answer2] @(805, 376) {$note, w=350px, size=28px, color=emp} 13
+[answer3] @(805, 415) {$note, w=350px, size=28px, color=emp} 2.5
+...
+[boundary] @(70, 515) {$note, w=1140px, size=28px} JavaScript reads the inputs and updates the page. Wasm computes the hypotenuse.
+[change] @(70, 605) {$note, w=1140px, size=27px, color=id} New inputs need only another function call. New WAT code needs a rebuild.
+---
+### Finding a Failure
+[build] @(70, 165) {$note, w=1140px, size=29px} **WAT validation error:** check operand types, the stack, and the declared result.
+...
+[fetch] @(70, 285) {$note, w=1140px, size=29px} **Fetch failure or HTTP 404:** check the server, the URL, and the `.wasm` filename.
+...
+[export] @(70, 405) {$note, w=1140px, size=29px} **Missing function:** JavaScript uses the exact export string `CalcHypotenuse`.
+...
+[old] @(70, 525) {$note, w=1140px, size=29px} **Old output after a WAT edit:** rebuild the binary and reload the page.
+[tools] @(70, 640) {$note, w=1140px, size=25px, color=emp} The browser's Console and Network tabs help identify which step failed.
+---
+### The Same Workflow in Project 3
+[compiler] @(70, 165) {$note, w=1140px, size=30px} Your compiler generates WAT from the source program.
+...
+[runner] @(70, 285) {$note, w=1140px, size=30px} The test script runs your compiler, then uses `wat2wasm` to build the binaries.
+...
+[server] @(70, 415) {$note, w=1140px, size=30px} Serve the project's `tests/` directory and open its test page to run the Wasm.
+...
+[check] @(70, 555) {$note, w=1140px, size=29px, color=emp} A valid Wasm module can still compute the wrong answer. Test its results as well as its syntax.
+% Source: web/project3.md, "Run the tests" and "Load the results".
+---
+% PowerPoint slides 88–96.
+### Removing Redundant Instructions
+[opt0] @(70, 150) {$code, w=765px, size=19px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local $var2 f64)       ;; c_sqr
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (local.set $var2)
+    (local.get $var2)       ;; Assignment result
+    (drop)                ;; Unused by statement
+    (local.get $var2)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+[explain] @(870, 175) {$note, w=330px, size=26px, color=explain} Start with the generated program. At the end of this function, the result can be returned implicitly.
+...
+[h1] {color=focus, thick=3, fill=none, round=0} !rect (75,481.2) (755,26.599999999999998)
+[h2] {color=focus, thick=3, fill=none, round=0} !rect (75,507.79999999999995) (755,26.599999999999998)
+!anim explain text This get immediately followed by drop has no effect.
+...
+!anim h1 hide 0.15s
+!anim h2 hide 0.15s
+!anim opt0 hide 0.15s
+[opt1] @(70, 150) {$code, w=765px, size=19px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local $var2 f64)       ;; c_sqr
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (local.set $var2)
+    (local.get $var2)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+!anim explain text Remove the unused assignment value and its drop.
+...
+[h3] {color=focus, thick=3, fill=none, round=0} !rect (75,454.59999999999997) (755,53.199999999999996)
+!anim explain text The remaining set/get pair stores the sum, then immediately reloads it. Here, c_sqr has no later uses.
+...
+!anim h3 hide 0.15s
+!anim opt1 hide 0.15s
+[opt2] @(70, 150) {$code, w=765px, size=19px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local $var2 f64)       ;; c_sqr
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+!anim explain text Keep the sum on the stack for f64.sqrt and remove the set/get pair.
+...
+[h4] {color=focus, thick=3, fill=none, round=0} !rect (75,241.8) (755,26.599999999999998)
+!anim explain text Now $var2 is unused, so its local declaration can be removed.
+...
+!anim h4 hide 0.15s
+!anim opt2 hide 0.15s
+[opt3] @(70, 150) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+!anim explain text The result is a compact sequence of stack instructions.
+[format] @(870, 440) {$note, w=330px, size=26px, color=emp} Other WAT formats can make the same computation easier to read.
+---
+### Folding the Optimized Program
+[fold0] @(70, 150) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+!anim fold0 hide 0.15s
+[explain] @(850, 185) {$note, w=345px, size=27px, color=explain} Fold the first product.
+[fold1] @(70, 170) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (f64.mul (local.get $var0) (local.get $var0))
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+!anim fold1 hide 0.15s
+!anim explain text Fold the second product.
+[fold2] @(70, 170) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (f64.mul (local.get $var0) (local.get $var0))
+    (f64.mul (local.get $var1) (local.get $var1))
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+!anim fold2 hide 0.15s
+!anim explain text Fold the addition around the two products.
+[fold3] @(70, 170) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (f64.add
+      (f64.mul (local.get $var0) (local.get $var0))
+      (f64.mul (local.get $var1) (local.get $var1))
+    )
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+!anim fold3 hide 0.15s
+!anim explain text Fold the square root around the addition.
+[fold4] @(70, 170) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (f64.sqrt
+      (f64.add
+        (f64.mul (local.get $var0) (local.get $var0))
+        (f64.mul (local.get $var1) (local.get $var1))
+      )
+    )
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+[equiv] @(850, 410) {$note, w=345px, size=27px, color=emp} The folded and flat forms perform the same operations in the same order.
+---
+% PowerPoint slides 105.
+### Structure of a Compiler
+[stage0] {$node, size=25px, fill=#612245} !rect (440,146) (420,44) Source Language
+[stage1] {$node, size=25px, fill=#173749} !rect (440,210) (420,44) Lexical Analyzer
+[link1] {$edge} !arrow (650,190) (650,210)
+[stage2] {$node, size=25px, fill=#173749} !rect (440,266) (420,44) Syntax Analyzer
+[link2] {$edge} !arrow (650,254) (650,266)
+[stage3] {$node, size=25px, fill=#173749} !rect (440,322) (420,44) Semantic Analyzer
+[link3] {$edge} !arrow (650,310) (650,322)
+[stage4] {$node, size=25px, fill=#173749} !rect (440,378) (420,44) Int. Code Generator
+[link4] {$edge} !arrow (650,366) (650,378)
+[stage5] {$node, size=25px, fill=#654614} !rect (440,448) (420,44) Intermediate Code
+[link5] {$edge} !arrow (650,422) (650,448)
+[stage6] {$node, size=25px, fill=#173749} !rect (440,518) (420,44) Code Optimizer
+[link6] {$edge} !arrow (650,492) (650,518)
+[stage7] {$node, size=25px, fill=#173749} !rect (440,574) (420,44) Target Code Generator
+[link7] {$edge} !arrow (650,562) (650,574)
+[stage8] {$node, size=25px, fill=#1B5439} !rect (440,644) (420,44) Target Language
+[link8] {$edge} !arrow (650,618) (650,644)
+[front] @(925, 286) {$note, w=270px, size=32px} **Front End**
+[back] @(925, 540) {$note, w=270px, size=32px} **Back End**
+[frontbrace] {color=id, thick=3} !polyline (420,210) (400,210) (400,422) (420,422)
+[backbrace] {color=id, thick=3} !polyline (420,518) (400,518) (400,618) (420,618)

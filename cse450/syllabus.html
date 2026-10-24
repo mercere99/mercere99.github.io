@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CSE450: Syllabus</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1
+id="cse450-translation-of-programming-languages---fall-2026-syllabus">CSE450:
+Translation of Programming Languages - Fall 2026 Syllabus</h1>
+<p><strong>Instructor:</strong> Charles Ofria (<a
+href="mailto:ofria@cse.msu.edu" class="email">ofria@cse.msu.edu</a>)<br>
+<em>Office</em>: ISTB 1103<br> <em>Office Hours</em>: after class &amp;
+by appointment</p>
+<p><strong>TA:</strong> Berlitz Cockburn (<a
+href="mailto:kiinoter@msu.edu" class="email">kiinoter@msu.edu</a>)<br>
+<em>Office Hours</em>: Tuesdays 5–6pm (over Zoom; see Piazza for link) +
+by appointment</p>
+<p><strong>Web page:</strong> <a href="http://www.cse.msu.edu/~cse450/"
+class="uri">http://www.cse.msu.edu/~cse450/</a></p>
+<p><strong>Meeting time &amp; room:</strong> Mon/Wed 12:40–2:00pm, STEM
+2201</p>
+<p><strong>Pre-reqs</strong>: CSE 331 and (CSE 320 or ECE 331) - We
+expect a solid working knowledge of C/C++ (from CSE 232) and an
+understanding of basic algorithms and data structures (searching,
+sorting, linked lists, trees).</p>
+<p><strong>Textbooks</strong>: None required.<br> <em>Recommended</em>:
+Compilers: Principles, Techniques, and Tools by Aho, Lam, Sethi, and
+Ullman, Addison-Wesley; 2nd edition, ISBN: 978-0321486813</p>
+<p><strong>Course Description</strong>: Theory and practice of
+programming language translation. Languages, grammars and parsing.
+Lexical, syntactic and semantic analysis. Compile-time error handling.
+Code optimization and code generation.</p>
+<!-- TODO: Add a "Learning Objectives" section here - what students should be able to do by the end of the course. -->
+<h2 id="grading">Grading</h2>
+<ul>
+<li>50% Projects (5 projects at 10% each)</li>
+<li>50% Quizzes (5 quizzes at 10% each)</li>
+</ul>
+<p>Your numeric grade shall be determined by the weighted average of
+your scores on the projects and quizzes, as described below. By
+default:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Average</th>
+<th style="text-align: center;">Grade</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">90%+</td>
+<td style="text-align: center;">4.0</td>
+</tr>
+<tr>
+<td style="text-align: center;">86%+</td>
+<td style="text-align: center;">3.5</td>
+</tr>
+<tr>
+<td style="text-align: center;">82%+</td>
+<td style="text-align: center;">3.0</td>
+</tr>
+<tr>
+<td style="text-align: center;">78%+</td>
+<td style="text-align: center;">2.5</td>
+</tr>
+<tr>
+<td style="text-align: center;">74%+</td>
+<td style="text-align: center;">2.0</td>
+</tr>
+<tr>
+<td style="text-align: center;">70%+</td>
+<td style="text-align: center;">1.5</td>
+</tr>
+<tr>
+<td style="text-align: center;">66%+</td>
+<td style="text-align: center;">1.0</td>
+</tr>
+<tr>
+<td style="text-align: center;">Under 66%</td>
+<td style="text-align: center;">0.0</td>
+</tr>
+</tbody>
+</table>
+<p>I reserve the right to adjust these numbers later in the term.</p>
+<h2 id="projects">Projects</h2>
+<p>There will be five projects over the course of the semester, each
+contributing 10% to your final grade, for a total of 50%. You must work
+on all of the projects individually, though you may collaborate on idea,
+algorithms, and debugging as long as you don’t share large chunks of
+code.</p>
+<!-- TODO: Add a short list of the five projects here (topic + what gets built), matching the project pages linked from the course web site. -->
+<p><strong>Handing in</strong>: All projects will be handed in through a
+git repository that will be assigned to you; the specific details will
+be announced on Piazza. Each project will have its own repository, with
+both the student and instructors as members. The project must have a
+Makefile to manage compilation; the initial project skeleton that you
+are provided will have a working Makefile that will typically require
+minimal modification (if any) to customize for your project. As you are
+working on a project you must regularly <code>commit</code> files to
+demonstrate activity and <code>push</code> the results to provide
+instructors access. Only code that is pushed will be considered “turned
+in”, with the date stamp of the push, not the individual commits.</p>
+<p><strong>Due dates:</strong> Each project will be worked on for
+approximately a 3 week period. A check in (to force you to start early)
+will be due after two weeks, and the main project will be due on the
+date indicated (by midnight). If students notify the instructors (on
+Piazza) in advance, they will be allowed to turn in projects up to five
+days late; extensions should be used rarely as each project builds on
+previous concepts, so if you are late on one project we do not want it
+to cascade into the next. Instructors may talk with students who use
+multiple extensions to help you come up with a better time management
+plan.</p>
+<p>Once the five-day late period has passed, project solutions will be
+handed out to the class. As such, no project submissions can be accepted
+beyond that point, since the solutions are then publicly available. Plan
+accordingly: an extension buys you five days, not an open-ended
+window.</p>
+<p><strong>Check-Ins</strong> Project check-ins will be due exactly one
+week before the main project is due. They require you to have started
+implementing the project features (you are welcome to start with the
+easy ones first!) Specifically, check-ins are worth 25% of the score of
+the overall project (i.e., 2.5 points) and require you to:</p>
+<ul>
+<li>Successfully pass at least 25% of the functionality test cases for
+the project. (You don’t need to worry about the error test cases yet.)
+For Projects 3–5, use the designated current-project check-in group
+described in the handout and selected by <code>make check-in</code>;
+inherited regression tests do not replace that milestone.</li>
+<li>Include an initial README file indicating which test cases you
+pass.</li>
+<li>Add a <code>my_tests/</code> directory with at least one test
+program in it, somehow different from the instructor provided test
+cases. Your code does not need to pass this test case yet, but it must
+adhere to the project specifications. Particularly clever test cases
+(especially those that help other students find flaws in their code) may
+earn you extra credit.</li>
+</ul>
+<p><em>Note regarding student-supplied test cases</em>: We will NOT
+automatically take points off the code of other students who fail your
+test case unless it uncovers a problem that they should have reasonably
+caught. We WILL, however, let them know about the problem know so that
+they can avoid the same problem in the future. Our goal is for everyone
+to learn how to produce as solid compilers as possible, not to
+nickle-and-dime for points.</p>
+<h2 id="quizzes">Quizzes</h2>
+<p>There will be five quizzes in this course, each of which will be
+worth 10% of your final grade, for a total of 50%. Note that you must
+score at least 50% of the total quiz points or you will automatically
+receive a zero in the course. Each quiz is tied to the project you are
+working on at the time, and each one is offered in three versions. All
+of the dates are on the <a href="schedule.html">course calendar</a>.</p>
+<ul>
+<li>The <strong>first version</strong> comes in the middle of the
+three-week period you spend on the associated project, once you have had
+time to make yourself familiar with the concepts. Beyond testing you, it
+is meant to highlight the key points and the issues you are most likely
+to run into over the rest of the project.</li>
+<li>The <strong>second version</strong> comes a few days before that
+project is due, when you have used all of the material in practice and
+should be considerably more comfortable with it.</li>
+<li>The <strong>third version</strong> is given during the final exam
+slot, in place of a normal final. At that point you may retry any of the
+quizzes you would like to improve.</li>
+</ul>
+<p>Each version is a new quiz covering the same material, and only the
+highest-scoring attempt for each quiz will be used in calculating your
+final grade. A quiz that you are already happy with is one you never
+need to take again.</p>
+<p><strong>Quiz logistics</strong>: All quizzes are administered through
+D2L, but they are taken <em>in person</em>, during our regularly
+scheduled class session. You must be present in class to take a quiz.
+Bring a laptop on quiz days. If your machine dies or you otherwise end
+up without one, don’t panic — I bring a few paper copies of each quiz to
+class for exactly that situation.</p>
+<p><strong>Make-ups</strong>: There are no make-up quizzes. The three
+scheduled attempts at each quiz <em>are</em> the make-up mechanism — if
+you miss the first attempt, take the second; if you miss both, take the
+third during the final exam slot. If you miss all three attempts at a
+given quiz, you will receive a zero for that quiz.</p>
+<p><strong>Project-specific questions</strong>: Quizzes will include
+questions about the projects — not just the concepts behind them, but
+the specific decisions, trade-offs, and failure modes you run into while
+building the thing. These questions are written so that a student who
+did the work can answer them quickly, and a student who did not cannot
+answer them at all, no matter how well they have read the project
+description. This is deliberate, and it is the main reason the projects
+and the quizzes are each worth half of your grade: the projects are how
+you learn the material, and the quizzes are how I find out whether you
+did. I also reserve the right to ask questions about what you
+specifically did in your own code. Since a project has to be handed in
+before I can ask you about it, questions of that kind will always show
+up on a <em>later</em> quiz than the project they refer to.</p>
+<h2 id="software-and-tools">Software and Tools</h2>
+<p>You will develop your projects on your own machine, so you need a
+working toolchain in place before the first project is due:</p>
+<ul>
+<li>A <strong>C++ compiler supporting C++23</strong> (or later).</li>
+<li>Standard developer tools, including <code>make</code> and
+<code>git</code>.</li>
+<li>Tools for working with <strong>WebAssembly</strong> (we will cover
+the specific options in class before they are needed, starting with
+Project 3).</li>
+</ul>
+<p>You will also need an account on whichever repository host we use for
+handing in projects; that will be announced on Piazza.</p>
+<p>Getting a compiler installed and <em>actually working</em> is often
+the most frustrating part of the first week of a course like this, and
+the answer differs across Windows, macOS, and Linux. This class is small
+enough that I am willing to work with you individually until your setup
+genuinely works — come to office hours or post on Piazza, and we will
+get it sorted out. Please do not quietly fight a broken toolchain for
+two weeks; you cannot do the projects without one, and this is a
+solvable problem.</p>
+<h2 id="communication">Communication</h2>
+<p><strong>All course communication will be handled through <a
+href="https://piazza.com/">Piazza</a>.</strong> Announcements, project
+clarifications, and questions about course material all belong there,
+and it is the first place you should look when you are stuck — if you
+have a question, odds are good that several of your classmates have the
+same one.</p>
+<p>Please use Piazza rather than email for course questions so that the
+whole class benefits from the answer. Anything that needs to stay
+private — grades, personal circumstances, extension requests — can be
+posted privately on Piazza, visible only to the instructors.</p>
+<p>Grades will be tracked in D2L.</p>
+<h2 id="grading-policies">Grading Policies</h2>
+<p>Beyond the grade you receive on your projects and quizzes, several
+other factors can affect your final grade:</p>
+<p><strong>Extra Credit</strong>: Throughout the course, you may have
+opportunities to receive <em>extra credit</em> points by implementing
+difficult additional features, and in general I may reward particularly
+clever answers with extra credit points. Extra credit is not required,
+and I will construct any grade curve ignoring extra-credit points. Once
+grades are assigned, I will consider the extra credit to boost grades up
+to a maximum of one step (that is, one-half letter grade).</p>
+<p><strong>Re-grades</strong>: Requests for re-grading can go in either
+direction. I am often generous when I first grade something, so please
+be sure that I did make a mistake before you submit your request. On the
+other hand, my goal is for you to understand the course material, so I
+will always be willing to explain to you any portion that you are stuck
+on. All requests for re-grades must come in writing, within one week of
+the return of the graded item. Thereafter, no requests will be
+considered, so be sure to look over your returned projects and quizzes
+in a timely manner.</p>
+<p><strong>Academic Dishonesty</strong>: Because a goal of this course
+is to teach professionalism, any academic dishonesty will be viewed as
+evidence that this goal has not been achieved, and will be grounds for
+receiving a final grade of 0.0. Examples of academic dishonesty include
+(but are not limited to):</p>
+<ul>
+<li>Copying another student’s code or exam answers</li>
+<li>Using code implemented by someone else specifically to solve this
+project (i.e., don’t get someone else to do your project for you!)</li>
+<li>Using code implemented by someone (or something) else without
+attributing credit (i.e., you can use tools, libraries, code snippets
+from the web, or even LLMs, but you must include a comment in your code
+or your README!)</li>
+<li>Including code as your own that you do not understand.</li>
+<li>Writing code that deceptively passes the test cases, but doesn’t
+solve the problem given (i.e., do not abuse automatic grading mechanisms
+to gain unearned points.)</li>
+<li>Submitting a solution that you do not understand or cannot explain
+to an instructor.</li>
+<li>Providing false information to the instructor about matters related
+to the course.</li>
+<li>Facilitating another student in any of these activities.</li>
+</ul>
+<p>You must be able to explain how your code works if requested by the
+instructor. It is understood that you may not understand every nuance of
+the code, but do not use any code in your projects if you don’t think
+you have a general understanding of why it produces the result it
+does.</p>
+<p>Beyond the course-level consequences described above, MSU requires
+instructors to report academic dishonesty to the student’s academic
+dean; such reports become part of your student record and may carry
+additional university-level consequences. The relevant university
+policies are MSU’s <a
+href="https://reg.msu.edu/AcademicPrograms/Print.aspx?Section=112">Integrity
+of Scholarship and Grades</a> policy and General Student Regulation
+1.00.</p>
+<h2 id="generative-ai">Generative AI</h2>
+<p>Large language models and AI coding assistants are a real part of
+modern software development, and I am not going to pretend otherwise.
+You may use them on the projects, subject to three rules:</p>
+<ol type="1">
+<li><strong>Attribute it.</strong> Any code that came from an LLM — like
+code from a library, a web search, or another person — must be credited
+in a comment in your code or in your README. The standard here is
+exactly the same as for any other outside source.</li>
+<li><strong>Understand it.</strong> You must be able to explain how any
+part of your submission works if an instructor asks. Submitting code
+that you cannot explain is academic dishonesty regardless of where it
+came from, and “the AI wrote it” is not a defense.</li>
+<li><strong>Remember what it is for.</strong> The projects exist to
+teach you how compilers work; the quizzes test whether you learned it.
+Quizzes include questions that can only be answered by someone who
+actually built the project (see the Quizzes section above), so if you
+outsource the thinking on a project, you will typically discover the
+cost two weeks later on the corresponding quiz, when there is no
+assistant available and half your grade is on the line.</li>
+</ol>
+<p>A practical warning: a compiler is a large, stateful program where a
+subtly wrong decision in one phase surfaces as a baffling failure three
+phases later. AI assistants are good at producing plausible code for
+problems like this and much less good at producing <em>correct</em> code
+for them. However the code got written, the bugs are yours to find and
+explain.</p>
+<p><strong>Quizzes are different.</strong> Quizzes are closed to all
+outside assistance, including AI tools, notes, and other people, unless
+I explicitly say otherwise for a particular quiz.</p>
+<p><strong>Oral exams</strong>: If I have reason to believe that a
+student has outsourced their learning — to an AI assistant, to another
+student, or to anything else — I reserve the right to ask that student
+to explain their project to me in person, and to use that conversation
+in determining their grade on the project. This is not a punishment and
+it is not an accusation; it is simply the most direct way to find out
+what someone actually knows. If you did the work, an oral exam is a
+short and fairly pleasant conversation about code you understand.</p>
+<h2 id="class-sessions">Class Sessions</h2>
+<p>Each class session will typically consist of some combination of:</p>
+<ul>
+<li>Lecture</li>
+<li>Open discussion</li>
+<li>Live coding demonstrations</li>
+<li>Coding exercises (individually or in small groups)</li>
+<li>Quizzes</li>
+</ul>
+<p>Students are expected to attend all classes in person (no remote
+option will be available) and are strongly encouraged to bring a laptop
+to be able to fully participate in any in-class coding or other similar
+activities. In some cases, videos may be assigned before a class
+session; students are expected to watch the video to be able to keep up
+with course material and engage in discussions.</p>
+<p>Attendance is critical for success in this course. While we will not
+assign a portion of your grade based on attendance, three or more
+unexcused absences is grounds for receiving a zero in the course. Note
+that I do not want you to come to class sick; if you are not feeling
+well you simply need to e-mail me to get an excused absence. Please let
+me know at least two weeks in advance if a religious holiday or a
+university-sanctioned event is going to require you to miss class.</p>
+<h2 id="course-materials-and-recording">Course Materials and
+Recording</h2>
+<p><strong>Recording</strong>: Please ask before recording any class
+session. Recordings made for your own study use are generally fine, but
+they may not be shared or posted publicly. If you have an RCPD
+accommodation that includes recording, no separate permission is needed
+— just let me know.</p>
+<p><strong>Course materials</strong>: Slides, project descriptions, test
+cases, and quizzes are provided for your use in this course. Please do
+not post them publicly or pass them along to students in future
+semesters.</p>
+<p><strong>Your project repositories</strong>: Keep your project
+repositories private while the course is running — a public repository
+with a working solution in it creates problems for your classmates and
+for you. Once the semester is over you are welcome to make them public;
+a compiler you wrote yourself is a genuinely good thing to show off.</p>
+<h2 id="university-resources-and-policies">University Resources and
+Policies</h2>
+<p><strong>Accommodations</strong>: Michigan State University is
+committed to providing equal opportunity for participation in all
+programs, services, and activities. Students with disabilities should
+contact the <a href="https://www.rcpd.msu.edu">Resource Center for
+Persons with Disabilities</a> (RCPD) to establish reasonable
+accommodations. Once you have a Verified Individualized Services and
+Accommodations (VISA) form, please share it with me as early in the
+semester as possible so that we can put the accommodations in place;
+requests that arrive immediately before a quiz may not be possible to
+honor for that quiz.</p>
+<p><strong>Mental health and well-being</strong>: Your well-being
+matters more than any deadline in this course. MSU’s <a
+href="https://caps.msu.edu">Counseling and Psychiatric Services</a>
+(CAPS) provides free, confidential support to students, including 24/7
+crisis services. If you are struggling — with this course or with
+anything else — please reach out to them, and please also talk to me so
+that I can help where I can.</p>
+<p><strong>Title IX and mandatory reporting</strong>: I care about your
+safety and want to support you. However, MSU designates instructors as
+mandatory reporters: if you disclose to me an incident of sexual
+harassment, sexual assault, relationship violence, or stalking, I am
+required to share that information with the university’s Office of
+Institutional Equity. If you would like to speak with someone
+confidentially instead, MSU’s <a
+href="https://centerforsurvivors.msu.edu">Center for Survivors</a> and
+CAPS can provide confidential support. You can also <a
+href="https://civilrights.msu.edu/file-a-report/index.html">file a
+report directly</a>.</p>
+<h2 id="general-notes">General Notes</h2>
+<p>The goal of this course is for you to learn about compilers. If you
+find that anything is coming in your way of that goal, please talk with
+me about it. I plan to keep the class flexible to the learning styles
+that seem to work best for the students, so feedback is always
+appreciated.</p>
+<p><strong>Inclusive Classroom</strong>: By taking this class, you
+acknowledge to adhere to the MSU values of Diversity and Inclusion as
+outlined in its <a
+href="https://trustees.msu.edu/about/statement-diversity-inclusion.html">Statement
+on Diversity and Inclusion</a>. If you feel marginalized, tokenized, or
+targeted by a microaggression — talk to the instructor or report any
+issues to MSU Office of Institutional Equity (OIE) using this link: <a
+href="https://civilrights.msu.edu/file-a-report/index.html"
+class="uri">https://civilrights.msu.edu/file-a-report/index.html</a>.</p>
+<p><strong>The Spartan Code of Honor Academic Pledge</strong>: As a
+Spartan, I will strive to uphold values of the highest ethical standard.
+I will practice honesty in my work, foster honesty in my peers, and take
+pride in knowing that honor is worth more than grades. I will carry
+these values beyond my time as a student at Michigan State University,
+continuing the endeavor to build personal integrity in all that I
+do.</p>
+</body>
+</html>

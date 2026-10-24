@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CSE 450: Project 1</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1 id="cse450-project-1-lexical-analysis">CSE450 Project 1: Lexical
+Analysis</h1>
+<h3 id="check-in-sunday-september-13th-by-midnight">Check In: Sunday,
+September 13th, by Midnight</h3>
+<h3 id="project-due-sunday-september-20th-by-midnight">Project Due:
+Sunday, September 20th, by Midnight</h3>
+<p>For this first project, you will write C++ code for a fully working
+interpreter for a language called “Marquee”, a small language for
+scripting a scrolling sign; the hardest part should be designing the
+lexical analyzer (i.e., the “scanner” or “tokenizer”). You will
+implement string variables, string literals, numeric literals, and
+simple commands to assemble strings and post them to the sign. The
+values you will work with will be stored on a stack, as described
+below.</p>
+<p>The program that you turn in will load a source file (specified as a
+command-line argument), which it will execute line-by-line. Step one is
+to set up a working lexer that will remove whitespace and comments and
+convert each word or symbol into a <strong>token</strong>. A token is
+one or more characters that are grouped together as a unit, such as all
+of the letters in a variable’s name or all of the characters in a
+number. Tokens make subsequent processing of a file much easier because
+the input is cleaned up and grouped into meaningful units. We are
+providing <a href="Emplex/Emplex.html">Emplex</a>, a tool for generating
+C++ lexers from sets of regular expressions, that you must use. Once you
+have the vector of tokens you must process it, outputting results as
+appropriate; see the next section for the language specifications.</p>
+<p>Be warned that the token types in Marquee are designed so that
+<em>writing the regular expressions is the real work of this
+project</em>. Several of them interact with each other in ways that will
+not work if you write the obvious pattern without thinking it through;
+the specification below tells you exactly what must and must not match,
+and you should test your lexer against those cases before you write any
+of the interpreter.</p>
+<p>Each student must write this project on their own, with no code
+provided by other students. You may use pre-existing web resources and
+get AI help, but you MUST cite any code that you did not write yourself
+(with a URL, if available, for the original source or AI log.)
+Furthermore you may only use code that you understand how it works and
+can explain; I reserve the right to have you explain your project to me
+in particularly egregious cases, adjusting your grade if appropriate.
+See the <a href="syllabus.html">Generative AI section of the
+syllabus</a> for the full policy.</p>
+<h2 id="marquee-specifications">Marquee Specifications</h2>
+<p>A program in Marquee is a script for a sign: it builds up strings,
+stores them, and posts them to the sign at specified times. A program
+consists of keywords (commands), variable names, literal strings, and
+numbers, as well as whitespace and comments. Each line has a single
+keyword; the keywords are followed by zero or more arguments, which can
+be variable names, literal strings, or numbers. Arguments may be
+separated by any number of spaces or tabs.</p>
+<ul>
+<li>The <strong>keywords</strong> are “LOAD”, “SAVE”, “JOIN”, “CUT”,
+“REPEAT”, “WAIT”, and “SHOW”. These are reserved values and cannot be
+used as variable names.</li>
+<li>The <strong>variable names</strong> are sequences of alphanumeric
+characters and underscores. A variable name cannot begin with a digit.
+For example, <code>state</code>, <code>i</code>, or
+<code>my_var4</code>, but not <code>4ever</code>.</li>
+<li>The <strong>literal strings</strong> are sequences that begin and
+end with either a single quote or double quote (start and end symbols
+must be identical.) A literal string may not have a quote inside of it
+of the same type as the start/end quote, unless you are doing the second
+extra credit.</li>
+<li>The <strong>numbers</strong> come in four flavors (integer,
+hexadecimal, decimal, and duration), described in detail below.</li>
+<li>The <strong>comments</strong> come in two flavors (line comments and
+block comments), also described below.</li>
+</ul>
+<p>The internal state of a Marquee program consists of:</p>
+<ul>
+<li>a global stack of strings,</li>
+<li>a table of variable names mapped to their current values (i.e., a
+“symbol table”), and</li>
+<li>a clock, measured in whole milliseconds, which starts at 0.</li>
+</ul>
+<h3 id="numbers">Numbers</h3>
+<p>Marquee has four kinds of numeric literal. Getting these right is the
+central challenge of the project.</p>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 20%" />
+<col style="width: 36%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Examples</th>
+<th>Rules</th>
+<th>Value as text</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Integer</strong></td>
+<td><code>42</code>, <code>7</code>, <code>1_000_000</code></td>
+<td>One or more decimal digits. Single underscores are allowed
+<em>between</em> digits as separators.</td>
+<td>The digits, with underscores removed (<code>1_000_000</code> →
+<code>1000000</code>)</td>
+</tr>
+<tr>
+<td><strong>Hexadecimal</strong></td>
+<td><code>0x2A</code>, <code>0xff</code>, <code>0xDEAD_BEEF</code></td>
+<td>A <code>0x</code> prefix (lowercase <code>x</code>) followed by one
+or more hex digits (<code>0</code>-<code>9</code>,
+<code>a</code>-<code>f</code>, <code>A</code>-<code>F</code>).
+Underscores are allowed between hex digits.</td>
+<td>The decimal value (<code>0x2A</code> → <code>42</code>,
+<code>0xff</code> → <code>255</code>)</td>
+</tr>
+<tr>
+<td><strong>Decimal</strong></td>
+<td><code>3.5</code>, <code>0.25</code>, <code>1_000.50</code></td>
+<td>Digits, a single period, then more digits. At least one digit is
+required on each side of the period. Underscores are allowed between
+digits on either side.</td>
+<td>As written, with underscores removed (<code>1_000.50</code> →
+<code>1000.50</code>)</td>
+</tr>
+<tr>
+<td><strong>Duration</strong></td>
+<td><code>250ms</code>, <code>1.5s</code>, <code>2m</code>,
+<code>90_000ms</code></td>
+<td>An integer or a decimal immediately followed by a unit:
+<code>ms</code> (milliseconds), <code>s</code> (seconds), or
+<code>m</code> (minutes). No whitespace is allowed before the unit.</td>
+<td>The total number of whole milliseconds (<code>1.5s</code> →
+<code>1500</code>, <code>2m</code> → <code>120000</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>A separator underscore must have a digit on <strong>both</strong>
+sides of it; <code>1_000</code> is a legal integer, but
+<code>_100</code>, <code>100_</code>, and <code>1__000</code> are not.
+If a duration works out to a fraction of a millisecond, round
+<em>down</em> to the nearest whole millisecond (so <code>0.0005s</code>
+is a duration of <code>0</code> milliseconds).</p>
+<p>Some of these token types are prefixes of others, and Marquee relies
+on the standard lexer rule that the <em>longest</em> match wins. The
+following table shows how several tricky inputs must be tokenized; your
+lexer should reproduce all of them.</p>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 32%" />
+<col style="width: 52%" />
+</colgroup>
+<thead>
+<tr>
+<th>Input</th>
+<th>Tokenizes as</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>1_000</code></td>
+<td>one integer</td>
+<td>Longest match takes the whole thing, rather than an integer
+<code>1</code> followed by a variable named <code>_000</code>.</td>
+</tr>
+<tr>
+<td><code>1_</code></td>
+<td>integer <code>1</code>, then variable <code>_</code></td>
+<td>The trailing underscore cannot be part of the number, so the longest
+legal integer is just <code>1</code>.</td>
+</tr>
+<tr>
+<td><code>0x1F</code></td>
+<td>one hexadecimal</td>
+<td>Not an integer <code>0</code> followed by a variable named
+<code>x1F</code>.</td>
+</tr>
+<tr>
+<td><code>0x</code></td>
+<td>integer <code>0</code>, then variable <code>x</code></td>
+<td>A hex literal needs at least one hex digit after the prefix.</td>
+</tr>
+<tr>
+<td><code>250ms</code></td>
+<td>one duration</td>
+<td>Not an integer <code>250</code> followed by a variable named
+<code>ms</code>.</td>
+</tr>
+<tr>
+<td><code>250 ms</code></td>
+<td>integer <code>250</code>, then variable <code>ms</code></td>
+<td>Whitespace is not allowed before the unit.</td>
+</tr>
+<tr>
+<td><code>12msec</code></td>
+<td>duration <code>12ms</code>, then variable <code>ec</code></td>
+<td>Longest match takes <code>12ms</code> as a duration; the leftovers
+are a perfectly good variable name. (This will end up as an error when
+the statement is processed, but that is the parser’s problem, not the
+lexer’s.)</td>
+</tr>
+<tr>
+<td><code>3.</code></td>
+<td>integer <code>3</code>, then a stray <code>.</code></td>
+<td>A decimal needs digits after the period, so <code>3</code> is the
+longest number here and the <code>.</code> is not part of any legal
+token.</td>
+</tr>
+<tr>
+<td><code>.5</code></td>
+<td>a stray <code>.</code>, then integer <code>5</code></td>
+<td>Likewise, a decimal needs digits <em>before</em> the period.</td>
+</tr>
+</tbody>
+</table>
+<p>Any character that cannot begin a legal token (such as the stray
+<code>.</code> above, or a <code>@</code>) should be reported as an
+<code>Unexpected token</code> error, with the offending character as the
+lexeme. It is easiest to handle this by giving your lexer a final
+catch-all pattern that matches any single character, so that it always
+produces a token rather than failing. The two exceptions are a quote
+that never closes and a <code>/*</code> that never closes; those have
+their own error messages, described under Error Reporting.</p>
+<h3 id="comments">Comments</h3>
+<p>Marquee has two kinds of comment, and both must be removed before the
+tokens are processed.</p>
+<ul>
+<li>A <strong>line comment</strong> is a pair of forward slashes (that
+is, “<code>//</code>”) followed by any sequence of characters, ending at
+the next newline.</li>
+<li>A <strong>block comment</strong> begins with “<code>/*</code>” and
+ends at the next “<code>*/</code>”. A block comment may span multiple
+lines, and it may appear in the middle of a line. Block comments do
+<strong>not</strong> nest: the <em>first</em> <code>*/</code> ends the
+comment, so in <code>/* outer /* inner */</code> the comment is over
+after the only <code>*/</code> that appears.</li>
+</ul>
+<p>Neither kind of comment has any special meaning inside of a literal
+string. For example, <code>SHOW "https://cse.msu.edu"</code> prints the
+whole URL, and <code>SHOW "/* hello */"</code> prints
+<code>/* hello */</code> exactly.</p>
+<p>A <code>/*</code> with no matching <code>*/</code> before the end of
+the file is an error (see Error Reporting).</p>
+<h3 id="lines-and-statements">Lines and Statements</h3>
+<p>Every statement must be contained on a single line: the keyword and
+all of its arguments appear together, and the statement ends at the
+newline. Empty lines, and lines that contain only whitespace and
+comments, are allowed and do nothing.</p>
+<p>A block comment that spans multiple lines also ends the statement it
+appears in. For example:</p>
+<pre><code>SHOW /* this comment
+ends the statement */ &quot;hello&quot;</code></pre>
+<p>Here the <code>SHOW</code> is a complete statement with no arguments,
+and <code>"hello"</code> begins a new statement (which will report an
+<code>Unknown command</code> error, since a literal string is not a
+keyword).</p>
+<h3 id="the-load-and-save-keywords">The <code>LOAD</code> and
+<code>SAVE</code> Keywords</h3>
+<p>The <code>LOAD</code> and <code>SAVE</code> keywords allow a Marquee
+programmer to control the top of the stack and the values associated
+with variables stored in the symbol table.</p>
+<p>A <strong>LOAD</strong> statement begins with the keyword
+<code>LOAD</code> followed by a single argument that is a variable name,
+a literal string, or a number. If a variable name is used, the value of
+that variable is pushed onto the stack. If a literal string is used, the
+string it directly represents is pushed onto the top of the stack. If a
+number is used, its value as text (per the table above) is pushed onto
+the top of the stack.</p>
+<p>A <strong>SAVE</strong> statement begins with the keyword
+<code>SAVE</code> followed by a single variable name. The top string on
+the stack is removed and placed into that variable as its new value.</p>
+<p>For example:</p>
+<table>
+<colgroup>
+<col style="width: 19%" />
+<col style="width: 28%" />
+<col style="width: 25%" />
+<col style="width: 27%" />
+</colgroup>
+<thead>
+<tr>
+<th>Code</th>
+<th>Stack (<strong>TOP</strong> →)</th>
+<th>Symbol Table</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LOAD</code> <code>"FIRST"</code></td>
+<td><strong>“FIRST”</strong></td>
+<td><em>(empty)</em></td>
+<td>LOAD a literal string onto stack</td>
+</tr>
+<tr>
+<td><code>LOAD</code> <code>"next"</code></td>
+<td>“FIRST”, <strong>“next”</strong></td>
+<td><em>(empty)</em></td>
+<td>Most recent string is at stack top</td>
+</tr>
+<tr>
+<td><code>SAVE var1</code></td>
+<td><strong>“FIRST”</strong></td>
+<td>var1=“next”</td>
+<td>SAVE sets variables in symbol table</td>
+</tr>
+<tr>
+<td><code>LOAD</code> <code>'March'</code></td>
+<td>“FIRST”, <strong>“March”</strong></td>
+<td>var1=“next”</td>
+<td></td>
+</tr>
+<tr>
+<td><code>LOAD</code> <code>0x04</code></td>
+<td>“FIRST”, “March”, <strong>“4”</strong></td>
+<td>var1=“next”</td>
+<td>Numbers are loaded as their text value</td>
+</tr>
+<tr>
+<td><code>SAVE day</code></td>
+<td>“FIRST”, <strong>“March”</strong></td>
+<td>var1=“next”, day=“4”</td>
+<td></td>
+</tr>
+<tr>
+<td><code>SAVE month</code></td>
+<td><strong>“FIRST”</strong></td>
+<td>var1=“next”, day=“4”, month=“March”</td>
+<td></td>
+</tr>
+<tr>
+<td><code>LOAD</code> <code>day</code></td>
+<td>“FIRST”, <strong>“4”</strong></td>
+<td>var1=“next”, day=“4”, month=“March”</td>
+<td>LOAD can be called on a variable</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-join-and-cut-keywords">The <code>JOIN</code> and
+<code>CUT</code> Keywords</h3>
+<p>The <code>JOIN</code> and <code>CUT</code> keywords are used to
+either merge two strings together (appending one to the other) or to
+split a single string apart into two pieces.</p>
+<p>A <strong>JOIN</strong> statement begins with the keyword
+<code>JOIN</code> followed by one or two <em>optional</em> arguments,
+each of which is a variable name, a literal string, or a number. If one
+or both arguments are missing, values from the top of the stack will be
+used in their place. The strings associated with the two arguments
+should be merged together into a single string and that resulting string
+should be pushed onto the top of the stack.</p>
+<p>For example: <code>JOIN "CSE" "450"</code> will push the string
+“CSE450” onto the stack.</p>
+<p>A <strong>CUT</strong> statement begins with the keyword
+<code>CUT</code>, followed by one or two arguments, the
+<em>delimiter</em> and the <em>pattern</em> (the second of which is
+optional). The command will search for the delimiter inside of the
+pattern, and then split the two pieces from either side (removing the
+delimiter from it entirely). The resulting sub-strings are pushed onto
+the stack in order. For example, if the command is:</p>
+<pre><code>CUT &quot;at&quot; &quot;Foundation&quot;</code></pre>
+<p>it would find the “at” in the middle of “Foundation”, removing it and
+splitting the string apart at that point. It would then push the strings
+“Found” and “ion” onto the top of the stack. Since “Found” is pushed
+first, it will be below “ion” on the stack.</p>
+<p>If the delimiter is not found anywhere inside of the pattern, the
+entire pattern is pushed onto the stack first, followed by an empty
+string.</p>
+<p>Arguments that <em>are</em> provided always fill in from the left, so
+the single argument of a <code>CUT</code> is always the delimiter. Any
+argument that is missing is taken from the stack, from right to left;
+that is, when both arguments of a <code>JOIN</code> are missing, the
+first value popped becomes the second (right) argument and the next
+value popped becomes the first (left) argument. A <code>CUT</code> with
+no delimiter is a <code>Missing argument</code> error; <code>JOIN</code>
+and <code>SHOW</code> are the only commands that may appear with no
+arguments at all. For example:</p>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 34%" />
+<col style="width: 43%" />
+</colgroup>
+<thead>
+<tr>
+<th>Code</th>
+<th>Stack (<strong>TOP</strong> →)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LOAD</code> <code>"This</code> <code>is</code> <code>a</code> <code>"</code></td>
+<td><strong>“This is a”</strong></td>
+<td>Load beginning onto stack</td>
+</tr>
+<tr>
+<td><code>LOAD "sentence"</code></td>
+<td>“This is a”, <strong>“sentence”</strong></td>
+<td>Load rest onto stack</td>
+</tr>
+<tr>
+<td><code>JOIN</code></td>
+<td><strong>“This is a sentence”</strong></td>
+<td>No arguments, so top two strings on stack are merged</td>
+</tr>
+<tr>
+<td><code>CUT</code> ” ”</td>
+<td>“This”, <strong>“is a sentence”</strong></td>
+<td>Only one argument (a single space), so the pattern was taken from
+stack</td>
+</tr>
+<tr>
+<td><code>CUT</code> ” ”</td>
+<td>“This”, “is”, <strong>“a sentence”</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>CUT</code> ” ”</td>
+<td>“This”, “is”, “a”, <strong>“sentence”</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>JOIN</code> ” new ”</td>
+<td>“This”, “is”, “a”, <strong>” new sentence”</strong></td>
+<td>JOIN with one argument will pre-pend to top of stack</td>
+</tr>
+<tr>
+<td><code>JOIN</code></td>
+<td>“This”, “is”, <strong>“a new sentence”</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-repeat-keyword">The <code>REPEAT</code> Keyword</h3>
+<p>A <strong>REPEAT</strong> statement begins with the keyword
+<code>REPEAT</code>, followed by a <em>count</em> and then an
+<em>optional</em> argument. The count must be an integer or a
+hexadecimal number; a decimal or a duration is an error. If the second
+argument is missing, the string is taken from the top of the stack. The
+string is repeated <code>count</code> times and the result is pushed
+onto the stack. A count of <code>0</code> produces an empty string.</p>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 34%" />
+<col style="width: 43%" />
+</colgroup>
+<thead>
+<tr>
+<th>Code</th>
+<th>Stack (<strong>TOP</strong> →)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LOAD "-"</code></td>
+<td><strong>“-”</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>REPEAT 5</code></td>
+<td><strong>“—–”</strong></td>
+<td>No second argument, so the top of the stack is used</td>
+</tr>
+<tr>
+<td><code>REPEAT 3 "ab"</code></td>
+<td>“—–”, <strong>“ababab”</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>REPEAT 0x2 "!"</code></td>
+<td>“—–”, “ababab”, <strong>“!!”</strong></td>
+<td>A count may be written in hex</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-wait-and-show-keywords">The <code>WAIT</code> and
+<code>SHOW</code> Keywords</h3>
+<p>A <strong>WAIT</strong> statement begins with the keyword
+<code>WAIT</code> followed by a single duration, which is added to the
+program’s clock. Nothing is printed, and the stack is not changed. Your
+interpreter must <strong>not</strong> actually pause; the clock is a
+number that you keep track of, not real elapsed time. An argument that
+is not a duration is an error.</p>
+<p>A <strong>SHOW</strong> statement begins with the <code>SHOW</code>
+keyword, followed by zero or more arguments. If at least one argument is
+provided, the strings associated with each argument should be printed to
+the screen. If no argument is provided, the top of the stack is popped
+and printed to the screen.</p>
+<p>Every line printed by <code>SHOW</code> begins with the current clock
+value in square brackets, followed by a single space, and ends with a
+newline. Beyond that prefix, no additional whitespace should be added.
+So a <code>SHOW</code> at the very beginning of a program prints
+<code>[0]</code> before its text.</p>
+<p>Here are some example statements (assume that they follow the sample
+code above):</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 26%" />
+<col style="width: 21%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr>
+<th>Code</th>
+<th>Stack (<strong>TOP</strong> →)</th>
+<th>Symbol Table</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SHOW "Hello"</code></td>
+<td>“This”, “is”, <strong>“a new sentence”</strong></td>
+<td></td>
+<td><code>[0] Hello</code></td>
+</tr>
+<tr>
+<td><code>WAIT 1.5s</code></td>
+<td><em>(unchanged)</em></td>
+<td></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>SHOW</code></td>
+<td>“This”, <strong>“is”</strong></td>
+<td></td>
+<td><code>[1500] a new sentence</code></td>
+</tr>
+<tr>
+<td><code>WAIT 500ms</code></td>
+<td><em>(unchanged)</em></td>
+<td></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>SAVE my_word</code></td>
+<td><strong>“This”</strong></td>
+<td>my_word=“is”</td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>SHOW 'This ' my_word ' is printed.'</code></td>
+<td><strong>“This”</strong></td>
+<td>my_word=“is”</td>
+<td><code>[2000] This is printed.</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="a-complete-example">A Complete Example</h3>
+<pre><code>// Sign script for the CSE 450 classroom
+LOAD &quot;=&quot;
+REPEAT 12
+SAVE rule           // rule is now a line of 12 equals signs
+
+LOAD &quot;CSE&quot;
+LOAD &quot;450&quot;
+JOIN
+SAVE course         /* course is now &quot;CSE450&quot; */
+
+SHOW rule
+SHOW course &quot; -- Compilers&quot;
+WAIT 1.5s
+SHOW rule</code></pre>
+<p>This code should output:</p>
+<pre><code>    [0] ============
+    [0] CSE450 -- Compilers
+    [1500] ============</code></pre>
+<h2 id="error-reporting">Error Reporting</h2>
+<p>In addition to being able to load in and interpret a working Marquee
+program, you also need to be able to identify incorrect code and report
+back to the user what the problems were.</p>
+<p>All errors must begin with “<code>ERROR (line ??):</code>” with the
+?? being replaced by the actual line number that the error occurred on.
+For example:</p>
+<pre><code>ERROR (line 3): Unknown variable &#39;foo&#39;</code></pre>
+<p>The specific errors that your program must report are:</p>
+<table>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 69%" />
+</colgroup>
+<thead>
+<tr>
+<th>Error</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unknown command ‘ABC’</td>
+<td>If the first non-whitespace token of a statement is not a keyword.
+Note that empty lines (consisting only of whitespace or comments) ARE
+allowed.</td>
+</tr>
+<tr>
+<td>Unknown variable ‘ABC’</td>
+<td>If an argument is a variable name, but not already in the symbol
+table</td>
+</tr>
+<tr>
+<td>Stack underflow</td>
+<td>If a command tries to pop a string from an empty stack</td>
+</tr>
+<tr>
+<td>Missing argument</td>
+<td>If a command is missing an argument that it requires</td>
+</tr>
+<tr>
+<td>Unexpected token ‘ABC’</td>
+<td>Any other time an invalid token appears (such as too many arguments,
+a keyword as an argument, a duration where a count is required, a count
+where a duration is required, or a character that cannot start any legal
+token.)</td>
+</tr>
+<tr>
+<td>Non-terminating string literal</td>
+<td>If the input file has a string with an open quote, but no close to
+match it on the same line.</td>
+</tr>
+<tr>
+<td>Non-terminating comment</td>
+<td>If the input file has a <code>/*</code> with no matching
+<code>*/</code> before the end of the file.</td>
+</tr>
+</tbody>
+</table>
+<p>In all cases above, the ‘ABC’ should be replaced with the actual
+lexeme that was found. For a non-terminating comment, report the line on
+which the <code>/*</code> appeared. Multiple test cases exist associated
+with each error to help you refine your output.</p>
+<p>Once an error occurs, you should halt execution. DO NOT try to
+recover and continue interpreting the code from there.</p>
+<h2 id="implementation-suggestions">Implementation Suggestions</h2>
+<h3 id="token-identification">Token Identification</h3>
+<p>In implementing the Marquee language, you should first design the
+regular expressions that you need to identify the relevant tokens and
+then use <a href="Emplex/Emplex.html">Emplex</a> to build a C++ lexer
+that will identify them. Specifically, you should consider identifying
+the keywords either as a single KEYWORD token type (where you then check
+the lexeme produced) or as seven different token types, one per keyword
+(which will allow you to use a <code>switch</code> statement to act on a
+given keyword). You also need to identify variable names, literal
+strings, and each of the four kinds of number, as well as eliminate
+whitespace and both kinds of comment.</p>
+<p>A <strong>pattern</strong> is a rule by which a token is identified.
+It will be up to you as part of this project to design a regular
+expression that describes the patterns associated with each token type
+that you need. A <strong>lexeme</strong> is an instance of a pattern
+that was matched in a source file. For example, “my_var” is a lexeme
+that might be categorized as the token type IDENTIFIER. On the other
+hand the lexeme “   ” is a lexeme of three spaces that might get
+identified as a token of the type WHITESPACE.</p>
+<p>When multiple patterns match the text being processed, a lexer will
+choose the one that produces the <em>longest</em> lexeme that starts at
+the current position. If two different patterns match lexemes of the
+same length, a lexer will choose the one that comes <em>first</em> in
+the provided list. For example, in a C++ compiler if we had the lexeme
+“<code>int</code>” it could be matched either as a TYPE or as an
+IDENTIFIER. As long as TYPE type comes first in the token patterns, it
+will be correctly classified. If, however, we had the variable name
+“<code>interest_rate</code>”, we don’t want the lexer to stop after the
+“int” at the beginning and select “TYPE”; it will instead find the
+longer match of IDENTIFIER.</p>
+<p>A few specific things to think about as you design your patterns:</p>
+<ul>
+<li><strong>Do the numbers first, and test them by themselves.</strong>
+The four numeric types overlap each other and overlap variable names;
+the table of tricky inputs in the specification above is there so that
+you can check your patterns before the rest of your code exists.</li>
+<li><strong>You cannot look ahead.</strong> Emplex has no way to say
+“match this only if that follows” and no way to refer back to an earlier
+part of a match. Every rule in the specification has to be built into
+the pattern itself. In particular, this means the unit on a duration is
+<em>part of</em> the duration pattern, and the two styles of literal
+string need to be handled as two alternatives rather than as one pattern
+that remembers which quote it started with.</li>
+<li><strong>Separators are a “between” rule, not a “contains”
+rule.</strong> A pattern like “digits and underscores in any order” will
+happily match <code>1__0</code> and <code>100_</code>. Think about the
+shape of a number as a first digit group followed by repeated (separator
++ digit group) pieces.</li>
+<li><strong>Block comments are the hardest pattern here.</strong> You
+need to match everything up to the <em>first</em> <code>*/</code>, which
+means being careful about how you handle a <code>*</code> that is not
+followed by a <code>/</code>. Build it up slowly and test it on
+<code>/**/</code>, <code>/***/</code>, <code>/* a * b */</code>, and a
+comment that spans three lines.</li>
+<li><strong>Order matters.</strong> Keywords need to come before
+variable names in your list, or <code>SHOW</code> will lex as a variable
+name.</li>
+<li><strong>You can detect the two “never closes” errors with the
+longest-match rule itself.</strong> Consider what happens if,
+<em>after</em> your pattern for a complete literal string, you add a
+second pattern that matches just a single quote character. When a string
+is properly closed, the complete-string pattern produces a longer lexeme
+and wins; when it is not, only the short pattern can match, and you have
+a token that means “a quote started here and nothing legal followed.”
+The same idea works for an unterminated block comment. This is a
+standard trick for reporting lexical errors with a useful line number,
+and it is worth understanding rather than special-casing in your
+interpreter.</li>
+</ul>
+<p>Emplex’s built-in help lists every regular expression feature it
+supports, including character classes, ranges, negation, and the
+<code>{n}</code>, <code>{n,}</code>, and <code>{m,n}</code> repetition
+operators. It is worth reading before you start.</p>
+<h3 id="c-implementations">C++ Implementations</h3>
+<p>As you implement the internal state of the interpreter, you will need
+to consider how you implement some internal classes:</p>
+<p>Each <strong>string</strong> can be implemented directly as an <a
+href="https://en.cppreference.com/w/cpp/string/basic_string.html"><code>std::string</code></a>.
+(Note that <code>std::string</code> is just an alias for
+<code>std::basic_string&lt;char&gt;</code>).</p>
+<p>The <strong>stack</strong> can most directly be implemented as an <a
+href="https://en.cppreference.com/w/cpp/container/stack.html"><code>std::stack</code></a>
+of strings, though <a
+href="https://en.cppreference.com/w/cpp/container/vector.html"><code>std::vector</code></a>
+is also a good choice.</p>
+<p>The <strong>symbol table</strong> will get much more complex in
+future projects (where you will need to worry about scopes, variable
+types, and more useful errors that indicate where variables were first
+defined), but for now you should be able to use just a <a
+href="https://en.cppreference.com/w/cpp/container/map.html"><code>std::map</code></a>
+or <a
+href="https://en.cppreference.com/w/cpp/container/unordered_map.html"><code>std::unordered_map</code></a>
+of variable names to current values (i.e., a map of
+<code>std::string</code> to <code>std::string</code>.) Remember, in C++,
+maps will automatically insert entries if you try to index in and the
+key doesn’t already exist. You can use the <a
+href="https://en.cppreference.com/w/cpp/container/unordered_map/contains.html">contains()</a>
+member function to first check if it exists.</p>
+<p>The <strong>clock</strong> is just an integer count of milliseconds;
+a <code>size_t</code> is fine.</p>
+<p>Converting a numeric lexeme to its text value is a small amount of
+string work once the lexer has done its job. Strip out any underscores
+first (see <a
+href="https://en.cppreference.com/w/cpp/string/basic_string/erase2.html"><code>std::erase</code></a>),
+then convert as needed — <a
+href="https://en.cppreference.com/w/cpp/string/basic_string/stoul.html"><code>std::stoull</code></a>
+takes a base as its third argument, so a hex lexeme (with the
+<code>0x</code> still attached) converts with a base of 16.</p>
+<p>Remember also that when you read in a token of type “string literal”,
+you need to remove the quotes to convert it to an internal string. If
+you are doing the escape characters extra credit (see below) you may
+have to do additional processing of the string.</p>
+<p>We highly recommend that you modularize your code as much as
+possible. If you find yourself doing the same task multiple times, turn
+it into a function. For example:</p>
+<ul>
+<li>A helper function to trigger errors (where you send it the line
+number and main message) will also make it easier to standardize that
+output format, plus it can exit for you after an error.</li>
+<li>Helper functions to push and pop the stack can, for example, check
+if the stack is empty before popping and report the appropriate error if
+it is.</li>
+<li>A helper function to get the current value of a variable can first
+ensure that variable exists (and throw an error if not.)</li>
+<li>A helper function to resolve an argument token into a string
+(handling literals, variables, and numbers in one place) will be used by
+almost every command.</li>
+</ul>
+<h2 id="handing-in-and-grading">Handing In and Grading</h2>
+<p>There are two <strong>due dates</strong> for this project. By
+September 13th (for the Check In), you must have at least 25% of the
+project finished, worth 25% of your project grade (2.5 points). This can
+be <em>any</em> 25%, measured as passing at least 20 of the 80 provided
+test cases. Then, by September 20th, you will be expected to turn in a
+fully working version.</p>
+<p>On both occasions, when you hand in your program, you MUST:</p>
+<ul>
+<li>include a <strong>Makefile</strong> that produces an executable
+named “Project1”; an initial working Makefile is provided with the
+project template. From the main project directory <code>make</code> will
+compile optimized code, <code>make debug</code> will compile with debug
+symbols, and <code>make grumpy</code> will turn on many warnings to
+complain about anything odd you’re doing.</li>
+<li>include a “<strong>README</strong>” or “<strong>README.txt</strong>”
+that specifies which test cases your program is able to complete. You
+should also include any notes that you want us to read before grading
+your program, such as any external resources you used. If you are unable
+to complete the project, you MUST tell us that here to receive partial
+credit.</li>
+<li><strong>run all of the tests</strong>. On a mac or linux command
+line (including WSL) you can use the provided Makefile to run
+“<code>make tests</code>” or run “<code>run_tests.sh</code>” from the
+<code>tests/</code> directory. These will run your executable on each of
+the test files and compare your output to the expected output.
+Alternatively you can just run them on the EGR compute servers.</li>
+</ul>
+<p>If you want to ensure that your code compiles and runs correctly on
+the <strong>EGR compute servers</strong> (compute01.egr.msu.edu through
+compute08.egr.msu.edu; click <a
+href="https://www.egr.msu.edu/decs/labs/compute-servers">here</a> for
+instructions). You will first need to activate a newer version of
+<code>g++</code> by running <code>source $SOFT/gcc14</code> from your
+command line when you log into the compute server (using a bash shell,
+which is default).</p>
+<p>You will be assigned to a git repository for each project. Please
+<code>commit</code> files to the repository as you go to document your
+progress. You should <code>push</code> your code from your machine
+periodically, and especially before the Check In and before the final
+due date.</p>
+<p>When we are <strong>grading</strong> your program:</p>
+<ul>
+<li>The name of the source file must be specified on the command line,
+and your output must go to standard output or standard error. You can
+use output redirection if you want to store your data to a file for
+debugging purposes.</li>
+<li>Any deviation from the specified format will result in
+<strong>deductions</strong> from your score. This means no additional
+formatting of the output and no extra information.</li>
+<li>If you pass all of the provided test cases using generalized
+techniques, you should expect a high score on the project. I will not be
+grading on code style, though I may use additional test cases (similar
+to the ones you have; I won’t try to trick you).</li>
+</ul>
+<h2 id="extra-credit">Extra Credit</h2>
+<p>Extra credit points will be tracked separately from your main project
+and quiz grades and can raise your grade by at most one level (i.e.,
+from a 3 to a 3.5 or a 3.5 to a 4, but not all the way from a 3 to a 4).
+In general, doing an extra credit will be a lot of work and gain you 0.5
+points, so you should do them for the fun challenge more than the boost
+to your grade.</p>
+<p>A few opportunities are available for you to receive extra credit for
+this project. They are:</p>
+<ul>
+<li>Make the keywords <strong>case insensitive</strong>. For example, in
+addition to the “LOAD” keyword, you would also recognize “load”, “Load”,
+or even “LoAd” (and similar for the other options, such as
+“rEpEaT”).</li>
+<li>Allow literal strings to have <strong>escape characters</strong> in
+them including at least newline and escaped quotes. That is, if the
+source program has a backslash followed by the lowercase letter “n”
+(i.e., <code>'\n'</code>), then you should print a newline character in
+its place. For example: <code>SHOW "line 1\nline2"</code>. If there is a
+<code>\"</code> or <code>\'</code> inside of a string it should count as
+part of the string and then print out as a normal quote. For example, if
+a statement is <code>SHOW "say \"ah\" please."</code> it should print:
+<code>say "ah" please.</code> You MAY have additional escape characters
+as well, but are not required to for this extra credit.</li>
+<li>Implement <strong>nested block comments</strong>, so that
+<code>/* outer /* inner */ still a comment */</code> is ignored in its
+entirety. Before you start, convince yourself of <em>why</em> no regular
+expression can do this, no matter how clever you are; that argument is
+worth as much as the implementation, so include it in your README. You
+will need to handle the nesting outside of the lexer.</li>
+</ul>
+<p>You may do all, none, or any subset of the extra credits.</p>
+</body>
+</html>

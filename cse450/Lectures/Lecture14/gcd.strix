@@ -1,0 +1,11 @@
+// Subtraction-based GCD. Example domain: small nonnegative integers.
+// Inputs use doubles because Project 3 has only one source value type.
+function GCD(double a, double b) : double {
+  if (a == 0) return b;
+  if (b == 0) return a;
+  while (a != b) {
+    if (a > b) a = a - b;
+    else b = b - a;
+  }
+  return a;
+}

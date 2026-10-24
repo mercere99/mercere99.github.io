@@ -1,0 +1,5 @@
+// INVALID source
+function Bad() : double {
+  return 1;
+  return missing;
+}

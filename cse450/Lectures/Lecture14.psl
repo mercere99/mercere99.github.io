@@ -1,0 +1,520 @@
+!set baseurl https://www.cse.msu.edu/~cse450/Lectures/Lecture14.psl
+!set baseurl https://www.cse.msu.edu/~cse450/Lectures/Lecture14.psl
+!set baseurl https://www.cse.msu.edu/~cse450/Lectures/Lecture14.psl
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #CCCCFF
+!set visitedlinkcolor #CCCCFF
+!set size 30
+!set palette focus #FFD166
+!set palette id #8CD9FF
+!set palette emp #80FF80
+!set palette explain #DF97FF
+!style note {size=28px, w=1140px}
+!style code {font=Menlo, size=24px, w=750px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+
+# CSE450 Translation of Programming Languages
+## Lecture 14: Project 3 Implementation Workshop
+---
+% SLIDE 2. 00-02. Do not reteach the full flow-control lecture.
+### Project 3 Implementation Gaps
+[prior] @(70,175) {$note} We have built ASTs, generated WAT, run exports, and translated if, while, break, continue, and return.
+...
+[today] @(70,305) {$note, color=emp} Today: expressions with side effects, stable variable bindings, initialization, and useful failure reports.
+...
+[boundary] @(70,425) {$note} **Project 3:** double values, initialized declarations, assignments, comparisons, and structured control flow.
+---
+% SLIDE 3. 02-05. Collect predictions before revealing. Return to these later.
+### Three Predictions
+[a] @(70,150) {$code, w=750px, size=25px} ```cpp
+// Inside a function:
+double a = 0;
+double b = 0;
+a = b = 7;
+```
+[aq] @(865,160) {$note, w=335px} Which variable gets stored first? What value does the assignment expression produce?
+...
+[aa] @(865,325) {$note, w=335px, color=emp} Store b, then a. Value: 7.
+...
+[b] @(70,430) {$note} If an if condition is false, what happens to an unbraced declaration in its body?
+...
+[c] @(70,535) {$note} Should an unknown name after a return still cause a source error?
+...
+[defer] @(70,620) {$note, size=25px, color=explain} Keep the last two predictions. We will test both.
+---
+% SLIDE 4. 05-08. The grammar specifies grouping, not direct parser calls.
+% Implement left-recursive arithmetic rules with loops in recursive descent.
+### Expression Grammar for This Project
+[grammar] @(70,150) {$code, w=1140px, size=25px} ```text
+expression  -> assignment
+assignment  -> primary ('=' assignment)?
+comparison  -> sum (COMPARE_OP sum)?
+sum         -> sum [+-] product | product
+product     -> product [*/] unary | unary
+unary       -> [!-] unary | primary
+primary     -> NUMBER | ID | '(' expression ')'
+```
+...
+[assoc] @(70,500) {$note} **sum and product are left-associative.** Implement these left-recursive rules with loops that grow the left subtree. Assignment recurses right. Comparison permits one operator.
+...
+[check] @(70,640) {$note, size=25px, color=focus} After parsing an assignment, check that its left subtree is a Variable node.
+---
+% SLIDE 5. 08-11. Walk tokens through the two recursive calls.
+### Right-Associative Assignment
+[source] @(70,150) {$code, w=700px, size=27px} ```text
+a = b = 7
+
+Assignment
+  Variable(a)
+  Assignment
+    Variable(b)
+    Number(7)
+```
+...
+[parse] @(835,155) {$note, w=365px} Parse the left comparison. On `=`, parse another assignment as the right child.
+...
+[shape] @(835,340) {$note, w=365px, color=emp} The tree means `a = (b = 7)`. Its target is a variable binding, not a value to load.
+...
+[contrast] @(70,500) {$note} `12 / 3 / 2` groups as `(12 / 3) / 2`, yielding 2. Arithmetic uses a loop that repeatedly extends the left subtree.
+...
+[api] @(70,625) {$note, size=25px, color=id} `ASTKind::Assignment` children: target, then value. `AddChild` owns each subtree by value.
+---
+% SLIDE 6. 11-14. Beware blindly reusing a generic binary-operator loop.
+### Comparison Syntax and Assignment Targets
+[examples] @(70,155) {$code, w=750px, size=26px} ```cpp
+// INVALID:
+a < b < c;
+a == b != c;
+(a + b) = 7;
+
+// Legal when a, b, c are declared:
+(a < b) == 1;
+(a) = 7;
+```
+[compare] @(865,165) {$note, w=335px} After one comparison, reject another comparison operator at this level.
+...
+[parens] @(865,340) {$note, w=335px, color=emp} Parentheses start a new expression parse. They can return the enclosed AST directly.
+...
+[target] @(70,545) {$note} An assignment target must resolve to a Variable node. Parenthesized `a` still identifies a variable. The sum `a + b` does not.
+[where] @(70,645) {$note, size=24px, color=id} Target checks fit the semantic visitor. Chained-comparison rejection belongs in parsing.
+---
+% SLIDE 7. 14-17. Ask students to execute this using Strix rules, not C++ rules.
+### Evaluation Order Is Observable
+[source] @(70,150) {$code, w=750px, size=26px} ```cpp
+function LeftRead() : double {
+  double x = 10;
+  return x - (x = 2);
+}
+```
+[predict] @(865,165) {$note, w=335px, color=focus} What is the returned value? What would reverse-order evaluation return?
+...
+[trace] @(70,350) {$code, w=750px, size=25px} ```text
+left operand:   load x, retain 10
+right operand:  store x = 2, retain 2
+subtraction:   10 - 2 = 8
+```
+...
+[answer] @(865,380) {$note, w=335px, color=emp} Required: 8. Reading x after the assignment would instead yield 2 - 2 = 0.
+...
+[rule] @(70,570) {$note} Strix evaluates operands left to right. Associativity controls grouping. Evaluation order controls when effects happen.
+---
+% SLIDE 8. 17-20. Code is a function-body fragment, not a complete module.
+% Wasm local.tee semantics: spec/core/exec/instructions.html#exec-local-tee.
+### Assignment Translation Preserves Its Value
+[wat] @(70,150) {$code, w=750px, size=26px} ```wat
+;; a = b = 7
+;; a is $var0, b is $var1
+(f64.const 7)
+(local.tee $var1)
+(local.tee $var0)
+```
+[stack] @(865,155) {$note, w=335px} `local.tee` copies the top stack value into a local variable while leaving the operand stack unchanged.
+...
+[stmt] @(70,390) {$code, w=750px, size=26px} ```wat
+;; If used as the statement a = b = 7;
+(drop)
+```
+...
+[expr] @(865,380) {$note, w=335px, color=emp} Note: If used inside return or arithmetic, keep the value for the enclosing expression.
+...
+[contract] @(70,540) {$note} {{color=explain|Declaration}}: initializer plus `local.set`.{{br}}{{color=explain|Assignment expression}}: right side plus `local.tee`. {{br}}{{color=explain|Expression statement}}: expression plus `drop`.
+---
+% SLIDE 9. 20-23. Explicit statements avoid C++ string-concatenation order issues.
+### A Visitor Preserves the Source Contract
+[pseudo] @(70,150) {$code, w=790px, size=24px} ```text
+GenerateExpression(Binary node):
+    GenerateExpression(left child)
+    GenerateExpression(right child)
+    GenerateOperation(opcode)
+
+GenerateExpression(Assignment node):
+    GenerateExpression(right child)
+    id = left child's resolved variable_id
+    Generate("local.tee", id)
+```
+[why] @(905,160) {$note, w=295px} Emit the left operand's code before the right operand's code. Execution then follows the required order.
+...
+[when] @(905,380) {$note, w=295px, color=focus} The compiler emits instructions. Each Wasm call executes them.
+...
+[ast] @(70,580) {$note, size=27px, color=id} This is pseudocode. In the scaffold, inspect `const ASTNode &`, use `GetChild`, and read each node's resolved IDs. Keep translation separate from parsing.
+---
+% SLIDE 10. 23-25. Short discussion, not another full stack lecture.
+### A Stack Audit for Any New Node
+[expr] @(70,155) {$note} **{{color=explain|Expression}}:** leaves one f64 above whatever was already on the stack. Include assignment, comparison, and `!`.
+...
+[stmt] @(70,280) {$note} **{{color=explain|Statement}}:** leaves the existing stack unchanged when it completes normally. `return`, break, and continue transfer control.
+...
+[compare] @(70,405) {$note} A {{color=explain|comparison}} first yields i32. Append `f64.convert_i32_s` when it produces a Strix value. A condition compares its f64 value with zero to obtain i32.
+...
+[bug] @(70,555) {$note, color=lightyellow} {{color=red|Note}}: A bare expression statement that forgets `drop` can invalidate a function even if its return expression is correct.
+---
+% SLIDE 11. 25-28. Ask which x each reference denotes before assigning IDs.
+### A Source Name Can Denote Several Locals
+[source] @(70,150) {$code, w=750px, size=24px} ```cpp
+function ScopeExample() : double {
+  double x = 10;
+  {
+    double x = x + 1;
+    x = 20;
+  }
+  return x;
+}
+```
+[bindings] @(865,155) {$note, w=335px} Outer x gets ID 0. Inner x gets ID 1. The initializer reads ID 0. The assignment writes ID 1.
+
+@(865,355) {$note, w=435px} {{color=emp|What does the function return?}}
+...
+[result] @(865,420) {$note, w=435px, color=emp} **{{size=40|10}}** - Leaving the inner scope restores the outer scope.
+...
+[identity] @(70,580) {$note} A scope map answers which declaration a name means here. `Program::variables` retains every declaration for later phases.
+---
+% SLIDE 12. 28-31. Supplied SymbolTable API names are exact.
+### Initializer Before New Binding
+Parsing: `double x = expression;`
+...
+[pseudo] @(70,220) {$code, w=790px, size=24px} ```text
+read type, name, and '='
+initializer = parse the expression
+require ';'
+id = symbols.DeclareVariable(name_token)
+     build Declaration(id, initializer)
+```
+...
+[order] @(905,225) {$note, w=295px} Registering x too early would make its initializer read the new zero-valued local.
+...
+[errors] @(70,430) {$note} Without a visible outer x, `double x = x + 1;` is an unknown-name error. Every declaration requires an initializer.
+[sharing] @(70,545) {$note} Parameters and the outer function body share a scope. A local cannot redeclare a parameter there. Nested braces may shadow it.
+---
+% SLIDE 13. 31-34. Make the parser/storage distinction concrete.
+### Stable IDs Survive Scope Exit
+[pseudo] @(70,150) {$code, w=750px, size=25px} ```text
+Enter function:
+    create SymbolTable(program, function_id)
+    declare parameters in its initial scope
+
+Enter nested braces: PushScope()
+Resolve a reference:  LookupVariable(token)
+Leave nested braces: PopScope()
+```
+[retained] @(865,155) {$note, w=335px} Pop removes visibility. The variable record and its numeric ID remain available to the translator.
+...
+[function] @(70,465) {$note, w=1035px, color=emp} `FunctionInfo` must retain ordered `parameter_ids`, `local_ids`, and a body AST.
+...
+[storage] @(70,530) {$note} Emit all parameter and local declarations before instructions. Use IDs for WAT names such as `$var0`, even when source spellings repeat.
+...
+[lifetime] @(70,640) {$note, size=24px, color=focus} Keep IDs across vector growth. References to vector elements can become invalid after push_back.
+---
+% SLIDE 14. 34-37. Answers: Skipped(0)=0, Skipped(1)=7, Skipped(0)=0 again.
+### Local Storage and Declaration Execution
+[source] @(70,150) {$code, w=750px, size=25px} ```cpp
+function Skipped(double flag) : double {
+  if (flag) double x = 7;
+  return x;
+}
+```
+...
+[q] @(865,160) {$note, w=335px, color=focus} Predict Skipped(0), Skipped(1), then Skipped(0) again on the same instance.
+...
+[answer] @(865,350) {$note, w=335px, color=emp} 0, 7, 0. Each call starts with fresh locals initialized to zero.
+...
+[scope] @(70,395) {$note, w=750px} Only braces introduce scopes. This unbraced declaration belongs to the surrounding function scope.
+...
+[runtime] @(70,550) {$note} Declare storage at function entry. Execute the initializer at its original position, only when control reaches the declaration.
+---
+% SLIDE 15. 37-40. ResetLocal(3)=3. Wrongly hoisted initializer yields 6.
+### A Loop Runs Its Initializer Each Time
+[source] @(70,150) {$code, w=750px, size=24px} ```cpp
+function ResetLocal(double n) : double {
+  double sum = 0;
+  while (n > 0) {
+    double t = 0;
+    t = t + 1;
+    sum = sum + t;
+    n = n - 1;
+  }
+  return sum;
+}
+```
+...
+[predict] @(865,155) {$note, w=335px, color=focus} What does ResetLocal(3) return? What if t's initializer is moved before the loop?
+...
+[answer] @(865,365) {$note, w=335px, color=emp} Correct: 3. Moving the initializer before the loop makes the sum 1 + 2 + 3 = 6.
+...
+[distinction] @(70,550) {$note, size=27px} The local declaration appears in the WAT header. The initialization instructions remain inside the loop body.
+---
+% SLIDE 16. 40-42. The code is a legal fragment within a function.
+### Small Statement Rules That Affect the AST
+[source] @(70,150) {$code, w=750px, size=25px} ```cpp
+if (a)
+  if (b) x = 1;
+  else x = 2;
+{}
+;
+return x;
+```
+...
+[else] @(865,155) {$note, w=335px} The else attaches to the nearest unmatched if. Parse its then statement recursively before looking for else.
+...
+[empty] @(70,410) {$note, w=1000px, color=emp} Accept empty statements and empty nested blocks. Neither leaves a value.
+...
+[rules] @(70,475) {$note} Reject nested function definitions and top-level statements. Parse the whole file, including input after the last valid function.
+---
+% SLIDE 17. 42-45. Implementation checklist; lexer code is supplied.
+### Lexer Boundaries and Source Locations
+[valid] @(70,175) {$code, w=750px, size=25px} ```text
+Legal:    42   1_000   0x2A   1_000.25
+Invalid:  .5   5.     1e3    1__0
+```
+[validate] @(70,325) {$note} Reject bad bytes, malformed literals, invalid tokens, and unterminated comments. Keep each token's original line for diagnostics.
+...
+[lifetime] @(70,450) {$note} `Lexer::Tokenize` returns its token vector by reference. Copy it or retain and use the lexer object. If using a copied vector, handle EOF explicitly.
+...
+[error] @(70,580) {$note, color=emp} Use `ReportError(token, message)`. The lexer's Error / checked Use helpers use a different diagnostic format.
+---
+% SLIDE 18. 45-48. This is a complete intentionally invalid program.
+### Unreachable Source Still Needs Checking
+[invalid] @(70,150) {$code, w=750px, size=25px} ```cpp
+// INVALID source
+function Bad() : double {
+  return 1;
+  return missing;
+}
+```
+[q] @(865,160) {$note, w=335px, color=focus} The first return always runs. Can the compiler accept this function?
+...
+[answer] @(70,365) {$note, w=800px, color=emp} No. Resolve and validate the second return's expression too. Report the unknown name on line 4.
+...
+[traversal] @(70,470) {$note, w=750px} Parsing and semantic traversal inspect every source node. Runtime reachability is not even analyzed until semantic checking.
+...
+[final] @(70,620) {$note, size=27px} Also check the final direct return and loop context in every function. Reset loop depth between functions.
+---
+% SLIDE 19. 48-50. Driver already implements this ordering.
+### A Failed Compilation Produces No WAT
+[pipeline] @(70,150) {$code, w=1140px, size=24px} ```text
+Parse the complete Program
+Analyze every function
+Generate the complete module string
+Write the module to stdout
+```
+...
+[invalid] @(70,370) {$note} Invalid source requires exit status 1, empty stdout, and `ERROR (line N): useful explanation` on stderr.
+...
+[late] @(70,495) {$note} A valid first function followed by an invalid second function must still produce no WAT.{{br}}{{color=explain|Lexing}}, {{color=explain|Parsing}}, and {{color=explain|Semantic analysis}} should catch all errors.  THEN {{color=explain|code generation}} should be guaranteed to NOT produce errors.
+...
+[debug] @(70,640) {$note, size=25px, color=id} `./Project3 --ast file.strix > file.wat 2> file.log` keeps AST debugging out of WAT. The supplied driver prints ASTs after semantic checking succeeds.
+---
+% SLIDE 20. 50-54. Use one existing failed test's artifacts if available.
+### A Failure Has a Stage
+[compile] @(70,155) {$note} **Compiler failure:** inspect `.compile.log`, the source line, and the AST when available. Check parser and semantic behavior first.
+...
+[assembly] @(70,280) {$note} **Assembly failure:** inspect `.wat` and `.assemble.log`. Look for undeclared locals, stack values, wrong types, and malformed control structure.
+...
+[run] @(70,405) {$note} **Runtime mismatch:** inspect calls and expected values in `tests/manifest.json`, then emitted evaluation order, bindings, and branch targets.
+...
+[timeout] @(70,555) {$note, color=focus} **Timeout:** check condition placement, state updates, and continue targets. A loop must make progress and recheck its condition.
+---
+% SLIDE 21. 54-57. Students can use these sources as original regression seeds.
+### Small Tests That Distinguish Bugs
+[tests] @(70,155) {$code, w=1140px, size=24px} ```text
+Chain():        a = b = 7; return a + b;          expect 14
+Order():        return (x = 2) - (x = 5);         expect -3
+LeftRead():     x starts at 10; return x-(x=2);   expect 8
+ScopeExample(): outer x survives shadowing        expect 10
+ResetLocal(3):  initializer executes each time    expect 3
+Skipped(0), Skipped(1), Skipped(0):               expect 0,7,0
+```
+...
+[why] @(70,435) {$note} Choose inputs that expose the rule. `x + 0` hides operand reversal. Repeated calls expose accidental state that survives function calls.
+...
+[files] @(70,555) {$note, color=emp} [Expression examples](Lecture14/expressions.strix) and [scope examples](Lecture14/scopes.strix) are ready to compile. The companion runner checks exports and source errors.
+---
+% SLIDE 22. 57-60. Begin the 18-minute application block.
+### Building Challenge: GCD in Strix
+...
+[source] @(70,145) {$code, w=790px, size=23px} ```cpp
+function GCD(double a, double b) : double {
+  if (a == 0) return b;
+  if (b == 0) return a;
+  while (a != b) {
+    if (a > b) a = a - b;
+    else b = b - a;
+  }
+  return a;
+}
+```
+[domain] @(905,155) {$note, w=295px} Example domain: small nonnegative integers, stored as doubles. Handle zero first.
+...
+[algorithm] @(905,355) {$note, w=295px, color=emp} Subtract the smaller positive value from the larger. Stop when they match.
+---
+% SLIDE 23. 60-63. Have pairs trace one iteration each, then show the tests.
+### GCD Trace and Progress
+(a, b)
+...
+(48, 18)
+...
+(30, 18)
+...
+(12, 18)
+...
+(12,  6)
+...
+( 6,  6)  => return 6
+
+[proof] @(665,155) {$note, w=535px} For positive integers, subtracting the smaller preserves the common divisors and reduces a + b.
+...
+[zero] @(665,300) {$note, w=535px, color=focus} Without the early returns, what happens to GCD(0, 5)?
+...
+[answer] @(665,410) {$note, w=535px, color=focus} It would repeatedly compute 5 - 0. The explicit zero case prevents that infinite loop.
+[cases] @(70,630) {$note, size=26px, color=emp} Some other tests (48,18): 6, (18,48): 6, (7,7): 7, (0,5): 5, (5,0): 5, (0,0): 0.
+---
+% SLIDE 24. 63-68. Live: type module, export, guards, loop condition.
+% No live coding: students write the condition/exit sequence in pairs.
+### GCD Workshop: Loop Entry and Exit
+[wat] @(70,150) {$code, w=750px, size=24px} ```wat
+;; a is $a, b is $b, both f64 parameters
+;; After handling zero inputs:
+(block $exit
+  (loop $again
+    (local.get $a)
+    (local.get $b)
+    (f64.ne)          ;; i32: a != b
+    (i32.eqz)         ;; Are they equal?
+    (br_if $exit)
+    ;; Body goes here
+    (br $again)
+  )
+)
+```
+[reason] @(865,155) {$note, w=335px} The comparison feeds a condition directly here, so it can remain i32 in this handwritten WAT.
+...
+[generic] @(865,380) {$note, w=335px, color=emp} Your general compiler may convert to a source f64 and back. Correctness comes before optimization.
+---
+% SLIDE 25. 68-72. Live: fill the body; ask where each assignment value goes.
+% No live coding: half the room writes the then branch, half writes the else.
+### GCD Workshop: Updates and Return
+[wat] @(70,145) {$code, w=790px, size=24px} ```wat
+;; Inside the loop, before (br $again):
+(local.get $a)
+(local.get $b)
+(f64.gt)
+(if
+  (then
+    (local.set $a
+      (f64.sub (local.get $a) (local.get $b))))
+  (else
+    (local.set $b
+      (f64.sub (local.get $b) (local.get $a))))
+)
+;; After the block:
+(return (local.get $a))
+```
+[set] @(905,155) {$note, w=295px} Each assignment is a statement. This handwritten version uses local.set because it discards the value.
+...
+[generic] @(905,390) {$note, w=295px, color=emp} A compiler may use local.tee followed by drop. Both preserve the source behavior.
+---
+% SLIDE 26. 72-75. Execute fallback WAT even if student compilers are unfinished.
+### GCD Workshop: Assembly and Execution
+[commands] @(70,150) {$code, w=1140px, size=24px} ```bash
+# In web/Lectures/Lecture14/:
+wat2wasm gcd.wat -o /tmp/lecture14-gcd.wasm
+node run-gcd.mjs /tmp/lecture14-gcd.wasm
+
+# To verify the source through your own compiler:
+./Project3 gcd.strix > /tmp/lecture14-gcd.wat
+wat2wasm /tmp/lecture14-gcd.wat -o /tmp/lecture14-gcd.wasm
+node run-gcd.mjs /tmp/lecture14-gcd.wasm
+```
+[output] @(70,470) {$note} The host calls GCD with six test inputs. The compiler translates the function once. Each host call runs the compiled loop with fresh parameters.
+[fallback] @(70,570) {$note, color=focus} Use the absolute path to your Project3 executable if it lives in another directory. The WAT fallback lets us study execution before the compiler is complete.
+---
+% SLIDE 27. 75-78. Keep the milestone focused and attainable.
+### A Working Check-In Path
+[sequence] @(70,155) {$note} One exported constant-return function first. Then parameters and arithmetic. Then declarations, assignments, and expression statements.
+...
+[checks] @(70,290) {$note} Run `make check-in` to test the 16 designated fixtures. Use `make tests` for the full 130-fixture suite as the remaining language comes together.
+...
+[deliver] @(70,430) {$note} Check-in: Sunday, October 25, by midnight. Include an initial README identifying passing tests and at least one original program in `my_tests/`.
+[final] @(70,570) {$note, color=emp} Final: Sunday, November 1, by midnight. Before submission, test a clean command-line build on the course Linux systems.
+---
+% SLIDE 28. 78-80. Ask for explanations before reveal. Then end the main route.
+### Exit Questions
+[q1] @(70,155) {$note} Why does assignment need to preserve a value even when most assignments appear as statements?
+...
+[q2] @(70,290) {$note} Why can a compiler move local declarations to the function header while keeping their initializer instructions inside a loop?
+...
+[q3] @(70,425) {$note} Your compiler emits valid WAT but Order() returns the wrong result. Which evidence will you inspect next?
+...
+[answers] @(70,565) {$note, size=27px, color=emp} Assignment can feed a larger expression. Storage and initialization have different roles. Inspect the AST and the order of emitted operand code, then run a small distinguishing test.
+!---
+% A1. OPTIONAL POCKET SLIDE. Outside the timed route.
+### Extension Exercise: Nested Loop Context
+[code] @(70,145) {$code, w=790px, size=23px} ```cpp
+function Nested() : double {
+  double sum = 0;
+  double i = 0;
+  while (i < 3) {
+    i = i + 1;
+    while (1) { sum = sum + 10; break; }
+    sum = sum + 1;
+  }
+  return sum;
+}
+```
+[question] @(905,160) {$note, w=295px, color=focus} What should this return? What failure would a single current-loop label cause?
+...
+[answer] @(905,385) {$note, w=295px, color=emp} 33. Inner break targets the inner exit. Restore outer labels after the inner loop.
+[context] @(70,625) {$note, size=26px} Semantic context: loop depth. Translation context: a stack of exit/repeat label pairs. Keep both local to each function.
+!---
+% A2. OPTIONAL POCKET SLIDE. Truth was covered previously; use as a regression.
+% Wasm reference: spec/core/exec/numerics.html, floating-point comparisons.
+### Numeric Boundary Tests
+[tests] @(70,155) {$code, w=1140px, size=25px} ```text
+if (0.5) ...       true
+if (1 / 0) ...     true
+if (0 / 0) ...     true, since NaN != 0
+!(-0)             1.0
+(0 / 0) == 0      0.0
+(0 / 0) != 0      1.0
+```
+[warning] @(70,445) {$note} Compare with zero for truth. Integer truncation changes fractions and may trap for non-finite values.
+[negation] @(70,565) {$note} Negate a condition's i32 truth value with i32.eqz. Replacing `!(a <= b)` with `a > b` changes NaN behavior.
+!---
+% A3. OPTIONAL POCKET SLIDE. Student microtest, not a full compiler solution.
+### An Original Test in the Manifest
+[json] @(70,145) {$code, w=790px, size=23px} ```json
+{
+  "id": "my-assignment-order",
+  "name": "left-to-right assignment effects",
+  "source": "../my_tests/order.strix",
+  "checkin": false,
+  "calls": [
+    {"function": "Order", "args": [], "expected": -3}
+  ]
+}
+```
+[steps] @(905,155) {$note, w=295px} Save my_tests/order.strix. Add this object to tests/manifest.json.
+[scope] @(905,365) {$note, w=295px, color=emp} Run make tests. The new case stays outside the check-in group.
+[rule] @(70,570) {$note} Keep supplied fixtures intact. A test should state an observable result or a required source error, rather than demand one exact WAT spelling.

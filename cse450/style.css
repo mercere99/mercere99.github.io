@@ -1,0 +1,74 @@
+/* Overall page */
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+  color: #222;
+  background-color: #fafafa;
+}
+
+/* Headings */
+h1, h2, h3 {
+  font-weight: 600;
+  line-height: 1.2;
+  color: #2c3e50;
+}
+
+h1 {
+  /* border-bottom: 3px solid #f39c12; */
+  border-bottom: 3px solid #008800;
+  padding-bottom: 0.3em;
+  margin-top: 0;
+}
+
+/* Links */
+a {
+  color: #2980b9;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* Horizontal rules */
+hr, 
+--- {
+  border: 0;
+  border-top: 1px solid #ddd;
+  margin: 2rem 0;
+}
+
+/* Lists */
+ul, ol {
+  margin: 0.5em 0 1.5em 1.5em;
+}
+
+/* Info blocks (like instructor/TA info) */
+section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* Tables: borders + readable spacing */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+th, td {
+  border: 1px solid #d0d7de;   /* light gray */
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+}
+thead th {
+  background: #97c49d;         /* header shading */
+  text-align: left;
+}
+tbody tr:nth-child(odd) {
+  background: #e4ffe7;          /* optional zebra striping */
+}
+

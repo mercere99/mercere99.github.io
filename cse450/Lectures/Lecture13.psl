@@ -1,0 +1,439 @@
+!set baseurl https://www.cse.msu.edu/~cse450/Lectures/Lecture12.psl
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #CCCCFF
+!set visitedlinkcolor #CCCCFF
+!set size 30
+
+!set palette focus #FFD166
+!set palette id #8CD9FF
+!set palette done #B6A0D6
+!set palette emp #80FF80
+!set palette explain #DF97FF
+
+!style note {size=27px, w=1112px}
+!style code {font=Menlo, size=23px, w=740px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+!style node {size=22px, pad=0px, align=center, fill=#173749, stroke=#8CD9FF, textcolor=#F4F1E8, thick=2}
+!style edge {color=#8AA5B5, thick=2}
+
+% Adapted from Lectures/Lecture-12 - WASM-FlowControl.pptx (21 slides).
+% Repeated PowerPoint builds become PSL reveal steps.
+% Project 3 authority: web/project3.md and Code/project3-template/START-HERE.md,
+% AST.hpp, Semantics.hpp, and Translate.hpp. Reviewed 2026-10-13.
+% Wasm references: https://webassembly.github.io/spec/core/syntax/instructions.html
+% and https://webassembly.github.io/spec/core/exec/numerics.html
+
+# CSE450 Translation of Programming Languages
+## Lecture 13: Flow Control in WebAssembly
+---
+% PowerPoint slide 2.
+### What Is Flow Control?
+[definition] @(70, 150) {$note, w=1140px, size=31px} **Flow control** changes which instruction executes next.
+[return] @(90, 265) {$note, w=1100px, size=29px} **{{color=emp|return}}** exits a function and supplies its result.
+...
+[if] @(90, 340) {$note, w=1100px, size=29px} **{{color=emp|if / else}}** chooses a statement based on a condition.
+...
+[while] @(90, 415) {$note, w=1100px, size=29px} **{{color=emp|while}}** repeats a statement while its condition is true.
+...
+[break] @(90, 490) {$note, w=1100px, size=29px} **{{color=emp|break}}** exits the innermost enclosing loop.
+[continue] @(90, 565) {$note, w=1100px, size=29px} **{{color=emp|continue}}** jumps to that loop's condition.
+---
+### Project 3 Stack Contracts
+[expr] @(70, 165) {$note, w=1140px, size=31px} **An expression leaves one `f64` value.** Every Strix source value is a `double`, including comparison results.
+...
+[stmt] @(70, 295) {$note, w=1140px, size=31px} **A statement leaves no value when it finishes normally.** An expression statement uses `drop` to discard its result.
+...
+[cond] @(70, 445) {$note, w=1140px, size=31px} **Wasm `if` and `br_if` consume an `i32` condition.** Convert the source value at this boundary.
+[return] @(70, 590) {$note, w=1140px, size=27px, color=explain} `return` transfers its value to the caller. It does not resume the next statement in this function.
+---
+% PowerPoint slides 4-5.
+### Implementing return
+[wat] @(70, 150) {$code, w=765px, size=23px} ```wat
+(module
+  (func $add
+    (param $var0 f64) (param $var1 f64)
+    (result f64)
+    (local $var2 f64)
+
+    (local.get $var0)
+    (local.get $var1)
+    (f64.add)
+    (local.set $var2)
+
+    (local.get $var2)
+    (return)
+  )
+  (export "Add" (func $add))
+)
+```
+[setup] @(870, 165) {$note, w=330px, size=26px, color=explain} Declare parameters, the f64 result, and all locals before body instructions.
+...
+[value] @(870, 345) {$note, w=330px, size=27px, color=emp} First generate the return expression. Then emit `(return)`.
+...
+[exit] @(870, 510) {$note, w=330px, size=26px, color=explain} This exits the whole function, even from inside an if or loop.
+---
+% PowerPoint slide 7, corrected to satisfy the current final-return rule.
+### The Final Return in Strix
+[source] @(70, 175) {$code, w=790px, size=25px} ```cpp
+function Max(double v1, double v2) : double {
+  if (v1 > v2) return v1;
+  return v2;
+}
+```
+[early] @(905, 180) {$note, w=295px, size=27px, color=explain} The first return is conditional. The final return handles the other case.
+...
+[rule] @(70, 395) {$note, w=1140px, size=30px, color=emp} Each function body must end with a direct `return expression;` statement.
+...
+[both] @(70, 520) {$note, w=1140px, size=28px} Even if both branches of an if/else return, Project 3 still requires a final direct return after the if/else.
+[why] @(70, 630) {$note, w=1140px, size=25px, color=id} This is a simple source-language rule. Wasm itself does not impose it.
+---
+% PowerPoint slide 6.
+### Implementing if / else
+[wat] @(70, 150) {$code, w=765px, size=25px} ```wat
+;; Generate the source condition: f64
+(f64.const 0)
+(f64.ne)              ;; Convert to i32
+(if
+  (then
+    ;; Generate the then statement
+  )
+  (else
+    ;; Generate the else statement
+  )
+)
+```
+[explain] @(870, 170) {$note, w=330px, size=27px, color=explain} The condition selects exactly one branch.
+...
+[optional] @(870, 310) {$note, w=330px, size=27px, color=explain} Omit the `(else ...)` when the source has no else.
+...
+[result] @(870, 455) {$note, w=330px, size=27px, color=emp} A statement if needs no `(result f64)`. Its branches leave no value on normal completion.
+[template] @(70, 640) {$note, w=1140px, size=25px, color=id} Translation template: replace the comments with generated instructions.
+---
+### Converting a Strix Condition
+[wat] @(70, 170) {$code, w=730px, size=28px} ```wat
+;; Source expression leaves an f64
+(f64.const 0)
+(f64.ne)          ;; i32: value != 0
+```
+[zero] @(70, 360) {$note, w=730px, size=30px} **False:** zero, including negative zero.
+[other] @(70, 440) {$note, w=730px, size=30px} **True:** every other value, including fractions, infinities, and NaN.
+...
+[pitfall] @(860, 180) {$note, w=340px, size=29px, color=focus} Why would integer truncation give the wrong answer for 0.5?
+...
+[answer] @(860, 370) {$note, w=340px, size=28px, color=emp} It becomes 0. Comparing with zero preserves the required truth value.
+[not] @(70, 605) {$note, w=1140px, size=26px} For source `!x`: compare x with zero using `f64.eq`, then use `f64.convert_i32_s` to produce a source double.
+---
+### Comparison Results Are Also Doubles
+[wat] @(70, 170) {$code, w=765px, size=25px} ```wat
+;; Source expression: v1 > v2
+(local.get $var0)
+(local.get $var1)
+(f64.gt)             ;; i32: 0 or 1
+(f64.convert_i32_s)   ;; f64: 0.0 or 1.0
+```
+[value] @(870, 175) {$note, w=330px, size=27px, color=explain} A comparison is an expression. Its value may be stored, returned, or used in arithmetic.
+...
+[cond] @(70, 425) {$code, w=765px, size=25px} ```wat
+;; Use that source value as a condition
+(f64.const 0)
+(f64.ne)             ;; Back to i32
+```
+[opt] @(870, 425) {$note, w=330px, size=26px, color=emp} Optional optimization: when used only as a condition, keep the comparison's i32 directly.
+[contract] @(70, 620) {$note, w=1140px, size=26px, color=id} The general translation preserves the same expression contract everywhere.
+---
+% PowerPoint slide 8, using the current source-expression contract.
+### Translating Max
+[wat] @(70, 145) {$code, w=780px, size=22px} ```wat
+(module
+  (func $max
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local.get $var0)
+    (local.get $var1)
+    (f64.gt)
+    (f64.convert_i32_s)
+    (f64.const 0)
+    (f64.ne)
+    (if
+      (then
+        (return (local.get $var0)))
+    )
+    (return (local.get $var1))
+  )
+  (export "Max" (func $max))
+)
+```
+[cond] @(890, 165) {$note, w=310px, size=26px, color=explain} Generate v1 > v2 as a double, then convert it to the condition consumed by if.
+...
+[then] @(890, 355) {$note, w=310px, size=26px, color=emp} If true, return v1 immediately.
+...
+[final] @(890, 475) {$note, w=310px, size=26px, color=explain} Otherwise, reach the final return of v2.
+[calls] @(890, 605) {$note, w=310px, size=25px} `Max(3, 8)` gives 8.{{br}}`Max(9, 2)` gives 9.
+---
+% PowerPoint slide 9.
+### Implementing while
+[wat] @(70, 150) {$code, w=765px, size=23px} ```wat
+(block $exit1
+  (loop $loop1
+    ;; Generate condition: one f64
+    (f64.const 0)
+    (f64.ne)         ;; i32 truth value
+    (i32.eqz)        ;; Is it false?
+    (br_if $exit1)
+
+    ;; Generate the loop body
+
+    (br $loop1)
+  )
+)
+```
+[exit] @(870, 160) {$note, w=330px, size=27px, color=explain} Branching to the outer block resumes after the block.
+...
+[repeat] @(870, 315) {$note, w=330px, size=27px, color=explain} Branching to the loop restarts at its beginning, so the condition runs again.
+...
+[once] @(870, 515) {$note, w=330px, size=27px, color=focus} A Wasm loop repeats only when code branches back to it.
+[template] @(70, 640) {$note, w=1140px, size=25px, color=id} Translation template: the body must leave no value on normal completion.
+---
+% PowerPoint slides 10-14: factorial source, condition, and assignment builds.
+### Example while: Factorial
+[source] @(70, 165) {$code, w=790px, size=25px} ```cpp
+function Factorial(double n) : double {
+  double result = 1;
+  double i = 2;
+  while (i <= n) {
+    result = result * i;
+    i = i + 1;
+  }
+  return result;
+}
+```
+[vars] @(905, 175) {$note, w=295px, size=27px, color=id} `n`: parameter `$var0`{{br}}`result`: local `$var1`{{br}}`i`: local `$var2`
+...
+[predict] @(905, 370) {$note, w=295px, size=27px, color=focus} What does Factorial return for 0, 1, and 5?
+...
+[answer] @(905, 525) {$note, w=295px, size=28px, color=emp} 1, 1, and 120.
+[domain] @(70, 620) {$note, w=1140px, size=26px} Use nonnegative integers for this factorial example. Strix still represents n as a double.
+---
+### Factorial: Testing the Loop Condition
+[wat] @(70, 150) {$code, w=765px, size=24px} ```wat
+(local.get $var2)     ;; i
+(local.get $var0)     ;; n
+(f64.le)             ;; i32: i <= n
+(f64.convert_i32_s)   ;; Source double
+(f64.const 0)
+(f64.ne)             ;; i32 condition
+(i32.eqz)            ;; Condition is false
+(br_if $exit1)
+```
+[generic] @(870, 165) {$note, w=330px, size=27px, color=explain} This follows the general expression and condition rules.
+...
+[short] @(70, 470) {$code, w=765px, size=23px} ```wat
+;; Optional: comparison used only as a test
+(local.get $var2)
+(local.get $var0)
+(f64.le)
+(i32.eqz)
+(br_if $exit1)
+```
+[nan] @(870, 450) {$note, w=330px, size=26px, color=focus} Keep the logical inversion. Replacing it with f64.gt changes behavior when an operand is NaN.
+---
+### Factorial: Assignment Statements
+[source] @(70, 145) {$note, w=1140px, size=29px} Source statement: `result = result * i;`
+[baseline] @(70, 225) {$code, w=765px, size=26px} ```wat
+(local.get $var1)
+(local.get $var2)
+(f64.mul)
+(local.set $var1)
+(local.get $var1)     ;; Assignment value
+(drop)               ;; Expression statement
+```
+[explain] @(870, 230) {$note, w=330px, size=27px, color=explain} Assignment leaves the stored value. The enclosing statement discards it.
+...
+!anim baseline hide 0.15s
+[tee] @(70, 225) {$code, w=765px, size=26px} ```wat
+(local.get $var1)
+(local.get $var2)
+(f64.mul)
+(local.tee $var1)     ;; Store and retain
+(drop)               ;; Expression statement
+```
+!anim explain text local.tee combines the set and get. This is a convenient general assignment translation.
+...
+!anim tee hide 0.15s
+[optimized] @(70, 225) {$code, w=765px, size=26px} ```wat
+(local.get $var1)
+(local.get $var2)
+(f64.mul)
+(local.set $var1)     ;; Store, no stack value
+```
+!anim explain text When the value is discarded immediately, local.set is sufficient. This optimization is optional.
+[increment] @(70, 560) {$note, w=1140px, size=28px, color=emp} Apply the same reasoning to `i = i + 1;`.
+[warning] @(70, 630) {$note, w=1140px, size=25px} Preserve the value when assignment is used inside a larger expression.
+---
+### Factorial: The Complete WAT Function
+[wat] @(70, 150) {$code, w=835px, size=19px, pad=8px} ```wat
+(module
+  (func $factorial (param $var0 f64) (result f64)
+    (local $var1 f64) (local $var2 f64)
+    (local.set $var1 (f64.const 1))
+    (local.set $var2 (f64.const 2))
+    (block $exit1
+      (loop $loop1
+        (br_if $exit1 (i32.eqz
+          (f64.le (local.get $var2) (local.get $var0))))
+        (local.set $var1
+          (f64.mul (local.get $var1) (local.get $var2)))
+        (local.set $var2
+          (f64.add (local.get $var2) (f64.const 1)))
+        (br $loop1)
+      )
+    )
+    (return (local.get $var1))
+  )
+  (export "Factorial" (func $factorial))
+)
+```
+[folded] @(945, 160) {$note, w=255px, size=25px, color=explain} Folded instructions place operand expressions inside the instruction that uses them.
+...
+[optimized] @(945, 365) {$note, w=255px, size=25px, color=emp} This version uses the optional comparison and assignment simplifications.
+[same] @(945, 560) {$note, w=255px, size=25px} The general translation is also correct.
+---
+% PowerPoint slides 15-19, consolidated into reveal steps.
+### Implementing break and continue
+[context] @(70, 155) {$note, w=1140px, size=29px} Inside `(block $exit1 (loop $loop1 ...))`, which branch implements each statement?
+[breaklabel] @(70, 300) {$note, w=510px, size=32px, color=focus} `break;`
+[continuelabel] @(680, 300) {$note, w=510px, size=32px, color=focus} `continue;`
+...
+[breakcode] @(70, 375) {$code, w=510px, size=29px} ```wat
+(br $exit1)
+```
+[breaknote] @(70, 490) {$note, w=510px, size=28px} Leave the loop and resume after the outer block.
+...
+[continuecode] @(680, 375) {$code, w=510px, size=29px} ```wat
+(br $loop1)
+```
+[continuenote] @(680, 490) {$note, w=510px, size=28px} Skip the rest of this iteration and recheck the condition.
+[return] @(70, 630) {$note, w=1140px, size=26px, color=emp} `return` exits the function, regardless of how many loops enclose it.
+---
+### Nested Loops Need a Stack of Labels
+[wat] @(70, 155) {$code, w=765px, size=23px} ```wat
+(block $exit1
+  (loop $loop1
+    ;; Outer condition and body...
+    (block $exit2
+      (loop $loop2
+        ;; Inner condition and body...
+        ;; Inner break:    (br $exit2)
+        ;; Inner continue: (br $loop2)
+      )
+    )
+    ;; Outer break:    (br $exit1)
+    ;; Outer continue: (br $loop1)
+  )
+)
+```
+[push] @(870, 165) {$note, w=330px, size=26px, color=explain} Before translating a loop body, push its exit and repeat labels.
+...
+[use] @(870, 325) {$note, w=330px, size=26px, color=emp} Translate break and continue using the top pair. An if does not change that pair.
+...
+[pop] @(870, 510) {$note, w=330px, size=26px, color=explain} Pop the pair after translating the body. Give each loop distinct labels.
+[template] @(70, 650) {$note, w=1140px, size=24px, color=id} Nesting sketch: condition checks and ordinary iteration branches are omitted.
+---
+### Example: Skipping One Iteration
+[source] @(70, 150) {$code, w=790px, size=23px} ```cpp
+function SumExceptThree(double limit) : double {
+  double sum = 0;
+  double i = 0;
+  while (i < limit) {
+    i = i + 1;
+    if (i == 3) continue;
+    sum = sum + i;
+  }
+  return sum;
+}
+```
+[predict] @(905, 170) {$note, w=295px, size=27px, color=focus} What does the host call SumExceptThree(5) return?
+...
+[answer] @(905, 325) {$note, w=295px, size=27px, color=emp} 12: it adds 1 + 2 + 4 + 5.
+...
+[break] @(70, 545) {$note, w=1140px, size=28px} Replace `continue` with `break`: the result becomes 3, from 1 + 2.
+[progress] @(70, 635) {$note, w=1140px, size=25px, color=explain} Updating i before continue ensures the next condition sees the new value.
+---
+### Semantic Checks for Flow Control
+[loop] @(70, 160) {$note, w=1140px, size=29px} **Loop context:** break and continue require an enclosing while. Track loop depth during semantic traversal.
+...
+[return] @(70, 285) {$note, w=1140px, size=29px} **Returns:** require the function body's last statement to be a direct return. Analyze its expression normally.
+...
+[unreachable] @(70, 410) {$note, w=1140px, size=29px} **All source code:** validate both branches and unreachable statements. A return does not end semantic traversal.
+...
+[error] @(70, 540) {$note, w=1140px, size=28px, color=emp} Invalid source: report `ERROR (line N): ...` on stderr, return status 1, and leave stdout empty.
+[order] @(70, 640) {$note, w=1140px, size=25px, color=id} Parse and check the complete program before emitting its WAT module.
+---
+### Source Scope and Wasm Locals
+[source] @(70, 160) {$code, w=765px, size=24px} ```cpp
+function ScopeExample() : double {
+  double x = 10;
+  {
+    double x = x + 1;
+    x = 20;
+  }
+  return x;
+}
+```
+[ids] @(870, 170) {$note, w=330px, size=26px, color=explain} Each declaration gets a distinct local ID. Both locals appear at the start of the WAT function.
+...
+[init] @(870, 365) {$note, w=330px, size=26px, color=emp} Resolve the initializer before declaring the inner x. The function returns 10.
+...
+[braces] @(70, 500) {$note, w=1140px, size=28px} Only braces introduce scopes. An unbraced if/while declaration belongs to the surrounding scope.
+[runtime] @(70, 610) {$note, w=1140px, size=26px} Locals start at zero on each call. A declaration's initializer runs whenever execution reaches it, including each loop iteration.
+---
+% PowerPoint slides 3 and 20.
+### Other Forms of Flow Control
+[loops] @(70, 155) {$note, w=1140px, size=28px} **Other loops:** for adds initialization and an update, foreach visits a container, do/while tests at the end, and repeat/until stops when its test is true.
+...
+[choices] @(70, 285) {$note, w=1140px, size=28px} **Other choices:** switch selects a case, a ternary operator selects a value, and a jump transfers control to a target.
+...
+[calls] @(70, 405) {$note, w=1140px, size=28px} **Calls and suspension:** function calls run another function, yield suspends execution, and try/catch handles exceptional control flow.
+...
+[question] @(70, 540) {$note, w=1140px, size=29px, color=focus} How could we adapt the block/loop pattern for a for loop? Where should continue go?
+[scope] @(70, 645) {$note, w=1140px, size=24px, color=id} Beyond Project 3. Calls between Strix functions begin in Project 4. The host can call exports now.
+---
+% PowerPoint slide 21: the compiler structure, mapped to current starter files.
+### Where Flow Control Fits in the Compiler
+[front] @(70, 155) {$note, w=550px, size=31px, color=emp} **Front End**
+[lex] @(70, 225) {$note, w=550px, size=27px} Lexical analysis recognizes keywords and punctuation.
+[parse] @(70, 325) {$note, w=550px, size=27px} `Parser.hpp` builds AST nodes and resolves names.
+[check] @(70, 425) {$note, w=550px, size=27px} `Semantics.hpp` checks the AST, including loop context and returns.
+...
+[back] @(680, 155) {$note, w=520px, size=31px, color=emp} **Back End**
+[ir] @(680, 225) {$note, w=520px, size=27px} The AST is our intermediate representation. Later compilers may add more IRs and optimization passes.
+[gen] @(680, 365) {$note, w=520px, size=27px} `Translate.hpp` visits the AST and generates WAT instructions and labels.
+[target] @(680, 490) {$note, w=520px, size=27px} `wat2wasm` assembles the WAT into the target Wasm binary.
+[ast] @(70, 620) {$note, w=1140px, size=25px, color=id} `ASTKind::If`: condition, then, optional else. `ASTKind::While`: condition, body.
+---
+### Running the Current Project 3 Tests
+[commands] @(70, 155) {$code, w=660px, size=25px} ```bash
+make
+make doctor
+make check-in
+make tests
+make examples
+make serve
+```
+[workflow] @(790, 165) {$note, w=410px, size=28px} The runner compiles Strix, assembles WAT, and executes the exported functions.
+...
+[results] @(790, 330) {$note, w=410px, size=27px, color=emp} The 130 public source fixtures test behavior and source errors. Logs and output go in `build/tests`.
+...
+[browser] @(70, 500) {$note, w=1140px, size=28px} Open [http://localhost:8000/web/](http://localhost:8000/web/) after `make serve`. The Test results page can rerun compiled positive cases.
+[shade] @(70, 610) {$note, w=1140px, size=26px} Load a Wasm example from `build/examples`. The viewer samples `Shade(x, y, time)` for brightness. Shade is a host convention, not a keyword.
+---
+### Project 3 Milestones
+[checkin] @(70, 160) {$note, w=1140px, size=31px, color=emp} **Check-in: Sunday, October 25, by midnight. Worth 25%.**
+[early] @(70, 245) {$note, w=1140px, size=28px} `make check-in` runs 16 fixtures covering exports, parameters, expressions, declarations, and assignments. Loops are not required yet (unless you prefer to do them over the recommended 16 - then let me know in the README.md).
+...
+[final] @(70, 380) {$note, w=1140px, size=31px, color=emp} **Final: Sunday, November 1, by midnight. Worth 75%.**
+[complete] @(70, 465) {$note, w=1140px, size=28px} Complete the language, including flow control, and preserve the check-in behavior. Test results matter as well as valid WAT.
+[own] @(70, 565) {$note, w=1140px, size=26px} At check-in, include a modified README.md and at least one original program in `my_tests/`.
+[handout] @(70, 645) {$note, w=1140px, size=25px, color=id} [Current Project 3 handout and submission requirements](../project3.html)

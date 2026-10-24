@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>"CSE 450: Project 2"</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1 id="cse-450-project-2-parsing-asts-and-scoped-symbol-tables">CSE 450
+Project 2: Parsing, ASTs, and Scoped Symbol Tables</h1>
+<h3 id="check-in-sunday-october-4th-by-midnight">Check In: Sunday,
+October 4th, by Midnight</h3>
+<h3 id="project-due-sunday-october-11th-by-midnight">Project Due:
+Sunday, October 11th, by Midnight</h3>
+<p>For this project, you will extend the <strong>Marquee</strong>
+language from Project 1 into <strong>Marquee+</strong>. The main
+additions are expressions, variables, lexical scopes, conditionals, and
+loops. You will parse the entire source file into an abstract syntax
+tree (AST) and then execute that tree.</p>
+<p>This is an individual project. You may discuss general approaches
+with other students, but all code that you submit must be your own. As
+always, document any outside resources or AI tools that you use and make
+sure that you understand every part of your submission.</p>
+<h2 id="running-a-marquee-program">Running a Marquee+ Program</h2>
+<p>Your executable should take a single Marquee+ source file on the
+command line:</p>
+<pre class="console"><code>./Project2 example.marquee</code></pre>
+<p>Parse the complete program before executing any of it. If the program
+contains a lexical, syntax, or semantic error, report the first error
+and produce no normal program output.</p>
+<p>Marquee+ retains the program clock from Project 1. It begins at 0
+milliseconds, <code>WAIT</code> advances it, and <code>SHOW</code>
+prints its current value. The stack and the <code>LOAD</code>,
+<code>SAVE</code>, <code>JOIN</code>, <code>CUT</code>, and
+<code>REPEAT</code> commands from Project 1 are no longer part of the
+language.</p>
+<p>Unless this handout says otherwise, all Project 1 lexical rules still
+apply. This includes identifiers, string literals,
+integer/hexadecimal/decimal/duration literals, whitespace, line and
+block comments, literal normalization, and lexical error handling.</p>
+<h2 id="values-and-truth">Values and Truth</h2>
+<p>Marquee+ does <strong>not</strong> have a type system. Every runtime
+value is a string.</p>
+<ul>
+<li>The empty string (<code>""</code>) is false.</li>
+<li>Every nonempty string is true.</li>
+<li>Boolean operators produce <code>"1"</code> for true and
+<code>""</code> for false.</li>
+</ul>
+<p>This rule is intentionally based on strings, not numbers. In
+particular, the numeric literal <code>0</code> is converted to the
+string <code>"0"</code>, so it is <strong>true</strong>. There is no
+numeric arithmetic in Marquee+.</p>
+<h2 id="statements">Statements</h2>
+<p>Marquee+ supports the following statements:</p>
+<pre class="text"><code>SHOW expression
+WAIT duration
+VAR identifier = expression
+IF (expression) statement
+IF (expression) statement ELSE statement
+WHILE (expression) statement
+{ statements }
+expression</code></pre>
+<p>An expression used as a statement is evaluated and its result is
+discarded. This is particularly useful for assignments.</p>
+<p>Simple statements end at a newline or immediately before a closing
+brace. A source line may contain at most one simple statement. Empty
+lines and comments may appear between statements. As in Project 1, a
+newline inside a block comment still separates statements.</p>
+<p>A useful grammar for the statement structure is:</p>
+<pre class="text"><code>program          -&gt; NEWLINE* (statement NEWLINE*)* EOF
+statement        -&gt; show_statement
+                  | wait_statement
+                  | var_declaration
+                  | if_statement
+                  | while_statement
+                  | block
+                  | expression
+show_statement   -&gt; &quot;SHOW&quot; expression
+wait_statement   -&gt; &quot;WAIT&quot; DURATION
+var_declaration  -&gt; &quot;VAR&quot; ID &quot;=&quot; expression
+if_statement     -&gt; &quot;IF&quot; &quot;(&quot; expression &quot;)&quot; statement
+                    (NEWLINE* &quot;ELSE&quot; statement)?
+while_statement  -&gt; &quot;WHILE&quot; &quot;(&quot; expression &quot;)&quot; statement
+block            -&gt; &quot;{&quot; NEWLINE* (statement NEWLINE*)* &quot;}&quot;</code></pre>
+<p>This grammar omits statement terminators for readability. Your parser
+must still enforce the line-boundary rules described above.</p>
+<h3 id="show"><code>SHOW</code></h3>
+<p><code>SHOW</code> evaluates exactly one expression and prints its
+value, preceded by the program clock:</p>
+<pre class="marquee"><code>SHOW &quot;Hello, &quot; + &quot;world!&quot;</code></pre>
+<pre class="text"><code>[0] Hello, world!</code></pre>
+<p>Use the <code>+</code> operator when you want to combine multiple
+values into one output.</p>
+<h3 id="wait"><code>WAIT</code></h3>
+<p><code>WAIT</code> takes one duration literal and advances the clock.
+It should not delay the actual execution of your interpreter.</p>
+<pre class="marquee"><code>WAIT 1.5s
+SHOW &quot;Done&quot;</code></pre>
+<pre class="text"><code>[1500] Done</code></pre>
+<p>Unlike <code>SHOW</code>, <code>WAIT</code> does not accept a general
+expression.</p>
+<h3 id="variables-and-var">Variables and <code>VAR</code></h3>
+<p>Declare a variable with <code>VAR</code>:</p>
+<pre class="marquee"><code>VAR greeting = &quot;Hello&quot;
+SHOW greeting</code></pre>
+<p>Each program has an implicit global scope. A braced block creates a
+nested scope. A variable is visible after its declaration and throughout
+nested scopes, but not after its declaring scope closes. An inner
+declaration may shadow a variable from an outer scope. Declaring the
+same name twice in one scope is an error.</p>
+<pre class="marquee"><code>VAR message = &quot;outside&quot;
+{
+  VAR message = &quot;inside&quot;
+  SHOW message
+}
+SHOW message</code></pre>
+<pre class="text"><code>[0] inside
+[0] outside</code></pre>
+<p>Declarations are registered while the program is parsed. Each
+variable’s storage begins as the empty string. Executing its
+<code>VAR</code> statement evaluates the initializer and stores the
+result. Consequently, a declaration skipped by control flow retains the
+empty string. If a declaration is inside a loop, its initializer runs
+each time execution reaches it.</p>
+<p>Only braces create a new lexical scope; an unbraced <code>IF</code>
+or <code>WHILE</code> body does not. Using braces for declarations
+inside control-flow statements is strongly recommended.</p>
+<h3 id="if-and-else"><code>IF</code> and <code>ELSE</code></h3>
+<p><code>IF</code> executes its body when its condition is nonempty. An
+optional <code>ELSE</code> body executes otherwise.</p>
+<pre class="marquee"><code>IF (name == &quot;Ada&quot;) {
+  SHOW &quot;Welcome back!&quot;
+}
+ELSE {
+  SHOW &quot;Hello, &quot; + name
+}</code></pre>
+<p>The body after <code>IF</code> or <code>ELSE</code> may be any
+statement. Therefore <code>ELSE IF</code> works without any special
+syntax or AST node:</p>
+<pre class="marquee"><code>IF (answer == &quot;yes&quot;) SHOW &quot;accepted&quot;
+ELSE IF (answer == &quot;no&quot;) SHOW &quot;rejected&quot;
+ELSE SHOW &quot;unknown&quot;</code></pre>
+<p>An <code>ELSE</code> belongs to the nearest preceding unmatched
+<code>IF</code>.</p>
+<h3 id="while"><code>WHILE</code></h3>
+<p><code>WHILE</code> repeatedly evaluates its condition and executes
+its body as long as the condition is nonempty.</p>
+<pre class="marquee"><code>VAR remaining = &quot;xxx&quot;
+WHILE (remaining) {
+  SHOW remaining
+  remaining = remaining - &quot;x&quot;
+}</code></pre>
+<p>Marquee+ has no <code>BREAK</code> or <code>CONTINUE</code>
+statement; those will be introduced in Project 3.</p>
+<h2 id="expressions">Expressions</h2>
+<p>Expression terminals are identifiers, string literals, all
+numeric/duration literals from Project 1, and parenthesized expressions.
+Literal values are normalized exactly as in Project 1, and their
+normalized text becomes their runtime string value.</p>
+<p>The unary <code>!</code> operator negates truth: it produces
+<code>"1"</code> when its operand is empty and <code>""</code>
+otherwise. It may be applied repeatedly, as in <code>!!value</code>.</p>
+<p>The binary operators are listed below. Precedence 1 binds most
+tightly.</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 23%" />
+<col style="width: 31%" />
+<col style="width: 19%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: center;">Precedence</th>
+<th>Operators</th>
+<th>Associativity</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">1</td>
+<td><code>/</code>, <code>%</code></td>
+<td>Left</td>
+<td>Trim after or through the first matching substring</td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td><code>+</code>, <code>-</code></td>
+<td>Left</td>
+<td>Concatenate; remove the first matching substring</td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td><code>==</code>, <code>!=</code>, <code>&lt;</code>,
+<code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>,
+<code>CONTAINS</code></td>
+<td>Non-associative</td>
+<td>Compare strings; test containment</td>
+</tr>
+<tr>
+<td style="text-align: center;">4</td>
+<td><code>=</code></td>
+<td>Right</td>
+<td>Assign to a variable</td>
+</tr>
+</tbody>
+</table>
+<p>Unary <code>!</code> binds more tightly than every binary operator.
+Parentheses may be used to override precedence.</p>
+<p>The <code>/</code> operator keeps the portion of its left operand
+before the first match of its right operand. If no match exists, it
+returns the original left operand. The <code>%</code> operator keeps the
+portion after the first match; if there is no match, it returns the
+empty string:</p>
+<pre class="marquee"><code>&quot;Testing&quot; / &quot;i&quot;    // &quot;Test&quot;
+&quot;Testing&quot; % &quot;i&quot;    // &quot;ng&quot;</code></pre>
+<p>The <code>-</code> operator removes only the first occurrence of its
+right operand. If the right operand is not found, the left operand is
+unchanged. For example:</p>
+<pre class="marquee"><code>SHOW &quot;One&quot; + &quot;Two&quot; + &quot;Three&quot; - &quot;w&quot;</code></pre>
+<p>prints:</p>
+<pre class="text"><code>[0] OneToThree</code></pre>
+<p>Comparisons are case-sensitive and use ordinary lexicographic string
+ordering. <code>CONTAINS</code> produces <code>"1"</code> when the right
+string occurs within the left string, and <code>""</code> otherwise.</p>
+<p>The left side of <code>=</code> must be a plain variable reference.
+Assignment stores and returns the assigned value, so chained assignment
+works:</p>
+<pre class="marquee"><code>a = b = &quot;shared&quot;</code></pre>
+<p>Comparison operators are non-associative. An expression such as
+<code>a &lt; b &lt; c</code> is an error; use separate comparisons
+instead.</p>
+<p>One possible recursive-descent grammar is:</p>
+<pre class="text"><code>expression     -&gt; assignment
+assignment     -&gt; comparison (&quot;=&quot; assignment)?
+comparison     -&gt; join (comparison_op join)?
+join           -&gt; trim ((&quot;+&quot; | &quot;-&quot;) trim)*
+trim           -&gt; unary ((&quot;/&quot; | &quot;%&quot;) unary)*
+unary          -&gt; &quot;!&quot; unary | primary
+primary        -&gt; ID
+                | LIT_STRING
+                | INTEGER
+                | HEX
+                | DECIMAL
+                | DURATION
+                | &quot;(&quot; expression &quot;)&quot;
+comparison_op  -&gt; &quot;==&quot; | &quot;!=&quot; | &quot;&lt;&quot; | &quot;&lt;=&quot; | &quot;&gt;&quot; | &quot;&gt;=&quot; | &quot;CONTAINS&quot;</code></pre>
+<p>This grammar accepts a non-variable on the left side of
+<code>=</code>; detect that case and report an illegal-assignment
+error.</p>
+<h2 id="complete-example">Complete Example</h2>
+<pre class="marquee"><code>VAR course = &quot;CSE&quot; + 450
+VAR remaining = &quot;xxx&quot;
+
+SHOW course + &quot; -- Compilers&quot;
+WHILE (remaining) {
+  WAIT 250ms
+  SHOW remaining
+  remaining = remaining - &quot;x&quot;
+}
+
+IF (course CONTAINS &quot;450&quot;) {
+  SHOW &quot;ready&quot;
+}
+ELSE {
+  SHOW &quot;error&quot;
+}</code></pre>
+<pre class="text"><code>[0] CSE450 -- Compilers
+[250] xxx
+[500] xx
+[750] x
+[750] ready</code></pre>
+<h2 id="abstract-syntax-tree">Abstract Syntax Tree</h2>
+<p>After lexing, parse the complete program into an AST. Do not execute
+statements directly from the parser. Each AST node should represent one
+language construct and provide the behavior needed to execute or
+evaluate that construct.</p>
+<p>Reasonable node categories include:</p>
+<ul>
+<li>literal and variable-reference expressions;</li>
+<li>unary and binary expressions;</li>
+<li>assignment expressions;</li>
+<li>variable declarations;</li>
+<li><code>SHOW</code> and <code>WAIT</code> statements;</li>
+<li>blocks, conditionals, and loops; and</li>
+<li>a program root.</li>
+</ul>
+<p>You do not need to use these exact class names or inheritance
+structure. Aim for a design in which parsing, name resolution, and
+execution have clear responsibilities.</p>
+<h2 id="symbol-table-and-scope">Symbol Table and Scope</h2>
+<p>Build a scoped symbol table while parsing. A straightforward design
+uses:</p>
+<ul>
+<li>a vector containing one storage record for each declared variable;
+and</li>
+<li>a stack of maps from variable names to entries in that vector.</li>
+</ul>
+<p>Push a map when entering a braced block and pop it when leaving. Look
+up a name from the innermost scope outward. AST variable nodes should
+retain a stable ID, index, or pointer to the resolved storage record
+rather than repeating a string lookup every time they execute.</p>
+<p>Because the whole file is parsed before execution, parsing is also
+when you should detect unknown variables, same-scope redeclarations, and
+invalid assignment targets.</p>
+<h2 id="lexer-updates">Lexer Updates</h2>
+<p>Begin with your Project 1 lexer. Preserve its rules for strings,
+numeric and duration literals, comments, newlines, and lexical errors.
+Then:</p>
+<ul>
+<li>keep <code>SHOW</code> and <code>WAIT</code> as keywords;</li>
+<li>add <code>VAR</code>, <code>IF</code>, <code>ELSE</code>,
+<code>WHILE</code>, and <code>CONTAINS</code>;</li>
+<li>add tokens for every operator and delimiter used by Marquee+;
+and</li>
+<li>remove keyword rules for the retired Project 1 commands.</li>
+</ul>
+<p>Be sure that <code>==</code>, <code>!=</code>, <code>&lt;=</code>,
+and <code>&gt;=</code> are recognized as single tokens. If your lexer
+ends with a catch-all unexpected-character rule, punctuation will not be
+returned automatically; add explicit rules for <code>(</code>,
+<code>)</code>, <code>{</code>, <code>}</code>, <code>/</code>,
+<code>%</code>, <code>+</code>, <code>-</code>, <code>=</code>, and
+<code>!</code> as well. Put comment rules in place so that
+<code>//</code> and <code>/* ... */</code> are not mistaken for
+division.</p>
+<h2 id="errors">Errors</h2>
+<p>Stop after the first error and return a nonzero exit status. Include
+the source line number and a useful message. At minimum, handle:</p>
+<ul>
+<li>every lexical error required in Project 1;</li>
+<li>an unexpected token or missing statement component;</li>
+<li>a missing closing parenthesis or brace (include the opening line
+when useful);</li>
+<li>use of an unknown variable;</li>
+<li>redeclaration of a variable in the same scope;</li>
+<li>an illegal assignment target; and</li>
+<li>chained use of a non-associative comparison operator.</li>
+</ul>
+<p>Exact wording is not required unless a supplied test specifies it,
+but the message must clearly identify the problem. Errors go to standard
+error; normal <code>SHOW</code> output goes to standard output.</p>
+<h2 id="recommended-implementation-order">Recommended Implementation
+Order</h2>
+<p>The supplied tests will be organized so that you can make steady
+progress in roughly this order:</p>
+<ol type="1">
+<li>Update the lexer and support <code>SHOW</code>, literals, and
+parentheses.</li>
+<li>Add <code>VAR</code>, variable lookup, and simple assignment.</li>
+<li>Add expression statements and unary <code>!</code>.</li>
+<li>Add individual string operators.</li>
+<li>Complete associativity and precedence.</li>
+<li>Add blocks, scopes, and shadowing.</li>
+<li>Add semantic and syntax errors.</li>
+<li>Add <code>IF</code>, <code>ELSE</code>, and nested
+conditionals.</li>
+<li>Add <code>WHILE</code>.</li>
+<li>Finish integrated programs involving the clock, expressions, scopes,
+and control flow.</li>
+</ol>
+<p>The first 16 of the 64 supplied tests will concentrate on the early
+stages, so you should not need complete control flow or the full
+precedence parser for the check-in. You may implement the pieces in
+another order, but plan to keep the program compiling and tested
+throughout development.</p>
+<h2 id="check-in-sunday-october-4th">Check In: Sunday, October 4th</h2>
+<p>Submit your current project by midnight. This check-in is worth 25%
+of the project grade. To receive full check-in credit, your submission
+must compile and pass at least 25% of the supplied tests. The tests will
+be ordered according to the implementation sequence above.</p>
+<p>The check-in is intended to verify steady progress, not to require a
+nearly complete interpreter. Continue using the same repository after
+the check-in; your final submission will replace it for the remaining
+75% of the grade.</p>
+<h2 id="final-submission-sunday-october-11th">Final Submission: Sunday,
+October 11th</h2>
+<p>Submit the completed project by midnight. Include:</p>
+<ul>
+<li>all source files needed to build your interpreter;</li>
+<li>your updated <code>lexer.emplex</code> file;</li>
+<li>a <code>Makefile</code> whose default target builds an executable
+named <code>Project2</code>;</li>
+<li>any additional tests that you wrote; and</li>
+<li>a short <code>README.md</code> describing your design, any known
+limitations, and the resources or AI tools you used.</li>
+</ul>
+<p>We will build submissions from the command line on the course Linux
+systems. Do not rely on IDE-specific project files. Before submitting,
+verify that these commands work in a clean copy of your repository:</p>
+<pre class="console"><code>make
+./Project2 tests/your_test_file.marquee</code></pre>
+<p>If you develop on Windows, use WSL, an SSH connection to the
+Engineering workstations, or another Linux environment to test the
+provided <code>Makefile</code>.</p>
+<h2 id="extra-credit">Extra Credit</h2>
+<p>Complete the core language before attempting extra credit. Each
+option should include focused tests and a brief explanation in your
+README.</p>
+<h3 id="reverse-operator">Reverse operator</h3>
+<p>Add unary <code>~</code>, which reverses its operand. For example,
+<code>~"stressed"</code> produces <code>"desserts"</code>. It has the
+same precedence as unary <code>!</code>.</p>
+<h3 id="conditional-operator">Conditional operator</h3>
+<p>Add the expression:</p>
+<pre class="text"><code>condition ? value_if_true : value_if_false</code></pre>
+<p>Only the selected value expression is evaluated. The operator is
+right-associative and binds less tightly than comparisons but more
+tightly than assignment. The empty string is false, exactly as it is for
+<code>IF</code> and <code>WHILE</code>.</p>
+<p><code>CONTAINS</code> is written as a keyword in the core language so
+that <code>?</code> is available for this operator.</p>
+<h3 id="replace-operator">Replace operator</h3>
+<p>Add a string-replacement expression:</p>
+<pre class="text"><code>value | old_text -&gt; new_text</code></pre>
+<p>It produces a copy of <code>value</code> in which every occurrence of
+<code>old_text</code> is replaced with <code>new_text</code>. Define and
+document sensible behavior when <code>old_text</code> is empty.</p>
+</body>
+</html>

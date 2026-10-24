@@ -1,0 +1,519 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+!set palette keyword #CCBBFF
+!set palette emp #80FF80
+!set palette name #C3C9A0
+!set palette warning #BB3311
+!set palette rose #ffd0d0
+!set palette project #0097ebbf
+!set palette bg #08111F
+!set palette comment tan
+
+# CSE 450
+## Translation of Programming Languages
+Charles Ofria
+---
+### Overview
+[o1] {color=#A0D0FF} - Administrative Items
+[o2] {color=#A0D0FF} - Overview and History of Compilers
+[o3] {color=#A0D0FF} - Compiler Construction Example
+[o4] {color=#A0D0FF} - Lecture Schedule Review
+...
+!anim o1 color #FFFFFF 0.5s
+!anim o1 textsize 44px 0.5s
+---
+### Course Information
+- **{{color=emp|Meeting Time}}**: Monday/Wednesday 12:40-2:00 p.m.
+- **{{color=emp|Meeting Place}}**: STEM 2201
+- **{{color=emp|Pre-reqs}}** : CSE331 and (CSE320 or ECE331) I expect a solid understanding of C++ and a basic knowledge of algorithms and data structures (searching, sorting, linked lists, tree structures). You ***need*** programming experience.
+- **{{color=emp|Web Page}}**: http://www.cse.msu.edu/~cse450/
+---
+### Recommended Textbook
+- {{color=name|**Compilers: Principles, Techniques, and Tools**}}{{br}}by Aho, Lam, and Ullman Addison Wesley;{{br}}2nd edition
+- ISBN: 0321486811
+@(800, 150) {w=370px} ![image](https://upload.wikimedia.org/wikipedia/en/a/a3/Purple_dragon_book_b.jpg)
+---
+### Instructor Information
+{{color=name|Charles Ofria}}
+[ofria@cse.msu.edu](mailto:ofria@cse.msu.edu)
+Office Hours: After class (in person) and by appointment.
+
+{{br}}
+TA: {{color=name|Berlitz Cockburn}}
+[kiinoter@msu.edu](mailto:kiinoter@msu.edu)
+Office Hours: Tuesdays, 5-6pm On Zoom (see Piazza for link)
+---
+### Grading
+...
+- {{color=#0097ebbf|**Projects**}} : There will be 5 projects, each worth 10% of your final grade.
+[b1] {thick=1, fill=#0097ebbf, round=15} !rect (72, 540) (476, 100) 50% - Projects
+!anim b1 enter slideleft 0.8s
+...
+- {{color=#e07000bf|**Quizzes**}} : There will be 5 scheduled quizzes; each will count for 10%. You will have at lease three opportunities to score high on each quiz.
+[b2] {thick=1, fill=#e07000bf, round=15} !rect (553, 540) (476, 100) 50% - Quizzes
+!anim b2 enter slideup 0.8s
+...
+- {{color=warning|**Exams**}} : There will be no exams. During the final exam timeslot you will be allowed to have a third shot at the quizzes.
+...
+- {{color=#00bf42bf|**Extra Credit**}} : Projects may have opportunities for extra credit. We will also take into account class participation when assigning your final grade.
+[b3] {thick=1, fill=#00bf42bf, round=15} !rect (1035, 540) (100, 100) Extra Credit
+!anim b3 enter slideright 0.8s
+---
+### Projects
+[p1] - You will have {{color=project|five projects}}. Each project must be completed on your own, but you may talk about any concepts you want.
+...
+!anim p1 color #808080 0.5s
+[p2] - Projects will be due at {{color=project|Midnight}} at the end of their due date. You may, on occasion have up to a 5 day extension, but you should let us know before the deadline.
+...
+!anim p2 color #808080 0.5s
+[p3] - You must {{color=project|check in}} a version of your code that passes at least 25% of test cases by one week before the due date.
+...
+!anim p3 color #808080 0.5s
+[p4] - A valid {{color=project|Makefile}} must be submitted with your project.
+---
+### Tentative Projects
+**{{color=#0097ebbf|Project 1:}}** Lexical analysis.  You will build an interpreter for **Marquee**, emphasizing the tokenization of inputs.
+**{{color=#0097ebbf|Project 2:}}** Parsing and Abstract Syntax Tree construction.
+**{{color=#0097ebbf|Project 3:}}** Semantic Analysis and generating WebAssembly output.
+**{{color=#0097ebbf|Project 4:}}** Memory Management including implementation of strings and arrays.
+**{{color=#0097ebbf|Project 5:}}** A high-performance language with Advanced Language Features will emphasize Code Analysis and Optimizations.
+---
+### Academic Honesty
+...
+- **{{color=emp|Stay in charge}}** of your own project; don't lose your agency.
+...
+- Do not **{{color=warning|outsource}}** the entire project to an AI or another person.
+...
+- Always {{color=emp|attribute credit}} for code implemented by another person or AI.
+...
+- You must {{color=emp|understand all code}} that you submit for a project.
+...
+- {{color=warning|Do not provide false information}} to the instructor about course matters.
+...
+- {{color=warning|Do not facilitate other students}} in any of these activities.
+...
+- You must be able to {{color=emp|explain how your code works}}!
+...
+- Violation of these rules will result in a {{color=warning|final grade of **0.0**}}.
+
+---
+### Why should you care?
+...
+[p1] - Compilers draw together all of the theory and techniques that you’ve learned about in most of your previous computer science courses.
+...
+!anim p1 color #808080 0.5s
+[p2] - You will learn how to write a simple compiler to solve the kinds of problems you may face in a career as a programmer.
+...
+!anim p2 color #808080 0.5s
+[p3] - You will gain a deeper understanding of how compilers work and be able to write better code.
+...
+!anim p3 color #808080 0.5s
+[p4] - You will learn techniques to write other useful tools, such as parsers, interpreters, and debuggers.
+...
+!anim p4 color #808080 0.5s
+[s10_154] {thick=1, textcolor=#dc1f05, size=40} !rect (108, 580) (1062, 80) Warning : It will be a **LOT** of programming!
+!anim s10_154 enter grow 0.8s
+---
+### Overview
+[o1] {color=#808080} - Administrative Items
+[o2] {color=#A0D0FF} - Overview and History of Compilers
+[o3] {color=#A0D0FF} - Compiler Construction Example
+[o4] {color=#A0D0FF} - Lecture Schedule Review
+...
+!anim o2 color #FFFFFF 0.5s
+!anim o2 textsize 44px 0.5s
+---
+### How are languages implemented?
+...
+- Strategies depend on many factors, including how much **{{color=keyword|pre-processing}}** must be done before the program can run, and how {{color=keyword|**CPU specific**}} the executable can be.
+...
+- {{color=emp|Interpreters}} run a program "as is" with little or no-preprocessing, but no changes need to be made to run on a different platform
+...
+- {{color=emp|Compilers}} take time to do extensive pre-processing, but will generally run a program 2 to 20 times faster
+---
+### Language Implementations
+...
+- Many languages use a combination of compiler and interpreter to get the many benefits of each.
+...
+- {{color=keyword|Java}} and {{color=keyword|Microsoft’s .NET}} are hybrid languages that compile into virtual/intermediate assembly languages (Java bytecode, CIL), which can then be interpreted on any computer.
+...
+- Other languages ({{color=keyword|BASIC}}, {{color=keyword|Lisp}}) have both compilers and interpreters available.
+...
+- Many modern interpreters (e.g., {{color=keyword|JavaScript, PyPy}}) perform “just in time” compilation to convert routines into optimized native code when they are first used.
+---
+### History of Compiler Development
+...
+- In 1953 IBM developed the 701 EDPM{{br}}(Electronic Data Processing Machine),{{br}}its first general purpose computer,{{br}}built as a "defense calculator" in the{{br}}Korean War.
+@(695, 160) {w=560px} ![image](https://www.ibm.com/content/dam/connectedassets-adobe-cms/worldwide-content/arc/cf/ul/g/b5/41/701_205-copy.jpg/_jcr_content/renditions/cq5dam.web.3840.3840.jpeg)
+...
+- No high-level languages were available,{{br}}so all programming was done in{{br}}assembly language.
+---
+### History of Compilers
+...
+- As expensive as these early computers were, most of the money companies spent was for software development, due to the complexities of assembly language programming.
+...
+- In 1953, John Backus came up with the idea of{{br}}"speed coding", and developed the first interpreter.{{br}}Unfortunately, this was 10 to 20 times slower than{{br}}programs written in assembly.{{br}}{{br}}He was sure he could do better...
+@(900, 270) {w=280px} ![image](https://upload.wikimedia.org/wikipedia/commons/b/b2/John_Backus_2.jpg?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail_unscaled)
+@(680, 640) {size=32px, color=name} **John Backus**
+---
+### History of Compilers
+...
+- In 1954, Backus and his team released a research paper titled "*{{color=name|Preliminary Report, Specifications for the IBM Mathematical FORmula TRANslating System, FORTRAN.}}*"
+...
+- FORTRAN I was released in 1956, totaling 25,000 lines of assembly code. Compiled programs ran almost as fast as handwritten assembly!
+...
+- Projects that had previously taken two weeks to write now took only two hours.
+...
+- By 1958 more than half of all software was written in FORTRAN.
+---
+### Modern Compilers
+...
+- Compiler theory has not changed a great deal since the days of Backus. They still consist of two main components:
+...
+- The {{color=emp|front-end}} reads in the program in the source languages, makes sense of it, and stores it in an internal representation…
+...
+- …and the {{color=emp|back-end}} converts the internal representation into the target language, perhaps with optimizations. The target language is typically an assembly language, but it is often easier to use a more established, higher-level language.
+---
+### Overview
+[o1] {color=#808080} - Administrative Items
+[o2] {color=#808080} - Overview and History of Compilers
+[o3] {color=#A0D0FF} - Compiler Construction Example
+[o4] {color=#A0D0FF} - Lecture Schedule Review
+...
+!anim o3 color #FFFFFF 0.5s
+!anim o3 textsize 44px 0.5s
+---
+{textcolor=white, w=260, size=44} @(99, 61) Structure of a Compiler
+...
+% == Start at Source => ? => Target ==
+[source] {thick=1, fill=#bf1e4cbf, textcolor=black, size=32} !rect (448, 32) (384, 60) **Source Language**
+...
+[Q] {thick=1, fill=#0097ebb3, round=58, textcolor=black, size=60} !rect (448, 108) (384, 503) **?**{{br}}&nbsp;
+...
+[target] {thick=1, fill=#00bf42bf, textcolor=black, size=32} !rect (448, 627) (384, 60) **Target Language**
+...
+% == Drop-in "Intermediate Code" block ==
+{thick=0, fill=#e07000bf, textcolor=black, size=32} !rect (448, 393) (384, 60) **Intermediate Code**
+...
+% == Show front-ed and back-end blocks
+!anim Q hide
+[front] {thick=1, fill=#0097ebb3, textcolor=black, round=40, size=32} !rect (448, 108) (384, 269) **Front End**
+!anim front enter fade 0.8s
+[back] {thick=1, fill=#0097ebb3, textcolor=black, round=30, size=32} !rect (448, 469) (384, 141) **Back End**
+!anim back enter fade 0.8s
+...
+% == Front-end to outline ==
+!anim front exit fade 0.7s
+[front2] {color=#0097eb80, thick=5, fill=#0097eb59, round=40} !rect (450, 110) (379, 264)
+!anim front2 enter fade 0.3s
+...
+% == ENTER front-end components ==
+[lex] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 120) (340, 55) **Lexical Analyzer**
+!anim lex enter slidedown 0.5s
+...
+[parse] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 183) (340, 55) **Syntax Analyzer**
+!anim parse enter slidedown 0.5s
+...
+[semantic] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 246) (340, 55) **Semantic Analyzer**
+!anim semantic enter slidedown 0.5s
+...
+[int_code] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 309) (340, 55) **Int. Code Generator**
+!anim int_code enter slidedown 0.5s
+...
+% == Back-end to outline ==
+!anim back exit fade 0.7s
+[back2] {color=#0097eb80, thick=5, fill=#0097eb59, round=20} !rect (450, 471) (379, 136)
+!anim back2 enter fade 0.3s
+...
+[opt] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (458, 480) (364, 55) **Code Optimizer**
+!anim opt enter slidedown 0.6s
+...
+[target_gen] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (458, 543) (364, 55) **Target Code Generator**
+!anim target_gen enter slidedown 0.6s
+---
+!style step {
+  thick=1,
+  fill=#0097eb,
+  round=20,
+  textcolor=black,
+  size=30
+}
+
+[source:flow]   {thick=1, fill=#bf1e4cbf, textcolor=black, size=32} !rect (448, 32) (384, 60) **Source Language**
+[target:flow]   {thick=1, fill=#00bf42bf, textcolor=black, size=32} !rect (448, 627) (384, 60) **Target Language**
+[int_code:flow] {thick=1, fill=#e07000bf, textcolor=black, size=32} !rect (448, 393) (384, 60) **Intermediate Code**
+
+[f_box:flow]    {color=#0097eb80, thick=5, fill=#0097eb59, round=40} !rect (450, 110) (379, 264)
+[lex:flow]      {$step} !rect (470, 120) (340, 55) **Lexical Analyzer**
+[parse:flow]    {$step} !rect (470, 183) (340, 55) **Syntax Analyzer**
+[semantic:flow] {$step} !rect (470, 246) (340, 55) **Semantic Analyzer**
+[int_gen:flow]  {$step} !rect (470, 309) (340, 55) **Int. Code Generator**
+
+[b_box:flow]    {color=#0097eb80, thick=5, fill=#0097eb59, round=20} !rect (450, 471) (379, 136)
+[opt:flow]      {$step} !rect (458, 480) (364, 55) **Code Optimizer**
+[t_lang:flow]   {$step} !rect (458, 543) (364, 55) **Target Code Generator**
+
+!anim @flow move (20,32) 1.5s
+
+>>>
+[source_arrow] {color=white, thick=5} !arrow (420,62) (500,62)
+!anim source_arrow enter grow 0.7s
+>>>
+@(510,32) {size=38} `current = start + cycles * 60;`
+...
+% == LEXICAL ANALYSIS ==
+!anim lex color gold 0.7s
+[lex_arrow] {color=white, thick=5} !arrow (420,145) (500,145)
+!anim lex_arrow enter grow 0.7s
+>>>
+[tokens] @(510,120) {size=32} ID(0) ASSIGN ID(1) ADD ID(2) MULT INT(60) ENDL
+[token_cover] {fill=bg, thick=0} !rect (510, 120) (760, 60)
+!anim token_cover move (1270,120) 3.0s
+...
+[a1:arrows] {color=red, thick=3} !arrow (570,80) (550,125)
+@(510,120) {size=32} {{color=emp|ID(0)}} ASSIGN ID(1) ADD ID(2) MULT INT(60) ENDL
+...
+[a2:arrows] {color=red, thick=3} !arrow (680,80) (650,125)
+@(510,120) {size=32} {{color=emp|ID(0)}} {{color=keyword|ASSIGN}} ID(1) ADD ID(2) MULT INT(60) ENDL
+...
+[a3:arrows] {color=red, thick=3} !arrow (760,80) (750,125)
+@(510,120) {size=32} {{color=emp|ID(0)}} {{color=keyword|ASSIGN}} {{color=emp|ID(1)}} ADD ID(2) MULT INT(60) ENDL
+...
+[a4:arrows] {color=red, thick=3} !arrow (837,80) (835,125)
+[a5:arrows] {color=red, thick=3} !arrow (920,80) (910,125)
+[a6:arrows] {color=red, thick=3} !arrow (1010,80) (1005,125)
+[a7:arrows] {color=red, thick=3} !arrow (1060,80) (1100,125)
+[a8:arrows] {color=red, thick=3} !arrow (1090,80) (1200,125)
+@(510,120) {size=32} {{color=emp|ID(0)}} {{color=keyword|ASSIGN}} {{color=emp|ID(1)}} {{color=keyword|ADD}} {{color=emp|ID(2)}} {{color=keyword|MULT}} {{color=name|INT(60)}} {{color=rose|ENDL}}
+...
+
+% == SYNTAX ANALYSIS ==
+!anim lex color black 0.7s
+!anim parse color gold 0.7s
+!anim @arrows hide 1.0s
+[syn_arrow] {color=white, thick=5} !arrow (420,210) (500,210)
+...
+@(718, 200) {w=112px, size=28px} {{color=keyword|**ASSIGN**}}
+...
+{color=#ffffff, thick=3} !line (774, 246) (841, 280)
+{color=#ffffff, thick=3} !line (705, 280) (774, 246)
+...
+@(640, 290) {w=66px, size=28px} **{{color=emp|ID(0)}}**
+...
+@(841, 290) {w=66px, size=28px} **{{color=keyword|ADD}}**
+{color=#ffffff, thick=3} !line (874, 334) (941, 368)
+{color=#ffffff, thick=3} !line (804, 368) (874, 334)
+@(753, 383) {w=66px, size=28px} **{{color=emp|ID(1)}}**
+@(932, 383) {w=84px, size=28px} **{{color=keyword|MULT}}**
+
+{color=#ffffff, thick=3} !line (977, 430) (1044, 464)
+{color=#ffffff, thick=3} !line (908, 464) (977, 430)
+@(871, 479) {w=66px, size=28px} **{{color=emp|ID(2)}}**
+[int60] @(1010, 479) {w=99px, size=28px} **{{color=rose|INT(60)}}**
+
+...
+% == SEMANTIC ANALYSIS ==
+!anim parse color black 0.7s
+!anim semantic color gold 0.7s
+[sem_arrow] {color=white, thick=5} !arrow (420,270) (500,270)
+
+...
+!anim int60 scale 2.0 0.7s
+!anim int60 move (1010,490)
+...
+!anim int60 scale 1.0 0.7s
+!anim int60 move (1010,579)
+>>>
+@(1010, 479) {w=99px, size=28px} **{{color=#60a0ff|int2float}}**
+{color=#ffffff, thick=3} !line (1060, 525) (1060, 570)
+
+---
+% == SET IP STEPS FOR INTERMEDIATE CODE
+[source]   {thick=1, fill=#bf1e4cbf, textcolor=black, size=32} !rect (20, 32) (384, 60) **Source Language**
+[target]   {thick=1, fill=#00bf42bf, textcolor=black, size=32} !rect (20, 627) (384, 60) **Target Language**
+[int_code] {thick=1, fill=#e07000bf, textcolor=black, size=32} !rect (20, 393) (384, 60) **Intermediate Code**
+
+[f_box]    {color=#0097eb80, thick=5, fill=#0097eb59, round=40} !rect (22, 110) (379, 264)
+[lex]      {$step} !rect (42, 120) (340, 55) **Lexical Analyzer**
+[parse]    {$step} !rect (42, 183) (340, 55) **Syntax Analyzer**
+[semantic] {$step} !rect (42, 246) (340, 55) **Semantic Analyzer**
+[int_gen]  {$step} !rect (42, 309) (340, 55) **Int. Code Generator**
+
+[b_box]    {color=#0097eb80, thick=5, fill=#0097eb59, round=20} !rect (22, 471) (379, 136)
+[opt]      {$step} !rect (30, 480) (364, 55) **Code Optimizer**
+[t_lang]   {$step} !rect (30, 543) (364, 55) **Target Code Generator**
+
+% == SET UP TREE FOR INTERMEDIATE CODE
+[asg:tree] @(718, 200) {w=112px, size=28px, color=keyword} **ASSIGN**
+[ln0:tree] {color=#ffffff, thick=3} !line (774, 246) (841, 280)
+[ln1:tree] {color=#ffffff, thick=3} !line (705, 280) (774, 246)
+[id0:tree] @(640, 290) {w=66px, size=28px, color=emp} **ID(0)**
+[add:tree] @(841, 290) {w=66px, size=28px, color=keyword} **ADD**
+[ln2:tree] {color=#ffffff, thick=3} !line (874, 334) (941, 368)
+[ln3:tree] {color=#ffffff, thick=3} !line (804, 368) (874, 334)
+[id1:tree] @(753, 383) {w=66px, size=28px, color=emp} **ID(1)**
+[mul:tree] @(932, 383) {w=84px, size=28px, color=keyword} **MULT**
+[ln4:tree] {color=#ffffff, thick=3} !line (977, 430) (1044, 464)
+[ln5:tree] {color=#ffffff, thick=3} !line (908, 464) (977, 430)
+[id2:tree] @(871, 479) {w=66px, size=28px, color=emp} **ID(2)**
+[cst:tree] @(1010, 479) {w=99px, size=28px, color=#60a0ff} **int2float**
+[ln6:tree] {color=#ffffff, thick=3} !line (1060, 525) (1060, 570)
+[i60:tree] @(1010, 579) {w=99px, size=28px, color=rose} **INT(60)**
+
+!anim int_gen color gold 0.7s
+!anim @tree move (640,0) 2.0s
+{color=white, thick=5} !arrow (420,340) (480,340)
+
+% == TRANSLATION!! ==
+...
+!anim asg color gold 0.7s
+!anim asg scale 2.0 0.7s
+...
+!anim id0 color gold 0.7s
+!anim asg scale 1.0 0.7s
+!anim id0 scale 2.0 0.7s
+...
+@(670, 40) {w=112px, size=28px, color=#9437FF} id0
+!anim id0 color gray 0.7s
+!anim id0 scale 1.0 0.7s
+...
+!anim add color gold 0.7s
+!anim add scale 2.0 0.7s
+...
+!anim id1 color gold 0.7s
+!anim id1 scale 2.0 0.7s
+!anim add scale 1.0 0.7s
+...
+@(780, 120) {w=112px, size=28px, color=#9437FF} id1
+!anim id1 color gray 0.7s
+!anim id1 scale 1.0 0.7s
+!anim mul color gold 0.7s
+!anim mul scale 2.0 0.7s
+...
+!anim mul scale 1.0 0.7s
+!anim id2 color gold 0.7s
+!anim id2 scale 2.0 0.7s
+...
+@(870, 210) {w=112px, size=28px, color=#9437FF} id2
+!anim id2 color gray 0.7s
+!anim id2 scale 1.0 0.7s
+...
+!anim cst color gold 0.7s
+!anim cst scale 2.0 0.7s
+...
+!anim cst scale 1.0 0.7s
+!anim i60 color gold 0.7s
+!anim i60 scale 2.0 0.7s
+...
+@(1000, 330) {w=112px, size=28px, color=#9437FF} 60
+!anim i60 color gray 0.7s
+!anim i60 scale 1.0 0.7s
+!anim cst scale 2.0 0.7s
+...
+@(500,320) {font=monospace} temp1 = int2float(60)
+...
+@(1030, 210) {w=112px, size=28px, color=#9437FF} temp1
+!anim cst color gray 0.7s
+!anim cst scale 1.0 0.7s
+!anim mul scale 2.0 0.7s
+...
+@(500,370) {font=monospace} temp2 = id2 * temp1
+...
+@(930, 120) {w=112px, size=28px, color=#9437FF} temp2
+!anim mul scale 1.0 0.7s
+!anim mul color gray 0.7s
+!anim add scale 2.0 0.7s
+...
+@(500,420) {font=monospace} temp3 = id1 + temp2
+...
+!anim add color gray 0.7s
+!anim add scale 1.0 0.7s
+@(840, 40) {w=112px, size=28px, color=#9437FF} temp3
+!anim asg scale 2.0 0.7s
+...
+@(500,470) {font=monospace} id0 = temp3
+!anim asg color gray 0.7s
+!anim asg scale 1.0 0.7s
+
+---
+% == SET IP STEPS FOR OPTIMIZATION
+[source]   {thick=1, fill=#bf1e4cbf, textcolor=black, size=32} !rect (20, 32) (384, 60) **Source Language**
+[target]   {thick=1, fill=#00bf42bf, textcolor=black, size=32} !rect (20, 627) (384, 60) **Target Language**
+[int_code] {thick=1, fill=#e07000bf, textcolor=black, size=32} !rect (20, 393) (384, 60) **Intermediate Code**
+
+[f_box]    {color=#0097eb80, thick=5, fill=#0097eb59, round=40} !rect (22, 110) (379, 264)
+[lex]      {$step} !rect (42, 120) (340, 55) **Lexical Analyzer**
+[parse]    {$step} !rect (42, 183) (340, 55) **Syntax Analyzer**
+[semantic] {$step} !rect (42, 246) (340, 55) **Semantic Analyzer**
+[int_gen]  {$step} !rect (42, 309) (340, 55) **Int. Code Generator**
+
+[b_box]    {color=#0097eb80, thick=5, fill=#0097eb59, round=20} !rect (22, 471) (379, 136)
+[opt]      {$step} !rect (30, 480) (364, 55) **Code Optimizer**
+[t_lang]   {$step} !rect (30, 543) (364, 55) **Target Code Generator**
+
+% == STARTER INTERMEDIATE CODE ==
+[line1:code] @(500,320) {w=1000, font=monospace} temp1 = int2float(60)
+[line2:code] @(500,370) {w=1000, font=monospace} temp2 = id2 * temp1
+[line3:code] @(500,420) {w=1000, font=monospace} temp3 = id1 + temp2
+[line4:code] @(500,470) {w=1000, font=monospace} id0 = temp3
+
+!anim opt color gold 0.7s
+!anim @code move (500,20) 2.0s
+
+% == OPTIMIZATIONS ==
+...
+!anim line1 text temp1 = {{color=emp|int2float(60)}}
+...
+!anim line1 text temp1 = {{color=emp|60.0}}
+...
+!anim line1 text {{color=emp|temp1}} = 60.0
+!anim line2 text temp2 = id2 * {{color=emp|temp1}}
+...
+!anim line1 exit
+!anim line2 text temp2 = id2 * {{color=emp|60.0}}
+...
+!anim line2 text temp2 = id2 * 60.0
+!anim line3 text {{color=emp|temp3}} = id1 + temp2
+!anim line4 text id0 = {{color=emp|temp3}}
+...
+!anim line3 text {{color=emp|id0}} = id1 + temp2
+!anim line4 exit
+...
+!anim line2 text temp = id2 * 60.0
+!anim line3 text id0 = id1 + temp
+...
+!anim line2 text temp = id2 * {{color=emp|60.0}}
+!anim line3 text id0 = id1 + temp
+!anim opt color black 0.7s
+!anim t_lang color gold 0.7s
+
+% == TO ASSEMBLY ==
+...
+@(500,240) {{color=comment|`# Assume id1 is in f1 and id2 is in f2`}}
+@(500,280) {{color=comment|`# Load 60.0 into a floating-point register f3`}}
+@(500,320) {{color=emp|`li f3, 0x42700000`}} {{color=comment|`# Bit pattern for 60.0`}}
+...
+!anim line2 text {{color=orange|temp}} = {{color=#0096FF|id2}} * {{color=emp|60.0}}
+...
+@(500,400) {{color=comment|`# Multiply id2 by 60.0; store in temp (f4)`}}
+@(500,440) `fmul.s` {{color=orange|`f4,`}} {{color=#0096FF|`f2,`}} {{color=emp|`f3`}} {{color=comment|`# temp = id2 * 60.0`}}
+...
+!anim line3 text {{color=keyword|id0}} = {{color=yellow|id1}} + {{color=orange|temp}}
+...
+@(500,520) {{color=comment|`# Add id1 and temp and store the result in id0`}}
+@(500,560) `fadd.s` {{color=keyword|`f0,`}} {{color=yellow|`f1,`}} {{color=orange|`f4`}} {{color=comment|`# id0 = id1 + temp`}}
+
+---
+### Overview
+[o1] {color=#808080} - Administrative Items
+[o2] {color=#808080} - Overview and History of Compilers
+[o3] {color=#808080} - Compiler Construction Example
+[o4] {color=#A0D0FF} - Lecture Schedule Review
+...
+!anim o4 color #FFFFFF 0.5s
+!anim o4 textsize 44px 0.5s
+---
+[app] @(0,0) {w=1.0, h=1.0} !embed(https://cse.msu.edu/~cse450)

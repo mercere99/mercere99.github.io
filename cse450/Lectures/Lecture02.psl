@@ -1,0 +1,559 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+!set palette pp blue
+!set palette id lightblue
+!set palette keyword #FF00FF
+!set palette quote green
+!set palette num tan
+!set palette warn red
+!set palette math yellow
+!set palette emp #80FF80
+!set palette regex #73FDFF
+!set palette bg #08111F
+
+% Imported from Lecture-02 - RegEx.pptx — titles, bullets, text boxes, images, tables,
+% common shapes, and animations (grouped by click). Expect to clean up by hand.
+
+# **CSE 450** Translation of Programming Languages
+## Lecture 2: **Lexical Analysis**
+---
+### How well do you know C++?
+Have you used the "down-to" operator?  **`-->`**
+...
+@(150,225) {size=32} ```cpp
+  #include <print>
+
+  int main()
+  {
+      int x = 10;
+      while (x --> 0) {
+          std::println("{}", x);   
+      }
+  }
+```
+---
+{size=26} ```
+ #include <print>
+
+ int main()
+ {
+     int x = 10;
+     while (x   > 0) {
+         std::println("{}", x); 
+     }
+ }
+```
+[dashes] @(330,261) {z=11, color=black} --
+...
+[l1] @(650,80) {size=28} [{{color=pp|`#`}}]
+...
+!anim l1 text [{{color=pp|`#`}}][{{color=keyword|`include`}}]
+...
+!anim l1 text [{{color=pp|`#`}}][{{color=keyword|`include`}}][` `]
+...
+!anim l1 text [{{color=pp|`#`}}][{{color=keyword|`include`}}][` `][{{color=quote|`<print>`}}]
+...
+!anim l1 text [{{color=pp|`#`}}][{{color=keyword|`include`}}][` `][{{color=quote|`<print>`}}][\n]
+...
+[l2] @(650,115) {size=28} [\n]
+...
+[l3] @(650,155) {size=28} [{{color=keyword|`int`}}][` `][{{color=id|`main`}}][`(`][`)`][\n]
+[l4] @(650,190) {size=28} [`{`][\n]
+[l5] @(650,224) {size=28} [` `][{{color=keyword|`int`}}][` `][{{color=id|`x`}}][` `][`=`][` `][{{color=num|`10`}}][`;`][\n]
+...
+!anim l1 text [{{color=pp|`#`}}][{{color=keyword|`include`}}]{{color=warn|[` `]}}[{{color=quote|`<print>`}}]{{color=warn|[\n]}}
+!anim l2 text {{color=warn|[\n]}}
+!anim l3 text [{{color=keyword|`int`}}]{{color=warn|[` `]}}[{{color=id|`main`}}][`(`][`)`]{{color=warn|[\n]}}
+!anim l4 text [`{`]{{color=warn|[\n]}}
+!anim l5 text {{color=warn|[` `]}}[{{color=keyword|`int`}}]{{color=warn|[` `]}}[{{color=id|`x`}}]{{color=warn|[` `]}}[`=`]{{color=warn|[` `]}}[{{color=num|`10`}}][`;`]{{color=warn|[\n]}}
+...
+!anim l1 text [{{color=pp|`#`}}][{{color=keyword|`include`}}][{{color=quote|`<print>`}}]
+!anim l2 text &nbsp;
+!anim l3 text [{{color=keyword|`int`}}][{{color=id|`main`}}][`(`][`)`]
+!anim l4 text [`{`]
+!anim l5 text [{{color=keyword|`int`}}][{{color=id|`x`}}][`=`][{{color=num|`10`}}][`;`]
+...
+[l6] @(650,260) {size=28} [{{color=keyword|`while`}}][`(`][{{color=id|`x`}}][{{color=math|**`--`**}}][`>`][{{color=num|`0`}}][`)`][`{`]
+[l7] @(650,295) {size=28} [{{color=id|`std`}}][`::`][{{color=id|`println`}}][`(`][{{color=quote|`"{}"`}}][`,`][{{color=id|`x`}}][`)`][`;`]
+[l8] @(650,330) {size=28} [`}`]
+[l9] @(650,365) {size=28} [`}`]
+
+...
+!anim l6 text [{{color=keyword|`while`}}][`(`][{{color=id|`x`}}][{{color=warn|**`--`**}}][`>`][{{color=num|`0`}}][`)`][`{`]
+...
+!anim dashes color warn 1.0s
+>>>
+!anim dashes move (310,261) 2.0s
+% @(310,261) {z=11} **{{color=warn|--}}**
+
+---
+{textcolor=white, w=260, size=44} @(99, 61) Structure of a Compiler
+...
+[source] {thick=1, fill=#bf1e4cbf, textcolor=black, size=32} !rect (448, 32) (384, 60) **Source Language**
+[target] {thick=1, fill=#00bf42bf, textcolor=black, size=32} !rect (448, 627) (384, 60) **Target Language**
+{thick=0, fill=#e07000bf, textcolor=black, size=32} !rect (448, 393) (384, 60) **Intermediate Code**
+[front] {color=#0097eb80, thick=5, fill=#0097eb59, round=40} !rect (450, 110) (379, 264)
+[lex] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 120) (340, 55) **Lexical Analyzer**
+[parse] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 183) (340, 55) **Syntax Analyzer**
+[semantic] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 246) (340, 55) **Semantic Analyzer**
+[int_code] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (470, 309) (340, 55) **Int. Code Generator**
+[back] {color=#0097eb80, thick=5, fill=#0097eb59, round=20} !rect (450, 471) (379, 136)
+[opt] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (458, 480) (364, 55) **Code Optimizer**
+[target_gen] {thick=1, fill=#0097eb, round=20, textcolor=black, size=30} !rect (458, 543) (364, 55) **Target Code Generator**
+...
+{thick=12, color=#ffff60} !arrow (950, 146) (850, 146)
+@(980,100) {size=68,color=yellow} **TODAY!**
+!anim lex color gold
+!anim lex stroke gold
+!anim lex thick 5
+
+
+---
+### What, exactly, is lexing ?
+{size=40} Consider the code:
+{size=40} `int my_var = 1024;`
+{size=40} This is just a series of characters:
+
+!style char {
+  color=white,
+  textcolor=white,
+  round=0,
+  size=40
+}
+
+!set advance_pause 0.5
+
+...
+[ci:key] {$char} !rect (100, 400) (60, 80) **i**
+...
+[cn:key] {$char} !rect (160, 400) (60, 80) **n**
+...
+[ct:key] {$char} !rect (220, 400) (60, 80) **t**
+...
+[cs1:ws] {$char} !rect (280, 400) (60, 80) &nbsp;
+...
+[cm:id] {$char} !rect (340, 400) (60, 80) **m**
+...
+[cy:id] {$char} !rect (400, 400) (60, 80) **y**
+>>> ${advance_pause}s
+[cu:id] {$char} !rect (460, 400) (60, 80) **_**
+>>> ${advance_pause}s
+[cv:id] {$char} !rect (520, 400) (60, 80) **v**
+>>> ${advance_pause}s
+[ca:id] {$char} !rect (580, 400) (60, 80) **a**
+>>> ${advance_pause}s
+[cr:id] {$char} !rect (640, 400) (60, 80) **r**
+>>> ${advance_pause}s
+[cs2:ws] {$char} !rect (700, 400) (60, 80) &nbsp;
+>>> ${advance_pause}s
+[cq:sym] {$char} !rect (760, 400) (60, 80) **=**
+>>> ${advance_pause}s
+[cs3:ws] {$char} !rect (820, 400) (60, 80) &nbsp;
+>>> ${advance_pause}s
+[c1:num] {$char} !rect (880, 400) (60, 80) **1**
+>>> ${advance_pause}s
+[c0:num] {$char} !rect (940, 400) (60, 80) **0**
+>>> ${advance_pause}s
+[c2:num] {$char} !rect (1000, 400) (60, 80) **2**
+>>> ${advance_pause}s
+[c4:num] {$char} !rect (1060, 400) (60, 80) **4**
+>>> ${advance_pause}s
+[cs:end] {$char} !rect (1120, 400) (60, 80) **;**
+
+...
+!anim @ws text X
+!anim @ws textcolor red
+
+>>> 1.0s
+!anim @ws exit
+
+...
+!anim @key color keyword
+@(90,500) {size=48, color=keyword} **keyword**
+
+...
+!anim @id color id
+@(420,500) {size=48, color=id} **identifier**
+
+...
+!anim @sym color math
+@(710,500) {size=44, color=math} **symbol**
+
+...
+!anim @num color num
+@(930,500) {size=44, color=num} **number**
+
+...
+!anim @end color warn
+@(1120,500) {size=44, color=warn} **end**
+
+...
+{size=32, w=1150} @(25, 575) A {{color=lightgreen|**token type**}} is a category of substrings in the source language.
+...
+{size=32, w=1250} @(25, 625) English tokens are words or punctuation: {{color=#7980FF|nouns}}, {{color=#72FA78|verbs}}, {{color=#73FDFF|adjectives}}, or {{color=#FF84FF|end-marks}}.
+...
+{size=32, w=1250} @(25, 675) In a program or script, tokens are {{color=id|identifiers}}, {{color=math|symbols}}, {{color=num|numbers}}, {{color=warn|end lines}}, etc.
+---
+[:dia] @(90,500) {size=48, color=keyword} **keyword**
+[:dia] @(420,500) {size=48, color=id} **identifier**
+[:dia] @(710,500) {size=44, color=math} **symbol**
+[:dia] @(930,500) {size=44, color=num} **number**
+[:dia] @(1120,500) {size=44, color=warn} **end**
+[ci:key,dia] {$char} !rect (100, 400) (60, 80) **i**
+[cn:key,dia] {$char} !rect (160, 400) (60, 80) **n**
+[ct:key,dia] {$char} !rect (220, 400) (60, 80) **t**
+[cm:id,dia] {$char} !rect (340, 400) (60, 80) **m**
+[cy:id,dia] {$char} !rect (400, 400) (60, 80) **y**
+[cu:id,dia] {$char} !rect (460, 400) (60, 80) **_**
+[cv:id,dia] {$char} !rect (520, 400) (60, 80) **v**
+[ca:id,dia] {$char} !rect (580, 400) (60, 80) **a**
+[cr:id,dia] {$char} !rect (640, 400) (60, 80) **r**
+[cq:sym,dia] {$char} !rect (760, 400) (60, 80) **=**
+[c1:num,dia] {$char} !rect (880, 400) (60, 80) **1**
+[c0:num,dia] {$char} !rect (940, 400) (60, 80) **0**
+[c2:num,dia] {$char} !rect (1000, 400) (60, 80) **2**
+[c4:num,dia] {$char} !rect (1060, 400) (60, 80) **4**
+[cs:end,dia] {$char} !rect (1120, 400) (60, 80) **;**
+!anim @key color keyword
+!anim @id color id
+!anim @sym color math
+!anim @num color num
+!anim @end color warn
+
+!anim @dia move (90,50) 2.0s
+...
+@(90,230) {w=1150, size=32} A {{color=emp|**token**}} is a {{color=num|sequence}} of characters from an input stream, its {{color=num|type}}, and its {{color=num|location}} in the input (*e.g.*, a file position).
+...
+[:circle] {color=emp, thick=4} !ellipse (190,130) (120, 110)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (520,130) (220, 110)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (790,130) (60, 110)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (1000,130) (130, 110)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (1150,130) (60, 110)
+
+...
+!anim @circle exit
+@(90,330) {w=1150, size=32} A {{color=emp|**lexeme**}} is the specific {{color=num|character sequence}} associated with a particular token, such as `int`, `my_var`, `=`, `1024`, or `;`
+...
+[:circle] {color=emp, thick=4} !ellipse (190,90) (120, 60)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (520,90) (220, 60)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (790,90) (60, 60)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (1000,90) (130, 60)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (1150,90) (60, 60)
+
+...
+!anim @circle exit
+@(90,430) {w=1150, size=32} A {{color=emp|**token type**}} is a {{color=num|category}} of meaningful substrings in the source language. (a *keyword*, an *identifier*, a *symbol*, a *number*, an *end mark*, etc.)
+...
+[:circle] {color=emp, thick=4} !ellipse (190,190) (120, 60)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (520,190) (130, 60)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (790,190) (100, 60)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (1000,190) (100, 60)
+>>> 0.5s
+[:circle] {color=emp, thick=4} !ellipse (1165,190) (60, 60)
+...
+!anim @circle exit
+@(90,530) {w=1150, size=32} A {{color=emp|**pattern**}} is a {{color=num|description}} that fully characterizes the class of lexemes belonging to a token type.
+...
+@(90,630) {w=1150, size=32} A {{color=emp|**regular expression**}} is a formal, rigorous way of defining a pattern.
+
+
+
+---
+### Regular Expressions
+...
+{size=32} A {{color=emp|regular expression}} is a notation for a well-defined set of "words" (called a "regular language")
+...
+{size=32} If {{color=id|$A$}} is a regular expression, then {{color=id|$L(A)$}} is the language defined by that regular expression.
+...
+{size=32} {{color=id|$L(``c")$}} is a language with the single word {{color=id|"c"}}.
+...
+{size=32} But how do we specify the details of these regular expressions?
+---
+### Regular Expressions: **Concatenation**
+...
+{size=32} {{color=emp|$L(AB) = \{ ab : a ∈ L(A) \text{ and } b ∈ L(B) \}$}}
+...
+{size=32} If two regular expressions are concatenated, then both must be satisfied, one then the other.
+...
+{size=32} {{color=id|$L$('i' 'f')}} is a language with just the single word “{{color=keyword|if}}” in it
+...
+{size=32} {{color=id|$L$(‘ w ' ‘h’ ‘ i ’ ‘l’ ‘e')}} is a language with just the single word “{{color=keyword|while}}”
+...
+{size=32} These regex’s would usually be written as just {{color=num|`if`}} and {{color=num|`while`}}.
+---
+### Regular Expressions: **Union**
+...
+{size=32} {{color=emp|$L(A | B) = \{ s : s ∈ L(A) \text{ or } s ∈ L(B) \}$}}
+...
+{size=32} If two regular expressions are joined with a union (the pipe ‘|’ symbol, “OR”) , then either can be satisfied.
+...
+{size=32} {{color=id|$L( \text{ if } | \text{ then } | \text{ else })$}} is a language with the three words “{{color=keyword|if}}”, “{{color=keyword|then}}” and “{{color=keyword|else}}” in it.
+...
+{size=32} {{color=id|$L( (a | b) (c | d) )$}} is a language consisting of the four words: “ {{color=num|ac}} ”, “ {{color=num|ad}} ”, “ {{color=num|bc}} ”, and “ {{color=num|bd}} ”
+---
+### Regular Expressions: **Other patterns**
+| Expression | Meaning |
+|:---:|:---|
+| **"A"** | **A** is taken **literally** (e.g., "*" is the star symbol, not repeat). |
+| **A?** | **A** can be repeated **zero or one times**. |
+| **A+** | **A** can be repeated **one or more times**. |
+| **A*** | **A** can be repeated **zero or more times**. |
+| **(A)** | **A** should be grouped as a **single expression** |
+| **[…]** | Match any single character between **[** and **]**.  Start with `^` to negate; use `-` for range. |
+| **A{** ***n*** **}** | **A** must be matched **exactly** ***n*** **times**. |
+| **A{** ***n,*** **}** | **A** must be matched **at least** ***n*** **times**. |
+| **A{** ***m,n*** **}** | **A** must be matched **at least** ***m*** **times and at most** *n* **times**. |
+
+[cover] {thick=0, fill=bg} !rect (42, 218) (1203, 508)
+...
+!anim cover move (39, 271) 1s
+...
+!anim cover move (39, 323) 1s
+...
+!anim cover move (39, 375) 1s
+...
+!anim cover move (39, 426) 1s
+...
+!anim cover move (39, 478) 1s
+...
+!anim cover move (39, 530) 1s
+...
+!anim cover move (39, 582) 1s
+...
+!anim cover move (39, 634) 1s
+...
+!anim cover move (39, 690) 1s
+
+---
+### Regular Expressions: **Character Classes**
+{size=30} Square brackets define a {{color=emp|character class}}: a set from which exactly {{color=num|one}} character is matched.
+
+| Expression | Matches |
+|:---:|:---|
+| **[abc]** | One character: `a`, `b`, or `c` |
+| **[a-z]** | A **range** — any one lower-case letter |
+| **[a-zA-Z_]** | Ranges and single characters combine freely |
+| **[^abc]** | Negated — any one character that is **not** `a`, `b`, or `c` |
+| **[-+]** | A `-` is literal when it is **first** or **last** in the class |
+
+...
+{size=30} Emplex provides shortcuts for the most common classes: {{color=regex|`\d`}} = `[0-9]`, {{color=regex|`\l`}} = `[a-zA-Z]`, {{color=regex|`\w`}} = `[A-Za-z0-9_]`, {{color=regex|`\s`}} = whitespace, and {{color=regex|`.`}} = `[^\n]`.  Capitalize to negate: {{color=regex|`\D`}}, {{color=regex|`\L`}}, {{color=regex|`\W`}}, {{color=regex|`\S`}}.
+...
+{size=30} A class always matches {{color=num|one}} character, so use `*` or `+` when you want a run of them: {{color=regex|`[a-zA-Z_][a-zA-Z0-9_]*`}}
+...
+{size=30} Negated classes are how you say {{color=emp|"everything up to a delimiter"}}.  For example, {{color=regex|`//[^\n]*`}} matches a line comment: any run of characters that stops at the end of the line.
+...
+{size=30} {{color=math|Your turn}}: how would you match a literal string in quotes?  Which characters must the class exclude, and what breaks if you forget one?
+---
+### Designing a regular expression for literal numbers
+!set tabx 220
+!set col1 50
+!set col2 670
+!set spacing 45
+!set re_size 28
+!set txt_size 28
+
+@(${col1},${tabx}) {size=32} **Regular Expression**
+@(${col2},${tabx}) {size=32} **Issue (and example of failed case)**
+...
+@(${col1},${tabx+spacing}) {size=${re_size},color=regex,font=monospace} [0-9]
+...
+@(${col2},${tabx+spacing}) {size=${txt_size}} Only single digit (not “ **314** ”)
+...
+@(${col1},${tabx+spacing*2}) {size=${re_size},color=regex,font=monospace} [0-9]{{color=math|+}}
+...
+@(${col2},${tabx+spacing*2}) {size=${txt_size}} Non-negative numbers (not **-314** )
+...
+@(${col1},${tabx+spacing*3}) {size=${re_size},color=regex,font=monospace} {{color=math|[-+]?}}[0-9]+
+...
+@(${col2},${tabx+spacing*3}) {size=${txt_size}} No floating point (not **3.14** )
+...
+@(${col1},${tabx+spacing*4}) {size=${re_size},color=regex,font=monospace} [-+]?[0-9]+{{color=math|\.[0-9]+}}
+...
+@(${col2},${tabx+spacing*4}) {size=${txt_size}} **Requires** decimal point (not **314** )
+...
+@(${col1},${tabx+spacing*5}) {size=${re_size},color=regex,font=monospace} [-+]?[0-9]+{{color=math|(}}\.[0-9]+{{color=math|)?}}
+...
+@(${col2},${tabx+spacing*5}) {size=${txt_size}} Needs digit **before** decimal point (not **.314** )
+...
+@(${col1},${tabx+spacing*6}) {size=${re_size},color=regex,font=monospace} [-+]?{{color=math|(}}[0-9]+(\.[0-9]+)?{{color=math|)|(\.[0-9]+)}}
+...
+@(${col2},${tabx+spacing*6}) {size=${txt_size}} Needs digits **after** decimal point (not **314.** )
+...
+@(${col1},${tabx+spacing*7}) {size=${re_size},color=regex,font=monospace} [-+]?([0-9]+(\.[0-9]{{color=math|*}})?)|(\.[0-9]+)
+...
+@(${col2},${tabx+spacing*7}) {size=${txt_size}} Can be simplified a bit…
+...
+@(${col1},${tabx+spacing*8}) {size=${re_size},color=regex,font=monospace} [-+]?([0-9]{{color=#FF84FF|+\}}.{{color=math|?}}[0-9]*{{color=#FF84FF|)|}}(\.[0-9]+)
+...
+@(${col2},${tabx+spacing*8}) {size=${txt_size}} No scientific notation… (not **9.8e-7** )
+...
+@(60,645) {size=36, w=1200,color=emp,font=monospace} [-+]?(([0-9]+\.?[0-9]*)|(\.[0-9]+))([eE][-+]?[0-9]+)?
+
+---
+### Identifying Tokens
+{size=32} A lexical analyzer must be able to do three things:
+- {size=32} Correctly identify all tokens within a string.
+- {size=32} Discard all tokens for whitespace and comments.
+- {size=32} Return each remaining token with its type , its lexeme and the line number it was found on.
+{size=32} How do we go about implementing this?
+
+---
+### Can we just search for one token type at a time?
+...
+&nbsp;
+{size=36px}Consider searching for a literal number:
+...
+[l1] {size=36,w=1200,color=emp,font=monospace} &nbsp;int my_var2;
+[l2] {size=36,w=1200,color=emp,font=monospace} &nbsp;string test_str = “This is test #12”;
+[l3] {size=36,w=1200,color=emp,font=monospace} &nbsp;x = 23; // Set x to the value 23.
+...
+!anim l1 text &nbsp;int my_var{{color=warn|2}};
+...
+!anim l2 text &nbsp;string test_str = “This is test #{{color=warn|12}}”;
+...
+!anim l3 text &nbsp;x = {{color=#0096FF|23}}; // Set x to the value 23.
+...
+!anim l3 text &nbsp;x = {{color=#0096FF|23}}; // Set x to the value {{color=warn|23}}.
+...
+@(80, 500) {w=1196px, size=36px} Instead, we must step through input characters sequentially, matching regular expressions as we go.
+---
+### Lookahead
+...
+{size=36} - When reading tokens left-to-right, it is not always possible to decide if a token is finished without looking ahead.
+...
+{size=36} - Is '{{color=id|i}}' a variable, or the first character of the keyword '{{color=id|if}}' or '{{color=id|int}}', or is it some other identifier?
+...
+{size=36} - Is '{{color=math|=}}' an assignment, or the beginning of a comparison '{{color=math|==}}'?
+---
+### Lookahead
+...
+{size=36} - Some languages require more lookahead than others. For example, Fortran removes all whitespace before processing.
+...
+    [c1] {size=36,font=monospace} - DO 5 I = 1,25
+...
+{size=36} - ' DO ' is a keyword ! It triggers the variable I to go from 1 to 25, with each iteration looping back when it hits the line labeled “5”.
+...
+!anim c1 text {{color=keyword|DO}} {{color=num|5}} {{color=id|I}} {{color=math|=}} {{color=num|1}}{{color=math|,}}{{color=num|25}}
+...
+    [c2] {size=36,font=monospace} - DO 5 I = 1.25
+...
+{size=36} - ' DO5I ' is a variable ! It is initialized to the value 1.25
+...
+!anim c2 text {{color=id|DO 5 I}} {{color=math|=}} {{color=num|1.25}}
+
+---
+### Uglier Lookahead example
+PL/I is another difficult-to-lex language because it allows identifiers to be the same as keywords.
+- Consider these *legal* statements:
+[l1] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IF THEN THEN THEN = ELSE;
+[l2] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ELSE ELSE = THEN;
+...
+- ELSE and THEN are {{color=keyword|**keywords**}} in some contexts, but are {{color=id|**variables**}} in other contexts.
+...
+!anim l1 text &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{color=keyword|IF}} {{color=id|THEN}} {{color=keyword|THEN}} {{color=id|THEN}} {{color=math|=}} {{color=id|ELSE}};
+!anim l2 text &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{color=keyword|ELSE}} {{color=id|ELSE}} {{color=math|=}} {{color=id|THEN}};
+
+---
+### Details...
+...
+{size=36} - How should we figure out ambiguities?
+...
+{size=36} - If we see 'intact', are we declaring an integer called 'act' or making use of a previously defined identifier by the name 'intact'?
+...
+{size=36} - We need rules that ensure only one possible answer, ideally with only one character of lookahead.
+---
+### Designing Regular Expressions for a Lexer
+...
+{size=36} A regular expression must {{color=#00F900|cover ALL cases}} for the token type. If there are multiple distinct ways of building a token, use "or" ("|").
+...
+{size=36} A regular expression must {{color=#FF0000|exclude any cases}} that do not fit the given token type *unless* another RE will have priority
+...
+{size=36} The first method of deciding between two regular expressions is to take the {{color=id|longer match}}. (“{{color=num|maximum munch}}”)
+...
+{size=36} Equal-length matches are decided by taking the {{color=id|first match}} in order.
+...
+{size=36} If {{color=warn|no}} RegEx matches, the lexer returns that {{color=id|single character}} as its own token, and lets the next stage report the problem.
+---
+### Building a Lexer
+{size=36} Consider a language with the following token types:
+[id1] @(150,220) {size=36} {{color=num|Identifier}}:
+[id2] @(150,280) {size=36} {{color=num|Number}}:
+[id3] @(150,340) {size=36} {{color=num|Keywords}}:
+[id4] @(150,400) {size=36} {{color=num|Comparison}}:
+
+[re1] @(400,220) {size=36,font=monospace,color=pink} {{color=#9090FF|[a-zA-Z0-9_]}}+
+[re2] @(400,280) {size=36,font=monospace,color=pink} {{color=#9090FF|[-+]}}?{{color=#9090FF|[0-9]}}+({{color=emp|\.}}{{color=#9090FF|[0-9]}}+)?
+[re3] @(400,340) {size=36,font=monospace,color=pink} {{color=emp|if}}|{{color=emp|else}}|{{color=emp|int}}|{{color=emp|float}}|{{color=emp|for}}|{{color=emp|while}}
+[re4] @(400,400) {size=36,font=monospace,color=pink} ({{color=#9090FF|[=!]}}{{color=emp|=}})|({{color=emp|<=}}?)|({{color=emp|>=}}?)
+...
+@(80, 480) {color=#b8dcab, size=36px} What are the issues with these lexer patterns?
+...
+[question] @(80, 560) {color=#b8dcab, size=36px}  What would “**`100`**” match?
+...
+!anim id1 move (150,280) 2s
+!anim id2 move (150,220) 2s
+!anim re1 move (400,280) 2s
+!anim re2 move (400,220) 2s
+...
+!anim question text What would “{{color=math|**`for`**}}” match?
+...
+!anim id3 move (150,280) 2s
+!anim id1 move (150,340) 2s
+!anim re3 move (400,280) 2s
+!anim re1 move (400,340) 2s
+...
+!anim question text What would “{{color=math|**`7eleven`**}}” match?
+
+...
+!anim re1 text {{color=warn|[a-zA-Z_]}}{{color=#9090FF|[a-zA-Z0-9_]}}+
+...
+!anim re1 text {{color=#9090FF|[a-zA-Z_]}}{{color=#9090FF|[a-zA-Z0-9_]}}+
+!anim question text What would “{{color=math|**`i`**}}” match?
+...
+!anim re1 text {{color=#9090FF|[a-zA-Z_]}}{{color=#9090FF|[a-zA-Z0-9_]}}{{color=warn|*}}
+...
+
+!anim re1 text {{color=#9090FF|[a-zA-Z_]}}{{color=#9090FF|[a-zA-Z0-9_]}}*
+!anim question text What would “{{color=math|**`x-3`**}}” match?
+...
+!anim re2 text {{color=warn|[-+]?}}{{color=#9090FF|[0-9]}}+({{color=emp|\.}}{{color=#9090FF|[0-9]}}+)?
+...
+!anim re2 text {{color=#9090FF|[0-9]}}+({{color=emp|\.}}{{color=#9090FF|[0-9]}}+)?
+!anim question text What would “{{color=math|**`forest`**}}” match?
+...
+@(600, 530) {w=121px, size=107px} ✅
+---
+### Project 1: Lexical Analysis
+...
+- Correctness is job #1.
+...
+  - And job #2 and #3!
+...
+- Remember that this project may be used in future projects.
+...
+- Tips on building large systems (such as our compiler):
+...
+  - Keep it simple
+...
+  - Design systems that can be tested
+...
+  - Don't optimize prematurely
+...
+  - It is easier to modify a working system than to get a system working

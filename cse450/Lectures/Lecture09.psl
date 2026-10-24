@@ -1,0 +1,100 @@
+!set baseurl https://www.cse.msu.edu/~cse450/Lectures/Lecture09.psl
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+
+!set palette neon_blue #40C0FF
+!set palette neon_pink #FF40C0
+!set palette neon_green #C0FF40
+!set palette warn red
+!set palette math yellow
+!set palette emp #80FF80
+
+!set palette id lightblue
+!set palette keyword #FF00FF
+!set palette quote green
+!set palette num tan
+!set palette bright #73FDFF
+!set palette bg #08111F
+% Source: Lectures/Lecture-07 - ASTs.pptx (35 slides).
+% Hidden source slides 29–34 are omitted. The visible Class Problem (35) is retained.
+% Source slides 3–4 share a table; slides 14–28 form one continuous tree animation.
+% ... waits for a click; >>> sequences motions within a click.
+% All diagrams are editable PSL objects. Coordinates use a 1280 x 720 canvas.
+
+!set size 30
+!style body {size=30px, w=1112px}
+!style note {size=27px, w=1112px}
+!style code {font=Menlo, size=27px, w=1112px, pad=14px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+!style rule {size=28px, w=1112px, color=id}
+!style node {size=24px, w=60px, align=center, anchor=center, color=id}
+!style edge {color=#8AA5B5, thick=2}
+!style table {size=26px, w=1112px, pad=12px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233, stroke=#31505F}
+
+% PowerPoint slide 1.
+# CSE450 Translation of Programming Languages
+## Lecture 9 : Live Coding
+---
+### Expression Grammar
+...
+From Class:
+```
+expr -> NUM 'd' NUM
+      | expr '+' expr
+      | expr '-' expr
+      | MIN'('expr, expr')'
+      | MAX'('expr, expr')'
+      | '(' expr ')'
+      | NUM
+      | ID
+```
+...
+@(700, 230) Issues:
+...
+@(700, 280) - '+' and '-' should be left associative.
+...
+@(700, 330) - we need to have precedence.
+---
+### Expression Grammar
+Updated:
+```
+expr -> NUM 'd' NUM
+      | expr '+' expr
+      | expr '-' expr
+term -> MIN'('expr, expr')'
+      | MAX'('expr, expr')'
+      | '(' expr ')'
+      | NUM
+      | ID
+```
+---
+### Expression Grammar
+Updated:
+```
+expr -> NUM 'd' NUM
+      | expr '+' term
+      | expr '-' term
+term -> MIN'('expr, expr')'
+      | MAX'('expr, expr')'
+      | '(' expr ')'
+      | NUM
+      | ID
+```
+---
+### Expression Grammar
+Updated:
+```
+expr -> expr '+' expr2
+      | expr '-' expr2
+expr2 -> term 'd' term
+      | term
+term -> MIN'('expr, expr')'
+      | MAX'('expr, expr')'
+      | '(' expr ')'
+      | NUM
+      | ID
+```

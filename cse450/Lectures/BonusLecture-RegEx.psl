@@ -1,0 +1,220 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+
+!set palette id lightblue
+!set palette keyword #FF00FF
+!set palette quote green
+!set palette num tan
+!set palette warn red
+!set palette math yellow
+!set palette emp #80FF80
+!set palette bright #73FDFF
+!set palette bg #08111F
+
+# CSE450 Translation of Programming Languages
+## Bonus Lecture : A Tricky RegEx
+---
+### Tricky Regular Expression Redux
+- **Question:** Give a regular expression that identifies decimal integers that are a multiple of three.
+...
+- **The trick:** If a number is a multiple of three, its digits add up to a multiple of three.
+...
+- **Starting off:** Adding any of the digits 0, 3, 6, or 9 does not change whether the sum is a multiple of three.
+...
+    - `set0  [0369]`
+...
+- What next?
+---
+### RegEx (2)
+**Definitions:** Three sets of digits will be useful to predefine.
+...
+{size=25px, w=1112px, pad=10px} ```
+set0  [0369]
+set1  [147]
+set2  [258]
+```
+...
+These cover all possibilities. `set1` contains digits with remainder 1 modulo 3, and `set2` contains digits with remainder 2.
+...
+How do we combine these sets?
+---
+### RegEx (3)
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+...
+**The trick:** Whenever `set1` or `set2` appears, other digits must compensate to return the sum to a multiple of three. How can this be done?
+...
+{size=25px, w=1112px, pad=10px} ```
+{set1}{set2}
+{set2}{set1}
+{set1}{set1}{set1}
+{set2}{set2}{set2}
+```
+...
+We must allow these multiple times, as well as `set0`.
+---
+### RegEx (4)
+**Attempt 1:** Combine alternatives with `set0` between digits.
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+...
+{size=25px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set0}*{set2}
+| {set2}{set0}*{set1}
+| {set1}{set0}*{set1}{set0}*{set1}
+| {set2}{set0}*{set2}{set0}*{set2}
+)+
+```
+...
+Does this solve all of our problems?
+---
+### RegEx (4)
+**Attempt 1:** Combine alternatives with `set0` between digits.
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+{size=25px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set0}*{set2}
+| {set2}{set0}*{set1}
+| {set1}{set0}*{set1}{set0}*{set1}
+| {set2}{set0}*{set2}{set0}*{set2}
+)+
+```
+{{color=emp|The `{set0}*` terms allow any number of 0, 3, 6, and 9 digits.}}
+Does this solve all of our problems?
+---
+### RegEx (4)
+**Attempt 1:** Combine alternatives with `set0` between digits.
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+{size=25px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set0}*{set2}
+| {set2}{set0}*{set1}
+| {set1}{set0}*{set1}{set0}*{set1}
+| {set2}{set0}*{set2}{set0}*{set2}
+)+
+```
+{size=26px} {{color=math|Omit interleaved `{set0}*` terms for now. We’ll restore them later.}}
+---
+### RegEx (4)
+**Attempt 1:** Combine alternatives with `set0` between digits.
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+{size=25px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set2}
+| {set2}{set1}
+| {set1}{set1}{set1}
+| {set2}{set2}{set2}
+)+
+```
+{size=26px} {{color=math|Omit interleaved `{set0}*` terms for now. We’ll restore them later.}}
+---
+### RegEx (4)
+**Attempt 1:** Combine alternatives with `set0` between digits.
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+{size=25px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set2}
+| {set2}{set1}
+| {set1}{set1}{set1}
+| {set2}{set2}{set2}
+)+
+```
+Does this solve all of our problems?
+---
+### RegEx (5)
+**NO!**
+...
+We could keep skipping over each multiple of three. Consider this sequence:
+{size=28px} `1 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 1`
+...
+This is divisible by three, but our regular expression would not catch it!
+...
+Can we modify our regular expression to catch this special case?
+---
+### RegEx (6)
+**YES!**
+...
+{size=27px} We start a skip sequence when we sum to two, then add another two. First, define the starting case:
+{size=24px, w=1112px, pad=10px} ```
+sum2  {set2} | {set1}{set1}
+```
+...
+{size=27px} Now let’s define a single skip:
+{size=24px, w=1112px, pad=10px} ```
+skip  {sum2}{set2}{sum2}
+```
+...
+{size=27px} And allow any number of sequential skips:
+{size=24px, w=1112px, pad=10px} ```
+skip_sequence  {sum2}{set2}({set1}{set2})*{sum2}
+```
+---
+### RegEx (7)
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+{size=24px, w=1112px, pad=10px} ```
+sum2           {set2} | {set1}{set1}
+skip_sequence  {sum2}{set2}({set1}{set2})*{sum2}
+```
+{size=24px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set2}
+| {set2}{set1}
+| {set1}{set1}{set1}
+| {set2}{set2}{set2}
+| {skip_sequence}
+)+
+```
+---
+### RegEx (7)
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+{size=24px, w=1112px, pad=10px} ```
+sum2           {set2} | {set1}{set1}
+skip_sequence  {sum2}{set2}({set1}{set2})*{sum2}
+```
+{size=24px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set2}
+| {set2}{set1}
+| {set1}{set1}{set1}
+| {set2}{set2}{set2}
+| {skip_sequence}
+)+
+```
+{{color=emp|`{set2}{set2}{set2}` is already covered by `{skip_sequence}`.}}
+---
+### RegEx (7)
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+{size=24px, w=1112px, pad=10px} ```
+sum2           {set2} | {set1}{set1}
+skip_sequence  {sum2}{set2}({set1}{set2})*{sum2}
+```
+{size=24px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set2}
+| {set2}{set1}
+| {set1}{set1}{set1}
+| {skip_sequence}
+)+
+```
+---
+### RegEx (7)
+`set0 [0369]` &nbsp;&nbsp; `set1 [147]` &nbsp;&nbsp; `set2 [258]`
+{size=23px, w=1112px, pad=10px} ```
+sum2  {set2} | {set1}{set0}*{set1}
+skip_sequence
+  {sum2}{set0}*{set2}{set0}*({set1}{set0}*{set2})*{set0}*{sum2}
+```
+{size=24px, w=1112px, pad=10px} ```
+( {set0}+
+| {set1}{set0}*{set2}
+| {set2}{set0}*{set1}
+| {set1}{set0}*{set1}{set0}*{set1}
+| {skip_sequence}
+)+
+```
+...
+{color=emp, size=40px} **DONE!**

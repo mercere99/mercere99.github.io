@@ -1,0 +1,199 @@
+LECTURE 14 — PROJECT 3 IMPLEMENTATION WORKSHOP
+CSE 450, Fall 2026
+
+RECOMMENDED USE
+
+Use the 28-slide main route for 80 minutes, including an 18-minute GCD
+workshop. Three hidden pocket slides provide optional follow-up material.
+SlideDown skips pocket slides during normal next-slide navigation. To use one,
+select its thumbnail or use an exact slide link. Comments in the PSL are also
+presenter notes in SlideDown's script-based presenter console.
+
+The GCD workshop works as live WAT coding or as a paired paper exercise.
+It needs no completed student compiler. A second option, described below,
+uses a prepared partial compiler to demonstrate assignment translation.
+
+Open web/slidedown.html and choose File > Open to load Lecture14.psl.
+When served from the course web directory, the viewer URL is:
+  slidedown.html?present=Lectures/Lecture14.psl
+The relative companion links assume the Lecture14 directory sits beside the PSL
+on the web server. For offline use, open the local files directly from the
+Lecture14 folder.
+
+WHY THESE TOPICS
+
+Lectures 4-7 and 9 establish symbol tables, grammar, precedence, parsing, and
+ASTs. Lectures 10-11 establish WAT generation, assembly, host invocation, and
+optimization. Lectures 12-13 have nearly the same flow-control material,
+including condition conversion, comparison results, returns, loop labels,
+assignment stack effects, scope examples, and testing commands.
+
+The main opportunity is applying those individual ideas across compiler
+phases. This lecture develops the parts not previously worked through:
+  - Right-recursive assignment, non-associative comparisons, legal lvalues.
+  - Evaluation order when one operand changes a variable read by another.
+  - Expression values versus discarded statement values.
+  - Stable declaration IDs and source visibility after a scope is popped.
+  - Parse-time binding versus runtime initialization, skipped declarations,
+    repeated calls, and initializers inside loops.
+  - Grammar corners, token lifetimes, and source-error behavior.
+  - Finding the first failed stage using compiler/assembler/runtime artifacts.
+
+The old six-slide Lecture 14 contributes its implementation-challenge framing
+and GCD exercise. It uses last year's integer/remainder language, a power
+operator, sqrt calls, and logical &&. Those exceed this year's Project 3.
+The new GCD uses subtraction and doubles instead. Collatz and primality are
+omitted so the workshop can concentrate on compiler behavior.
+
+Some older lecture examples also exceed the current handout: Lecture 10 shows
+sqrt and optional declaration initializers. Clarify that the current handout
+requires initialized double declarations and has no source-level calls yet.
+Do not ask students to implement extensions to reproduce those older examples.
+
+80-MINUTE TEACHING ROUTE
+
+00-05  Slides 1-3. Establish boundaries and collect predictions.
+05-25  Slides 4-10. Parse assignments, check comparison syntax, trace effects,
+       and audit stack contracts. Ask students to draw a=b=7 before revealing.
+25-40  Slides 11-15. Trace stable bindings and initialization. Run or predict
+       ScopeExample, ShadowValue, Skipped, and ResetLocal.
+40-50  Slides 16-19. Statement corners, token lifetime, source diagnostics,
+       complete-program validation, and buffered output.
+50-57  Slides 20-21. Inspect a failed test artifact and design distinguishing
+       examples. Keep the emphasis on the first failing pipeline stage.
+57-75  Slides 22-26. GCD workshop, live or on paper.
+75-80  Slides 27-28. Check-in implementation sequence and exit explanations.
+
+Live coding REPLACES time assigned to its corresponding slides. Do not add an
+18-minute demonstration after teaching the complete 80-minute route. If a
+class discussion runs long, shorten the GCD implementation and run gcd.wat.
+The 3 pocket slides are outside the main route.
+
+LIVE WAT WORKSHOP (18 MINUTES)
+
+Before class:
+  1. Have wat2wasm and Node available.
+  2. Copy gcd.wat to a scratch file. Keep the complete version as fallback.
+  3. Open gcd.strix and run-gcd.mjs in adjacent editor panes.
+  4. For a scratch file, start with the module/function/export header, two f64
+     parameters, an f64 result, and a temporary return. Then replace its body
+     with the code developed during the workshop.
+
+57-60  Read the legal Strix source. State the domain: small nonnegative integers.
+       Ask why a zero case must precede the subtraction loop.
+60-63  Trace (48,18) and predict six boundary cases. Explain the progress
+       measure a+b for positive integer inputs.
+63-68  Type the zero guards and block/loop/condition/exit structure. Explain why
+       the hand-written comparison can feed i32 directly into if or br_if.
+68-72  Type the conditional subtraction updates, back edge, and final return.
+       Ask where local.tee/drop could replace local.set.
+72-75  Assemble and run the six host calls. Change one input, predict, rerun.
+
+From the companion folder:
+  wat2wasm gcd.wat -o /tmp/lecture14-gcd.wasm
+  node run-gcd.mjs /tmp/lecture14-gcd.wasm
+
+To exercise a student compiler, use its absolute path:
+  /absolute/path/to/Project3 gcd.strix > /tmp/lecture14-gcd.wat
+  wat2wasm /tmp/lecture14-gcd.wat -o /tmp/lecture14-gcd.wasm
+  node run-gcd.mjs /tmp/lecture14-gcd.wasm
+
+Do not use arbitrary fractions or negative values in this algorithm demo.
+Subtraction-based GCD is intentionally simple, and can be slow on large
+unequal integers. Termination reasoning assumes small nonnegative integers,
+with the two zero cases handled before the loop.
+
+PAPER WORKSHOP ALTERNATIVE (SAME 18 MINUTES)
+
+Use the same source and trace. Pairs write the loop exit condition, then split
+into then-branch and else-branch groups. Have students audit each branch's
+stack effect and explain why the loop repeats. Compare with slides 24-25.
+Assemble the supplied fallback and run the boundary cases to close the exercise.
+
+COMPILER LIVE-CODING ALTERNATIVE (REPLACES SLIDES 22-26)
+
+Use this route only with a prepared partial compiler that already parses and
+checks variables, declarations, and arithmetic, and emits function headers,
+returns, numeric expressions, and local accesses. No completed compiler is
+included in the lecture materials. The supplied student starter begins with
+TODOs, so a from-scratch compiler demonstration will not fit 18 minutes.
+
+57-60  Show Chain's AST. Explain Assignment's target/right-child contract.
+60-65  Add assignment translation: generate the right child, obtain the target's
+       variable_id, append local.tee. Do not emit a local.get for the target.
+65-69  Add expression-statement generation: generate the child and append drop.
+       Declarations use local.set after their initializer. Distinguish the cases.
+69-72  Compile expressions.strix with --ast. Inspect WAT for Chain and LeftRead.
+       Run them and compare 14 and 8. Order should return -3.
+72-75  Deliberately reverse operand emission or remove drop. Predict the failing
+       stage, observe it, restore the code, and rerun. Reversed emitted operands
+       can change both evaluation order and operand positions. Use LeftRead to
+       explain the source rule; avoid claiming one universal wrong result.
+
+The classroom compiler should be a staged teaching example or your own checkpoint,
+not the complete instructor solution published to students. The private reference
+implementation was used only to verify these lecture examples.
+
+EXPECTED RESULTS AND ANSWERS
+
+Slide 3:  b gets stored before a. The expression value is 7. An unbraced skipped
+          declaration has surrounding-scope visibility but zero storage.
+          Unknown names after return still cause errors.
+Slide 5:  a=(b=7); 12/3/2 evaluates to 2.
+Slide 6:  Reject chained comparisons and a sum as an assignment target.
+          Accept (a)=7 and (a<b)==1 when the variables are declared.
+Slide 7:  LeftRead returns 8. Evaluating its right operand first while preserving
+          operand roles would instead yield 0.
+Slide 11: ScopeExample returns 10.
+Slide 12: An initializer reads an outer binding. With no outer binding, a
+          self-reference in an initializer is an unknown-name error.
+Slide 14: Skipped(0), Skipped(1), Skipped(0) return 0,7,0 on one Wasm instance.
+Slide 15: ResetLocal(3) returns 3; hoisting initialization yields 6.
+Slide 18: Reject unknown variable missing at line 4, despite the early return.
+Slide 23: GCD(0,5) would loop forever without its zero guard.
+Slide 28: Assignment values compose into other expressions. Headers allocate
+          storage; body instructions implement dynamic initialization.
+          A runtime mismatch calls for the AST, generated WAT, and a small
+          reproducing input. Successful assembly alone proves no source semantics.
+Pocket A1: Nested returns 33. Inner break must target the inner loop's exit.
+
+EXAMPLES AND VERIFICATION
+
+expressions.strix: Chain=14, Order=-3, LeftRead=8, Divide=2, Parentheses=1.
+                  Truth(0.5)=1, Truth(0)=0, Truth(NaN)=1, Truth(Infinity)=1.
+                  Non-finite test inputs come from the host, not source literals.
+scopes.strix:      ScopeExample=10, ShadowValue=11, Skipped as above,
+                  ResetLocal(0)=0, ResetLocal(3)=3 on repeated calls, Nested=33.
+gcd.strix:         Six calls, matching the hand-written gcd.wat fallback.
+Four separate invalid files test comparison syntax, lvalues, unreachable names,
+and a late error after an earlier valid function. Never concatenate those
+invalid files into the positive examples.
+
+To verify the complete companion set through an implemented compiler:
+  node verify.mjs /absolute/path/to/Project3
+Optional second argument: path to wat2wasm.
+
+The runner creates and removes a temporary output directory, checks 24 runtime
+calls in the compiled-source modules, checks four source-error cases (exit 1,
+empty stdout, and source diagnostics), and checks the WAT fallback's six calls.
+Subprocess timeouts bound compiler, assembler, and runtime hangs. It requires
+no npm packages and does not modify the project manifest or public fixtures.
+It is a small teaching regression suite, not a replacement for make tests.
+
+The examples passed this runner using the local Project 3 reference compiler.
+Use a compiler with the required features when rehearsing. The unimplemented
+starter is expected to fail, which is different from a problem in the examples.
+
+SOURCES
+
+Course authority: web/project3.md and Code/project3-template source interfaces.
+Current implementation guide: Code/project3-template/Hints.md.
+The starter's older prose refers to START-HERE.md, which is absent in the current
+folder; use Hints.md and GettingStarted.md instead.
+Old challenge source: Lectures/Lecture-14 - WASM-Extras.pptx.
+Recent lecture sources: web/Lectures/Lecture04.psl through Lecture07.psl,
+and Lecture09.psl through Lecture13.psl.
+Wasm instruction text and execution:
+  https://webassembly.github.io/spec/core/text/instructions.html
+  https://webassembly.github.io/spec/core/exec/instructions.html
+  https://webassembly.github.io/spec/core/exec/numerics.html

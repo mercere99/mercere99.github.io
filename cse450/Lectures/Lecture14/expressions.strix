@@ -1,0 +1,27 @@
+// Project 3 expression regression examples.
+function Chain() : double {
+  double a = 0;
+  double b = 0;
+  a = b = 7;
+  return a + b;
+}
+function Order() : double {
+  double x = 0;
+  return (x = 2) - (x = 5);
+}
+function LeftRead() : double {
+  double x = 10;
+  return x - (x = 2);
+}
+function Divide() : double {
+  return 12 / 3 / 2;
+}
+function Parentheses() : double {
+  double a = 0;
+  (a) = 7;
+  return (a < 8) == 1;
+}
+function Truth(double x) : double {
+  if (x) return 1;
+  return 0;
+}

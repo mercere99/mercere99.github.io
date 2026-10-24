@@ -1,0 +1,829 @@
+!set baseurl https://www.cse.msu.edu/~cse450/Lectures/Lecture06.psl
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+
+!set palette neon_blue #40C0FF
+!set palette neon_pink #FF40C0
+!set palette neon_green #C0FF40
+!set palette warn red
+!set palette math yellow
+!set palette emp #80FF80
+
+!set palette id lightblue
+!set palette keyword #FF00FF
+!set palette quote green
+!set palette num tan
+!set palette bright #73FDFF
+!set palette bg #08111F
+% Adapted from Lecture-06 - Parsing2.pptx (32 source slides).
+% Hidden source slides 14 and 15 are omitted.
+% Repeated PowerPoint frames become click steps, with objects reused in place.
+% ... waits for a click; >>> finishes the current motion before continuing.
+% Each section lists its source slides. Geometry uses a 1280 x 720 canvas.
+% The parsing trace completes the example beyond the last PowerPoint trace row.
+
+!set size 30
+!style body {size=30px, w=1112px}
+!style note {size=27px, w=1112px}
+!style code {font=Menlo, size=28px, w=520px, pad=14px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+!style rule {size=28px, w=530px, color=id}
+!style node {size=24px, w=110px, color=id, align=center, anchor=center}
+!style edge {color=#8AA5B5, thick=2}
+!style table {w=1112px, size=26px, pad=12px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233, stroke=#31505F}
+
+% PowerPoint slide 1.
+# CSE450 Translation of Programming Languages
+## Lecture 6 : Hacking a Parser
+---
+% PowerPoint slides 2.
+### Ambiguity Example: 2 − 1 + 1
+@(84, 160) {$code, w=1112px, size=27px} ```
+Start → Expr
+Expr → Expr Op Expr
+Expr → Int
+Expr → Open Expr Close
+```
+...
+[question] @(84, 365) {$body} Which `Expr Op Expr` should we reduce first?
+[left] @(84, 440) {$rule} {{color=orange|Expr Op Expr}} Op Expr
+[right] @(690, 440) {$rule} Expr Op {{color=orange|Expr Op Expr}}
+...
+[left1] @(84, 495) {$rule} Expr Op Expr
+[right1] @(690, 495) {$rule} Expr Op Expr
+...
+[left2] @(84, 550) {$rule} Expr → Start
+[right2] @(690, 550) {$rule} Expr → Start
+...
+[left3] @(84, 620) {$body, color=emp, w=530px} `(2 - 1) + 1`
+[right3] @(690, 620) {$body, color=neon_pink, w=530px} `2 - (1 + 1)`
+---
+% PowerPoint slides 3–5.
+### Two Parse Trees, Two Answers
+[lh] @(320, 191) {$node, w=480px, size=32px, color=emp} `(2 - 1) + 1`
+[rh] @(940, 191) {$node, w=480px, size=32px, color=neon_pink} `2 - (1 + 1)`
+[left_start] @(320, 252) {$node, color=id, size=23px, w=110px} Start
+[left_e_root] {$edge} !line (320, 268) (320, 290)
+[left_root] @(320, 306) {$node, color=id, size=23px, w=110px} Expr
+[left_e_left] {$edge} !line (320, 322) (190, 346)
+[left_left] @(190, 362) {$node, color=id, size=23px, w=110px} Expr
+[left_e_op] {$edge} !line (320, 322) (320, 346)
+[left_op] @(320, 362) {$node, color=id, size=23px, w=110px} Op
+[left_e_right] {$edge} !line (320, 322) (450, 346)
+[left_right] @(450, 362) {$node, color=id, size=23px, w=110px} Expr
+[left_e_a] {$edge} !line (190, 378) (95, 412)
+[left_a] @(95, 428) {$node, color=id, size=23px, w=110px} Expr
+[left_e_iop] {$edge} !line (190, 378) (190, 412)
+[left_iop] @(190, 428) {$node, color=id, size=23px, w=110px} Op
+[left_e_b] {$edge} !line (190, 378) (285, 412)
+[left_b] @(285, 428) {$node, color=id, size=23px, w=110px} Expr
+[left_e_ia] {$edge} !line (95, 444) (95, 472)
+[left_ia] @(95, 488) {$node, color=id, size=23px, w=110px} Int
+[left_e_ib] {$edge} !line (285, 444) (285, 472)
+[left_ib] @(285, 488) {$node, color=id, size=23px, w=110px} Int
+[left_e_io] {$edge} !line (450, 378) (450, 412)
+[left_io] @(450, 428) {$node, color=id, size=23px, w=110px} Int
+[left_e_tok0] {$edge} !line (95, 504) (100, 574)
+[left_tok0] @(100, 590) {$node, color=orange, size=23px, w=110px} 2
+[left_e_tok1] {$edge} !line (190, 444) (210, 574)
+[left_tok1] @(210, 590) {$node, color=orange, size=23px, w=110px} −
+[left_e_tok2] {$edge} !line (285, 504) (320, 574)
+[left_tok2] @(320, 590) {$node, color=orange, size=23px, w=110px} 1
+[left_e_tok3] {$edge} !line (320, 378) (430, 574)
+[left_tok3] @(430, 590) {$node, color=orange, size=23px, w=110px} +
+[left_e_tok4] {$edge} !line (450, 444) (540, 574)
+[left_tok4] @(540, 590) {$node, color=orange, size=23px, w=110px} 1
+...
+[right_start] @(940, 252) {$node, color=id, size=23px, w=110px} Start
+[right_e_root] {$edge} !line (940, 268) (940, 290)
+[right_root] @(940, 306) {$node, color=id, size=23px, w=110px} Expr
+[right_e_left] {$edge} !line (940, 322) (810, 346)
+[right_left] @(810, 362) {$node, color=id, size=23px, w=110px} Expr
+[right_e_op] {$edge} !line (940, 322) (940, 346)
+[right_op] @(940, 362) {$node, color=id, size=23px, w=110px} Op
+[right_e_right] {$edge} !line (940, 322) (1070, 346)
+[right_right] @(1070, 362) {$node, color=id, size=23px, w=110px} Expr
+[right_e_a] {$edge} !line (1070, 378) (975, 412)
+[right_a] @(975, 428) {$node, color=id, size=23px, w=110px} Expr
+[right_e_iop] {$edge} !line (1070, 378) (1070, 412)
+[right_iop] @(1070, 428) {$node, color=id, size=23px, w=110px} Op
+[right_e_b] {$edge} !line (1070, 378) (1165, 412)
+[right_b] @(1165, 428) {$node, color=id, size=23px, w=110px} Expr
+[right_e_ia] {$edge} !line (975, 444) (975, 472)
+[right_ia] @(975, 488) {$node, color=id, size=23px, w=110px} Int
+[right_e_ib] {$edge} !line (1165, 444) (1165, 472)
+[right_ib] @(1165, 488) {$node, color=id, size=23px, w=110px} Int
+[right_e_io] {$edge} !line (810, 378) (810, 412)
+[right_io] @(810, 428) {$node, color=id, size=23px, w=110px} Int
+[right_e_tok0] {$edge} !line (810, 444) (720, 574)
+[right_tok0] @(720, 590) {$node, color=orange, size=23px, w=110px} 2
+[right_e_tok1] {$edge} !line (940, 378) (830, 574)
+[right_tok1] @(830, 590) {$node, color=orange, size=23px, w=110px} −
+[right_e_tok2] {$edge} !line (975, 504) (940, 574)
+[right_tok2] @(940, 590) {$node, color=orange, size=23px, w=110px} 1
+[right_e_tok3] {$edge} !line (1070, 444) (1050, 574)
+[right_tok3] @(1050, 590) {$node, color=orange, size=23px, w=110px} +
+[right_e_tok4] {$edge} !line (1165, 504) (1160, 574)
+[right_tok4] @(1160, 590) {$node, color=orange, size=23px, w=110px} 1
+...
+!anim left_left text Expr({{color=orange|1}})
+!anim left_left color emp
+[explain] @(84, 653) {$note} First subtract: 2 − 1 = 1.
+...
+!anim left_root text Expr({{color=orange|2}})
+!anim left_start text Start({{color=orange|2}})
+!anim explain text Then add: 1 + 1 = {{color=emp|2}}.
+...
+!anim right_right text Expr({{color=orange|2}})
+!anim right_right color neon_pink
+!anim explain text For the other tree, first add: 1 + 1 = 2.
+...
+!anim right_root text Expr({{color=orange|0}})
+!anim right_start text Start({{color=orange|0}})
+!anim explain text Then subtract: 2 − 2 = {{color=neon_pink|0}}. Same tokens, different meanings!
+---
+% PowerPoint slides 6.
+### Eliminating Ambiguity
+[intro] @(84, 165) {$body} Change the grammar so these operators {{color=emp|associate left}}.
+[oldhead] @(84, 252) {$body, w=520px, color=id} Original grammar
+[newhead] @(690, 252) {$body, w=520px, color=emp} Revised grammar
+@(84, 310) {$code, size=26px} ```
+Start → Expr
+Expr → Expr Op Expr
+Expr → Int
+Expr → Open Expr Close
+```
+...
+@(690, 310) {$code, size=26px} ```
+Start → Expr
+Expr → Expr Op Term
+Expr → Term
+Term → Int
+Term → Open Expr Close
+```
+...
+[why] @(84, 584) {$note} The right operand is a {{color=emp|Term}}. An unparenthesized operator sequence can only grow on the left.
+% Lecture 5 used Num for this role; Lecture 6 calls it Term.
+---
+% PowerPoint slides 7.
+### Only One Parse Tree
+[lh] @(320, 191) {$node, w=540px, size=30px, color=emp} Valid: `(2 - 1) + 1`
+[rh] @(940, 191) {$node, w=540px, size=30px, color=neon_pink} Invalid: `2 - (1 + 1)`
+[left_start] @(320, 236) {$node, color=id, size=23px, w=110px} Start
+[left_e_root] {$edge} !line (320, 252) (320, 274)
+[left_root] @(320, 290) {$node, color=id, size=23px, w=110px} Expr
+[left_e_left] {$edge} !line (320, 306) (190, 330)
+[left_left] @(190, 346) {$node, color=id, size=23px, w=110px} Expr
+[left_e_op] {$edge} !line (320, 306) (320, 330)
+[left_op] @(320, 346) {$node, color=id, size=23px, w=110px} Op
+[left_e_right] {$edge} !line (320, 306) (450, 330)
+[left_right] @(450, 346) {$node, color=id, size=23px, w=110px} Term
+[left_e_a] {$edge} !line (190, 362) (95, 396)
+[left_a] @(95, 412) {$node, color=id, size=23px, w=110px} Expr
+[left_e_iop] {$edge} !line (190, 362) (190, 396)
+[left_iop] @(190, 412) {$node, color=id, size=23px, w=110px} Op
+[left_e_b] {$edge} !line (190, 362) (285, 396)
+[left_b] @(285, 412) {$node, color=id, size=23px, w=110px} Term
+[left_e_aterm] {$edge} !line (95, 428) (95, 450)
+[left_aterm] @(95, 466) {$node, color=id, size=23px, w=110px} Term
+[left_e_ia] {$edge} !line (95, 482) (95, 500)
+[left_ia] @(95, 516) {$node, color=id, size=23px, w=110px} Int
+[left_e_ib] {$edge} !line (285, 428) (285, 456)
+[left_ib] @(285, 472) {$node, color=id, size=23px, w=110px} Int
+[left_e_io] {$edge} !line (450, 362) (450, 396)
+[left_io] @(450, 412) {$node, color=id, size=23px, w=110px} Int
+[left_e_tok0] {$edge} !line (95, 532) (100, 558)
+[left_tok0] @(100, 574) {$node, color=orange, size=23px, w=110px} 2
+[left_e_tok1] {$edge} !line (190, 428) (210, 558)
+[left_tok1] @(210, 574) {$node, color=orange, size=23px, w=110px} −
+[left_e_tok2] {$edge} !line (285, 488) (320, 558)
+[left_tok2] @(320, 574) {$node, color=orange, size=23px, w=110px} 1
+[left_e_tok3] {$edge} !line (320, 362) (430, 558)
+[left_tok3] @(430, 574) {$node, color=orange, size=23px, w=110px} +
+[left_e_tok4] {$edge} !line (450, 428) (540, 558)
+[left_tok4] @(540, 574) {$node, color=orange, size=23px, w=110px} 1
+...
+[right_start] @(940, 236) {$node, color=id, size=23px, w=110px} Start
+[right_e_root] {$edge} !line (940, 252) (940, 274)
+[right_root] @(940, 290) {$node, color=id, size=23px, w=110px} Expr
+[right_e_left] {$edge} !line (940, 306) (810, 330)
+[right_left] @(810, 346) {$node, color=id, size=23px, w=110px} Expr
+[right_e_op] {$edge} !line (940, 306) (940, 330)
+[right_op] @(940, 346) {$node, color=id, size=23px, w=110px} Op
+[right_e_right] {$edge} !line (940, 306) (1070, 330)
+[right_right] @(1070, 346) {$node, color=id, size=23px, w=110px} Expr
+[right_e_a] {$edge} !line (1070, 362) (975, 396)
+[right_a] @(975, 412) {$node, color=id, size=23px, w=110px} Expr
+[right_e_iop] {$edge} !line (1070, 362) (1070, 396)
+[right_iop] @(1070, 412) {$node, color=id, size=23px, w=110px} Op
+[right_e_b] {$edge} !line (1070, 362) (1165, 396)
+[right_b] @(1165, 412) {$node, color=id, size=23px, w=110px} Expr
+[right_e_ia] {$edge} !line (975, 428) (975, 456)
+[right_ia] @(975, 472) {$node, color=id, size=23px, w=110px} Int
+[right_e_ib] {$edge} !line (1165, 428) (1165, 456)
+[right_ib] @(1165, 472) {$node, color=id, size=23px, w=110px} Int
+[right_e_io] {$edge} !line (810, 362) (810, 396)
+[right_io] @(810, 412) {$node, color=id, size=23px, w=110px} Int
+[right_e_tok0] {$edge} !line (810, 428) (720, 558)
+[right_tok0] @(720, 574) {$node, color=orange, size=23px, w=110px} 2
+[right_e_tok1] {$edge} !line (940, 362) (830, 558)
+[right_tok1] @(830, 574) {$node, color=orange, size=23px, w=110px} −
+[right_e_tok2] {$edge} !line (975, 488) (940, 558)
+[right_tok2] @(940, 574) {$node, color=orange, size=23px, w=110px} 1
+[right_e_tok3] {$edge} !line (1070, 428) (1050, 558)
+[right_tok3] @(1050, 574) {$node, color=orange, size=23px, w=110px} +
+[right_e_tok4] {$edge} !line (1165, 488) (1160, 558)
+[right_tok4] @(1160, 574) {$node, color=orange, size=23px, w=110px} 1
+...
+!anim right_right color neon_pink
+!anim right_right text Expr ≠ Term
+{color=neon_pink, thick=4} !line (700, 265) (1180, 605)
+{color=neon_pink, thick=4} !line (1180, 265) (700, 605)
+[why] @(84, 646) {$note} The right operand cannot expand to `Expr Op Expr` without parentheses.
+---
+% PowerPoint slides 8.
+### Precedence Violations
+[intro] @(84, 180) {$body, w=590px} Left association alone is not enough.
+...
+[expr] @(84, 275) {$body, w=590px, size=44px} `2 - 3 * 4`
+...
+[wrong] @(84, 364) {$body, w=590px} All operators at one level give{{br}}`(2 - 3) * 4` = {{color=neon_pink|−4}}.
+...
+[want] @(84, 485) {$body, w=590px} We want `2 - (3 * 4)` = {{color=emp|−10}}.
+[old_start] @(950, 226) {$node, color=id, size=23px, w=110px} Start
+[old_e_root] {$edge} !line (950, 242) (950, 264)
+[old_root] @(950, 280) {$node, color=id, size=23px, w=110px} Expr
+[old_e_left] {$edge} !line (950, 296) (820, 320)
+[old_left] @(820, 336) {$node, color=id, size=23px, w=110px} Expr
+[old_e_op] {$edge} !line (950, 296) (950, 320)
+[old_op] @(950, 336) {$node, color=id, size=23px, w=110px} Op
+[old_e_right] {$edge} !line (950, 296) (1080, 320)
+[old_right] @(1080, 336) {$node, color=id, size=23px, w=110px} Term
+[old_e_a] {$edge} !line (820, 352) (725, 386)
+[old_a] @(725, 402) {$node, color=id, size=23px, w=110px} Expr
+[old_e_iop] {$edge} !line (820, 352) (820, 386)
+[old_iop] @(820, 402) {$node, color=id, size=23px, w=110px} Op
+[old_e_b] {$edge} !line (820, 352) (915, 386)
+[old_b] @(915, 402) {$node, color=id, size=23px, w=110px} Term
+[old_e_aterm] {$edge} !line (725, 418) (725, 440)
+[old_aterm] @(725, 456) {$node, color=id, size=23px, w=110px} Term
+[old_e_ia] {$edge} !line (725, 472) (725, 490)
+[old_ia] @(725, 506) {$node, color=id, size=23px, w=110px} Int
+[old_e_ib] {$edge} !line (915, 418) (915, 446)
+[old_ib] @(915, 462) {$node, color=id, size=23px, w=110px} Int
+[old_e_io] {$edge} !line (1080, 352) (1080, 386)
+[old_io] @(1080, 402) {$node, color=id, size=23px, w=110px} Int
+[old_e_tok0] {$edge} !line (725, 522) (730, 548)
+[old_tok0] @(730, 564) {$node, color=orange, size=23px, w=110px} 2
+[old_e_tok1] {$edge} !line (820, 418) (840, 548)
+[old_tok1] @(840, 564) {$node, color=orange, size=23px, w=110px} −
+[old_e_tok2] {$edge} !line (915, 478) (950, 548)
+[old_tok2] @(950, 564) {$node, color=orange, size=23px, w=110px} 3
+[old_e_tok3] {$edge} !line (950, 352) (1060, 548)
+[old_tok3] @(1060, 564) {$node, color=orange, size=23px, w=110px} *
+[old_e_tok4] {$edge} !line (1080, 418) (1170, 548)
+[old_tok4] @(1170, 564) {$node, color=orange, size=23px, w=110px} 4
+...
+[why] @(84, 620) {$note} Multiplication must bind more tightly, so its operation sits lower in the tree.
+---
+% PowerPoint slides 9.
+### Hacking Around Precedence: Tokens
+[intro] @(84, 177) {$body} Step 1: separate the operators by precedence.
+[oldhead] @(84, 268) {$body, w=520px, color=id} Original tokens
+[newhead] @(690, 268) {$body, w=520px, color=emp} Revised tokens
+@(84, 329) {$code, size=26px} ```
+Op = '+' | '-' | '*' | '/'
+
+Int = [0-9]+
+Open = '('
+Close = ')'
+```
+...
+@(690, 329) {$code, size=26px} ```
+AddOp = '+' | '-'
+MulOp = '*' | '/'
+Int = [0-9]+
+Open = '('
+Close = ')'
+```
+...
+[why] @(84, 615) {$note} Now the grammar can treat {{color=emp|MulOp}} differently from {{color=id|AddOp}}.
+---
+% PowerPoint slides 10.
+### Hacking Around Precedence: Grammar
+[intro] @(84, 170) {$body} Step 2: add a nonterminal for each precedence level.
+[oldhead] @(84, 251) {$body, w=520px, color=id} One level
+[newhead] @(690, 251) {$body, w=520px, color=emp} Two levels
+@(84, 310) {$code, size=25px} ```
+Start → Expr
+Expr → Expr Op Term
+Expr → Term
+Term → Int
+Term → Open Expr Close
+```
+...
+[r0] @(690, 310) {$rule, size=27px, w=530px} Start → Expr2
+...
+[r1] @(690, 350) {$rule, size=27px, w=530px} Expr2 → Expr2 AddOp Expr1
+[r2] @(690, 390) {$rule, size=27px, w=530px} Expr2 → Expr1
+...
+[r3] @(690, 430) {$rule, size=27px, w=530px} Expr1 → Expr1 MulOp Term
+[r4] @(690, 470) {$rule, size=27px, w=530px} Expr1 → Term
+...
+[r5] @(690, 510) {$rule, size=27px, w=530px} Term → Int
+[r6] @(690, 550) {$rule, size=27px, w=530px} Term → Open Expr2 Close
+...
+[why] @(84, 645) {$note} Parentheses return to {{color=emp|Expr2}}, allowing a full expression at any level.
+---
+% PowerPoint slides 11.
+### Parse Tree Changes
+[lh] @(320, 179) {$node, w=520px, size=30px, color=neon_pink} Old: `(2 - 3) * 4`
+[rh] @(940, 179) {$node, w=520px, size=30px, color=emp} New: `2 - (3 * 4)`
+[old_start] @(320, 222) {$node, color=id, size=23px, w=110px} Start
+[old_e_root] {$edge} !line (320, 238) (320, 260)
+[old_root] @(320, 276) {$node, color=id, size=23px, w=110px} Expr
+[old_e_left] {$edge} !line (320, 292) (190, 316)
+[old_left] @(190, 332) {$node, color=id, size=23px, w=110px} Expr
+[old_e_op] {$edge} !line (320, 292) (320, 316)
+[old_op] @(320, 332) {$node, color=id, size=23px, w=110px} Op
+[old_e_right] {$edge} !line (320, 292) (450, 316)
+[old_right] @(450, 332) {$node, color=id, size=23px, w=110px} Term
+[old_e_a] {$edge} !line (190, 348) (95, 382)
+[old_a] @(95, 398) {$node, color=id, size=23px, w=110px} Expr
+[old_e_iop] {$edge} !line (190, 348) (190, 382)
+[old_iop] @(190, 398) {$node, color=id, size=23px, w=110px} Op
+[old_e_b] {$edge} !line (190, 348) (285, 382)
+[old_b] @(285, 398) {$node, color=id, size=23px, w=110px} Term
+[old_e_aterm] {$edge} !line (95, 414) (95, 436)
+[old_aterm] @(95, 452) {$node, color=id, size=23px, w=110px} Term
+[old_e_ia] {$edge} !line (95, 468) (95, 486)
+[old_ia] @(95, 502) {$node, color=id, size=23px, w=110px} Int
+[old_e_ib] {$edge} !line (285, 414) (285, 442)
+[old_ib] @(285, 458) {$node, color=id, size=23px, w=110px} Int
+[old_e_io] {$edge} !line (450, 348) (450, 382)
+[old_io] @(450, 398) {$node, color=id, size=23px, w=110px} Int
+[old_e_tok0] {$edge} !line (95, 518) (100, 544)
+[old_tok0] @(100, 560) {$node, color=orange, size=23px, w=110px} 2
+[old_e_tok1] {$edge} !line (190, 414) (210, 544)
+[old_tok1] @(210, 560) {$node, color=orange, size=23px, w=110px} −
+[old_e_tok2] {$edge} !line (285, 474) (320, 544)
+[old_tok2] @(320, 560) {$node, color=orange, size=23px, w=110px} 3
+[old_e_tok3] {$edge} !line (320, 348) (430, 544)
+[old_tok3] @(430, 560) {$node, color=orange, size=23px, w=110px} *
+[old_e_tok4] {$edge} !line (450, 414) (540, 544)
+[old_tok4] @(540, 560) {$node, color=orange, size=23px, w=110px} 4
+...
+[new_s] @(920, 222) {$node, color=id, size=23px, w=110px} Start
+[new_e_root] {$edge} !line (920, 238) (920, 256)
+[new_root] @(920, 272) {$node, color=id, size=23px, w=110px} Expr2
+[new_e_left] {$edge} !line (920, 288) (740, 316)
+[new_left] @(740, 332) {$node, color=id, size=23px, w=110px} Expr2
+[new_e_op] {$edge} !line (920, 288) (885, 316)
+[new_op] @(885, 332) {$node, color=id, size=23px, w=110px} AddOp
+[new_e_right] {$edge} !line (920, 288) (1050, 316)
+[new_right] @(1050, 332) {$node, color=id, size=23px, w=110px} Expr1
+[new_e_l1] {$edge} !line (740, 348) (740, 374)
+[new_l1] @(740, 390) {$node, color=id, size=23px, w=110px} Expr1
+[new_e_lt] {$edge} !line (740, 406) (740, 430)
+[new_lt] @(740, 446) {$node, color=id, size=23px, w=110px} Term
+[new_e_li] {$edge} !line (740, 462) (740, 486)
+[new_li] @(740, 502) {$node, color=id, size=23px, w=110px} Int
+[new_e_r1] {$edge} !line (1050, 348) (960, 374)
+[new_r1] @(960, 390) {$node, color=id, size=23px, w=110px} Expr1
+[new_e_mul] {$edge} !line (1050, 348) (1050, 374)
+[new_mul] @(1050, 390) {$node, color=id, size=23px, w=110px} MulOp
+[new_e_rt] {$edge} !line (1050, 348) (1160, 374)
+[new_rt] @(1160, 390) {$node, color=id, size=23px, w=110px} Term
+[new_e_at] {$edge} !line (960, 406) (960, 430)
+[new_at] @(960, 446) {$node, color=id, size=23px, w=110px} Term
+[new_e_ai] {$edge} !line (960, 462) (960, 486)
+[new_ai] @(960, 502) {$node, color=id, size=23px, w=110px} Int
+[new_e_bi] {$edge} !line (1160, 406) (1160, 430)
+[new_bi] @(1160, 446) {$node, color=id, size=23px, w=110px} Int
+[new_e_tok0] {$edge} !line (740, 518) (740, 572)
+[new_tok0] @(740, 588) {$node, color=orange, size=23px, w=110px} 2
+[new_e_tok1] {$edge} !line (885, 348) (850, 572)
+[new_tok1] @(850, 588) {$node, color=orange, size=23px, w=110px} −
+[new_e_tok2] {$edge} !line (960, 518) (960, 572)
+[new_tok2] @(960, 588) {$node, color=orange, size=23px, w=110px} 3
+[new_e_tok3] {$edge} !line (1050, 406) (1060, 572)
+[new_tok3] @(1060, 588) {$node, color=orange, size=23px, w=110px} *
+[new_e_tok4] {$edge} !line (1160, 462) (1160, 572)
+[new_tok4] @(1160, 588) {$node, color=orange, size=23px, w=110px} 4
+...
+!anim new_right text Expr1({{color=orange|12}})
+[result] @(84, 648) {$note} Evaluate the multiplication first: 3 × 4 = 12.
+...
+!anim new_root text Expr2({{color=orange|−10}})
+!anim result text Then subtract: 2 − 12 = {{color=emp|−10}}.
+---
+% PowerPoint slides 12.
+### General Idea
+...
+- Group operators into {{color=emp|precedence levels}}.
+  - `*` and `/` bind more tightly than `+` and `-`.
+...
+- Use a {{color=emp|nonterminal for each level}}.
+  - `Expr1` handles multiplication and division.
+  - `Expr2` handles addition and subtraction.
+...
+- Choose {{color=emp|associativity}} within each level.
+...
+Tighter-binding operations appear {{color=id|lower in the parse tree}}.
+Their results become operands of the operations above them.
+---
+% PowerPoint slides 13.
+### Associativity
+...
+{$table, size=27px, colwidths=(22%,30%,48%)} | Associativity | Input | Grouping |
+|:---|:---|:---|
+| Left | `a + b + c` | `(a + b) + c` |
+| Right | `a = b = 5` | `a = (b = 5)` |
+| Non-associative | `a < b < c` | Syntax error if `<` is non-associative |
+...
+The side containing the recursion determines the grouping.
+[left] @(84, 463) {$rule, w=1112px} {{color=emp|Left:}} Expr → Expr Op Term
+...
+[right] @(84, 517) {$rule, w=1112px} {{color=emp|Right:}} Expr → Term Op Expr
+...
+[non] @(84, 571) {$rule, w=1112px} {{color=emp|Non:}} Expr → Term Op Term | Term
+[note] @(84, 633) {$note, size=24px} Term is the next tighter level. Base alternatives are needed for the recursive rules.
+---
+% PowerPoint slides 16.
+### The Parsing Problem
+Once we have a grammar, how do we determine whether a string belongs to its language?
+...
+- {{color=math|Brute force:}} try a production, then backtrack if it fails.
+...
+  - Backtracking can repeat substantial work.
+  - Naive recursive descent with left recursion can recurse forever.
+...
+- {{color=emp|Better:}} choose a production from the next token.
+...
+Can we arrange the grammar so there is only one choice?
+---
+% PowerPoint slides 17.
+### Example Problem
+[goal] @(84, 163) {$body} Goal: choose the production using the next token.
+@(84, 225) {$code, w=1112px} ```
+S → E + S | E
+E → num | ( S )
+```
+...
+[one] @(84, 353) {$body, color=emp} `(1)`
+[d1] @(84, 401) {$rule, w=1112px} S ⇒ E ⇒ (S) ⇒ (E) ⇒ (1)
+...
+[two] @(84, 474) {$body, color=emp} `(1)+2`
+[d2] @(84, 522) {$rule, w=1112px, size=27px} S ⇒ E + S ⇒ (S) + S ⇒ (E) + S ⇒ (1) + S{{br}}⇒ (1) + E ⇒ (1) + 2
+...
+[q] @(84, 628) {$note} Both start with `(`. How could one token tell us which S production to choose?
+---
+% PowerPoint slides 18.
+### Predictive Parsing
+...
+An **{{color=emp|LL(1) grammar}}** lets the parser choose a unique production from:
+...
+- The nonterminal being expanded.
+- One lookahead token.
+...
+**L**: scan the input left to right. **L**: produce a leftmost derivation. **1**: one-token lookahead.
+...
+A predictive parser is a {{color=id|top-down parser}} driven by a table:
+...
+**(nonterminal, lookahead terminal) → production**
+---
+% PowerPoint slides 19–20.
+### How Can We Fix This Grammar?
+[original] @(84, 162) {$code, w=1112px} ```
+S → E + S | E
+E → num | ( S )
+```
+...
+[e] @(84, 333) {$note} For E, the next token is enough: `num` chooses `num`, and `(` chooses `( S )`.
+...
+[s] @(84, 421) {$note} For S, both choices begin with E. We must delay the decision until {{color=emp|after E}}.
+...
+!anim original hide 0.3s
+>>>
+@(84, 162) {$code, w=1112px} ```
+S  → E S′
+S′ → + S | ε
+E  → num | ( S )
+```
+...
+[factor] @(84, 508) {$body} This transformation is {{color=emp|left factoring}}.
+...
+[decision] @(84, 582) {$note} After E: `+` continues the sum. `)` or end of input selects ε.
+---
+% PowerPoint slides 21–26.
+### Parsing with the New Grammar
+[grammar] @(84, 160) {$rule, w=1112px, size=29px} S → E S′&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S′ → + S | ε&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;E → num | ( S )
+[legend] @(84, 224) {$note} {{color=orange|Parsed input}}   {{color=id|Remaining input}}
+[input] @(84, 278) {$body, font=Menlo, size=40px} {{color=id|(1+2+(3+4))+5}}
+[look] @(920, 226) {$note, w=300px} Lookahead: {{color=math|(}}
+[formhead] @(84, 372) {$note, color=emp} Partly derived string
+[form] @(84, 422) {$rule, w=1112px, size=35px} S
+[rule] @(84, 535) {$note} Next: expand S.
+[progress] @(84, 625) {$note, size=25px} Choose a production, then consume exposed terminal symbols.
+...
+% Step 1: S → E S′.
+!anim rule text {{color=emp|S → E S′}}
+!anim form text E S′
+!anim input text {{color=id|(1+2+(3+4))+5}}
+!anim look text Lookahead: {{color=math|(}}
+...
+% Step 2: E → ( S ).
+!anim rule text {{color=emp|E → ( S )}}
+!anim form text ( S ) S′
+!anim input text {{color=orange|(}}{{color=id|1+2+(3+4))+5}}
+!anim look text Lookahead: {{color=math|1}}
+...
+% Step 3: S → E S′.
+!anim rule text {{color=emp|S → E S′}}
+!anim form text ( E S′ ) S′
+!anim input text {{color=orange|(}}{{color=id|1+2+(3+4))+5}}
+!anim look text Lookahead: {{color=math|1}}
+...
+% Step 4: E → num.
+!anim rule text {{color=emp|E → num}} — consume the number.
+!anim form text ( 1 S′ ) S′
+!anim input text {{color=orange|(1}}{{color=id|+2+(3+4))+5}}
+!anim look text Lookahead: {{color=math|+}}
+...
+% Step 5: S′ → + S.
+!anim rule text {{color=emp|S′ → + S}}
+!anim form text ( 1 + S ) S′
+!anim input text {{color=orange|(1+}}{{color=id|2+(3+4))+5}}
+!anim look text Lookahead: {{color=math|2}}
+...
+% Step 6: S → E S′.
+!anim rule text {{color=emp|S → E S′}}
+!anim form text ( 1 + E S′ ) S′
+!anim input text {{color=orange|(1+}}{{color=id|2+(3+4))+5}}
+!anim look text Lookahead: {{color=math|2}}
+...
+% Step 7: E → num.
+!anim rule text {{color=emp|E → num}} — consume the number.
+!anim form text ( 1 + 2 S′ ) S′
+!anim input text {{color=orange|(1+2}}{{color=id|+(3+4))+5}}
+!anim look text Lookahead: {{color=math|+}}
+...
+% Step 8: S′ → + S.
+!anim rule text {{color=emp|S′ → + S}}
+!anim form text ( 1 + 2 + S ) S′
+!anim input text {{color=orange|(1+2+}}{{color=id|(3+4))+5}}
+!anim look text Lookahead: {{color=math|(}}
+...
+% Step 9: S → E S′.
+!anim rule text {{color=emp|S → E S′}}
+!anim form text ( 1 + 2 + E S′ ) S′
+!anim input text {{color=orange|(1+2+}}{{color=id|(3+4))+5}}
+!anim look text Lookahead: {{color=math|(}}
+...
+% Step 10: E → ( S ).
+!anim rule text {{color=emp|E → ( S )}}
+!anim form text ( 1 + 2 + ( S ) S′ ) S′
+!anim input text {{color=orange|(1+2+(}}{{color=id|3+4))+5}}
+!anim look text Lookahead: {{color=math|3}}
+...
+% Step 11: S → E S′.
+!anim rule text {{color=emp|S → E S′}}
+!anim form text ( 1 + 2 + ( E S′ ) S′ ) S′
+!anim input text {{color=orange|(1+2+(}}{{color=id|3+4))+5}}
+!anim look text Lookahead: {{color=math|3}}
+...
+% Step 12: E → num.
+!anim rule text {{color=emp|E → num}} — consume the number.
+!anim form text ( 1 + 2 + ( 3 S′ ) S′ ) S′
+!anim input text {{color=orange|(1+2+(3}}{{color=id|+4))+5}}
+!anim look text Lookahead: {{color=math|+}}
+...
+% Step 13: S′ → + S.
+!anim rule text {{color=emp|S′ → + S}}
+!anim form text ( 1 + 2 + ( 3 + S ) S′ ) S′
+!anim input text {{color=orange|(1+2+(3+}}{{color=id|4))+5}}
+!anim look text Lookahead: {{color=math|4}}
+!anim progress text Now parse 4, then finish the two nested expressions.
+...
+% Step 14: S → E S′.
+!anim rule text {{color=emp|S → E S′}}
+!anim form text ( 1 + 2 + ( 3 + E S′ ) S′ ) S′
+!anim input text {{color=orange|(1+2+(3+}}{{color=id|4))+5}}
+!anim look text Lookahead: {{color=math|4}}
+...
+% Step 15: E → num.
+!anim rule text {{color=emp|E → num}} — consume the number.
+!anim form text ( 1 + 2 + ( 3 + 4 S′ ) S′ ) S′
+!anim input text {{color=orange|(1+2+(3+4}}{{color=id|))+5}}
+!anim look text Lookahead: {{color=math|)}}
+...
+% Step 16: S′ → ε.
+!anim rule text {{color=emp|S′ → ε}}
+!anim form text ( 1 + 2 + ( 3 + 4 ) S′ ) S′
+!anim input text {{color=orange|(1+2+(3+4)}}{{color=id|)+5}}
+!anim look text Lookahead: {{color=math|)}}
+!anim progress text ε consumes no token. Match a following `)` when its enclosing E resumes.
+...
+% Step 17: S′ → ε.
+!anim rule text {{color=emp|S′ → ε}}
+!anim form text ( 1 + 2 + ( 3 + 4 ) ) S′
+!anim input text {{color=orange|(1+2+(3+4))}}{{color=id|+5}}
+!anim look text Lookahead: {{color=math|+}}
+!anim progress text ε consumes no token. Match a following `)` when its enclosing E resumes.
+...
+% Step 18: S′ → + S.
+!anim rule text {{color=emp|S′ → + S}}
+!anim form text ( 1 + 2 + ( 3 + 4 ) ) + S
+!anim input text {{color=orange|(1+2+(3+4))+}}{{color=id|5}}
+!anim look text Lookahead: {{color=math|5}}
+...
+% Step 19: S → E S′.
+!anim rule text {{color=emp|S → E S′}}
+!anim form text ( 1 + 2 + ( 3 + 4 ) ) + E S′
+!anim input text {{color=orange|(1+2+(3+4))+}}{{color=id|5}}
+!anim look text Lookahead: {{color=math|5}}
+...
+% Step 20: E → num.
+!anim rule text {{color=emp|E → num}} — consume the number.
+!anim form text ( 1 + 2 + ( 3 + 4 ) ) + 5 S′
+!anim input text {{color=orange|(1+2+(3+4))+5}}
+!anim look text Lookahead: {{color=math|EOF}}
+...
+% Step 21: S′ → ε.
+!anim rule text {{color=emp|S′ → ε}}
+!anim form text ( 1 + 2 + ( 3 + 4 ) ) + 5
+!anim input text {{color=orange|(1+2+(3+4))+5}}
+!anim look text Lookahead: {{color=math|EOF}}
+!anim progress text ε consumes no token. Match a following `)` when its enclosing E resumes.
+!anim progress text {{color=emp|Accepted:}} the derivation and the input are both complete.
+---
+% PowerPoint slides 26–27.
+### Predictive Parsing Table
+[grammar] @(84, 160) {$rule, w=1112px, size=29px} S → E S′&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S′ → + S | ε&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;E → num | ( S )
+
+...
+[table] @(84, 240) {$table, colwidths=(12%,20%,16%,20%,16%,16%)} |  | num | + | ( | ) | EOF |
+|:---|:---|:---|:---|:---|:---|
+| S | S → E S′ |  | S → E S′ |  |  |
+| S′ |  | S′ → + S |  | S′ → ε | S′ → ε |
+| E | E → num |  | E → ( S ) |  |  |
+...
+[empty] @(84, 509) {$note} A blank cell means {{color=neon_pink|syntax error}}. EOF marks the end of input, often written `$`.
+...
+[functions] @(84, 596) {$note} One procedure per nonterminal:{{br}}`parse_S()`, `parse_S_prime()`, and `parse_E()`.
+% Use parse_S_prime: an apostrophe is not valid in a C++ identifier.
+---
+% PowerPoint slides 28.
+### Implementing LL(1): parse_S
+[grammar] @(84, 160) {$rule, w=1112px, size=29px} S → E S′&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S′ → + S | ε&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;E → num | ( S )
+@(84, 210) {$code, w=710px, size=27px} ```cpp
+void parse_S() {
+  switch (lexer.Peek()) {
+    case num:
+    case '(':
+      parse_E();
+      parse_S_prime();
+      return;
+    default:
+      ParseError();
+  }
+}
+```
+...
+[look] @(850, 217) {$note, w=340px} `Peek()` inspects{{br}}the lookahead token{{br}}without consuming it.
+...
+[rule] @(850, 379) {$note, w=340px} For `num` or `(`:{{br}}{{color=emp|S → E S′}}
+...
+[order] @(850, 507) {$note, w=340px} Call the procedures{{br}}in the order of the{{br}}right-hand side.
+---
+% PowerPoint slides 29.
+### Implementing LL(1): parse_S_prime
+[grammar] @(84, 160) {$rule, w=1112px, size=29px} S → E S′&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S′ → + S | ε&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;E → num | ( S )
+@(84, 210) {$code, w=710px, size=26px} ```cpp
+void parse_S_prime() {
+  switch (lexer.Peek()) {
+    case '+':
+      lexer.Use();
+      parse_S();
+      return;
+    case ')':
+    case EOF:
+      return;
+    default:
+      ParseError();
+  }
+}
+```
+...
+[plus] @(850, 214) {$note, w=340px} `+` selects{{br}}{{color=emp|S′ → + S}}.{{br}}Consume `+`, then{{br}}parse the next S.
+...
+[empty] @(850, 424) {$note, w=340px} `)` or EOF selects{{br}}{{color=emp|S′ → ε}}.{{br}}Return without{{br}}consuming a token.
+---
+% PowerPoint slides 30.
+### Implementing LL(1): parse_E
+[grammar] @(84, 160) {$rule, w=1112px, size=29px} S → E S′&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S′ → + S | ε&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;E → num | ( S )
+@(84, 210) {$code, w=730px, size=24px} ```cpp
+void parse_E() {
+  switch (lexer.Peek()) {
+    case num: lexer.Use(); return;
+    case '(':
+      lexer.Use();
+      parse_S();
+      if (lexer.Peek() != ')')
+        ParseError();
+      lexer.Use();
+      return;
+    default:
+      ParseError();
+  }
+}
+```
+...
+[num] @(850, 203) {$note, w=340px} A number selects{{br}}{{color=emp|E → num}}.
+...
+[paren] @(850, 318) {$note, w=340px} `(` selects{{br}}{{color=emp|E → ( S )}}.{{br}}Consume `(`, recurse,{{br}}then require `)`.
+...
+[fresh] @(850, 502) {$note, w=340px} Check {{color=emp|fresh lookahead}}{{br}}after `parse_S()`{{br}}returns.
+% Fix the stale-token check in the source: inspect Peek() after parsing S.
+% As in the source, these are lexer-interface sketches. ParseError must not return.
+---
+% PowerPoint slides 31.
+### Call Tree = Parse Tree
+[intro] @(84, 159) {$note} Every nonterminal expansion corresponds to a procedure call.
+[input] @(84, 214) {$note, color=emp} A smaller view of the same grammar: `(1)+2`
+[s] @(640, 286) {$node, color=id, size=22px, w=190px} parse_S
+...
+[e_e] {$edge} !line (640, 303) (360, 342)
+[e] @(360, 359) {$node, color=id, size=22px, w=190px} parse_E
+[e_p] {$edge} !line (640, 303) (920, 342)
+[p] @(920, 359) {$node, color=id, size=22px, w=190px} parse_S_prime
+...
+[e_open] {$edge} !line (360, 376) (190, 418)
+[open] @(190, 435) {$node, color=orange, size=22px, w=190px} (
+[e_inner] {$edge} !line (360, 376) (360, 418)
+[inner] @(360, 435) {$node, color=id, size=22px, w=190px} parse_S
+[e_close] {$edge} !line (360, 376) (540, 418)
+[close] @(540, 435) {$node, color=orange, size=22px, w=190px} )
+[e_plus] {$edge} !line (920, 376) (790, 418)
+[plus] @(790, 435) {$node, color=orange, size=22px, w=190px} +
+[e_tail] {$edge} !line (920, 376) (1040, 418)
+[tail] @(1040, 435) {$node, color=id, size=22px, w=190px} parse_S
+...
+[e_ie] {$edge} !line (360, 452) (290, 492)
+[ie] @(290, 509) {$node, color=id, size=22px, w=190px} parse_E
+[e_ip] {$edge} !line (360, 452) (480, 492)
+[ip] @(480, 509) {$node, color=id, size=22px, w=190px} parse_S_prime
+[e_te] {$edge} !line (1040, 452) (950, 492)
+[te] @(950, 509) {$node, color=id, size=22px, w=190px} parse_E
+[e_tp] {$edge} !line (1040, 452) (1140, 492)
+[tp] @(1140, 509) {$node, color=id, size=22px, w=190px} parse_S_prime
+...
+[e_one] {$edge} !line (290, 526) (290, 569)
+[one] @(290, 586) {$node, color=orange, size=22px, w=190px} 1
+[e_empty1] {$edge} !line (480, 526) (480, 569)
+[empty1] @(480, 586) {$node, color=orange, size=22px, w=190px} ε
+[e_two] {$edge} !line (950, 526) (950, 569)
+[two] @(950, 586) {$node, color=orange, size=22px, w=190px} 2
+[e_empty2] {$edge} !line (1140, 526) (1140, 569)
+[empty2] @(1140, 586) {$node, color=orange, size=22px, w=190px} ε
+...
+% Turn procedure names into grammar symbols without rebuilding the tree.
+!anim s text S
+!anim e text E
+!anim p text S′
+!anim inner text S
+!anim tail text S
+!anim ie text E
+!anim ip text S′
+!anim te text E
+!anim tp text S′
+[explain] @(84, 652) {$note, size=25px} Calls expand nonterminals. Token matches form the leaves. ε consumes nothing.
+% The full PowerPoint input, (1+2+(3+4))+5, is preserved in the preceding trace.
+% This complete smaller tree keeps all S-prime and epsilon nodes legible.
+---
+% PowerPoint slides 32.
+### Statement Parsing
+@(84, 156) {$code, w=1112px, size=24px} ```cpp
+ASTNode ParseStatement() {
+  if (lexer.None()) Error("Expected Statement.");
+
+  using namespace emplex;
+  switch (lexer.Peek()) {
+    case Lexer::ID_VAR:   return ParseStatement_Var();
+    case Lexer::ID_IF:    return ParseStatement_If();
+    case Lexer::ID_WHILE: return ParseStatement_While();
+    case Lexer::ID_PRINT: return ParseStatement_Print();
+    case '{':            return ParseStatement_Block();
+    // List other statement starts here...
+    default:             return ParseStatement_Expression();
+  }
+}
+```
+...
+[why] @(84, 665) {$note} The lookahead selects a procedure that returns an {{color=emp|AST node}}.
+% At the program entry point, also require EOF after the complete parse.
+% Lexer::ID_* and ASTNode retain the course-specific interfaces from the source.

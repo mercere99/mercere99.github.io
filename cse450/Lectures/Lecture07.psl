@@ -1,0 +1,623 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #ccccff
+!set visitedlinkcolor #ccccff
+
+!set palette neon_blue #40C0FF
+!set palette neon_pink #FF40C0
+!set palette neon_green #C0FF40
+!set palette warn red
+!set palette math yellow
+!set palette emp #80FF80
+
+!set palette id lightblue
+!set palette keyword #FF00FF
+!set palette quote green
+!set palette num tan
+!set palette bright #73FDFF
+!set palette bg #08111F
+% Source: Lectures/Lecture-07 - ASTs.pptx (35 slides).
+% Hidden source slides 29–34 are omitted. The visible Class Problem (35) is retained.
+% Source slides 3–4 share a table; slides 14–28 form one continuous tree animation.
+% ... waits for a click; >>> sequences motions within a click.
+% All diagrams are editable PSL objects. Coordinates use a 1280 x 720 canvas.
+
+!set size 30
+!style body {size=30px, w=1112px}
+!style note {size=27px, w=1112px}
+!style code {font=Menlo, size=27px, w=1112px, pad=14px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+!style rule {size=28px, w=1112px, color=id}
+!style node {size=24px, w=60px, align=center, anchor=center, color=id}
+!style edge {color=#8AA5B5, thick=2}
+!style table {size=26px, w=1112px, pad=12px, headerfill=#173749, headertext=#F4F1E8, bodytext=#F4F1E8, stripe=#102233, stroke=#31505F}
+
+% PowerPoint slide 1.
+# CSE450 Translation of Programming Languages
+## Lecture 7 : Abstract Syntax Trees
+---
+% PowerPoint slides 2.
+### How do we Implement a Parser?
+[review] @(84, 165) {$note, color=emp} A quick review!
+...
+[step1] @(84, 218) {$note} **Step 1: Design the grammar.** Handle exponents and parentheses, as in `(2^3)^2`.
+...
+[original] @(84, 298) {$code, w=560px, size=26px} ```
+Expr → Term '^' Expr | Term
+Term → num | '(' Expr ')'
+```
+...
+[conflict] @(700, 301) {$note, w=490px} Both Expr options start with {{color=math|Term}}.{{br}}The next token cannot tell us which to pick.
+...
+[assoc] @(700, 414) {$note, w=490px} `^` is {{color=emp|right-associative}}.
+...
+[step2] @(84, 472) {$note} **Step 2: Hack your grammar.** Defer the choice until lookahead can decide.
+...
+[factored] @(84, 534) {$code, size=26px} ```
+Expr → Term ExprExtra
+ExprExtra → '^' Expr | ε
+Term → num | '(' Expr ')'
+```
+---
+% PowerPoint slides 3–4.
+### How do we Implement a Parser?
+[review] @(84, 160) {$note, color=emp} A quick review
+[named] @(84, 210) {$code, w=615px, size=25px} ```
+Expr → Term ExprExtra
+ExprExtra → '^' Expr | ε
+Term → num | '(' Expr ')'
+```
+...
+[short] @(752, 210) {$code, w=444px, size=25px} ```
+S → T S′
+S′ → '^' S | ε
+T → num | '(' S ')'
+```
+...
+[predict] @(84, 371) {$table, size=24px, pad=10px, colwidths=(28%,16%,14%,16%,13%,13%)} |  | num | ^ | ( | ) | EOF |
+|:---|:---|:---|:---|:---|:---|
+| Expr (S) | → T S′ |  | → T S′ |  |  |
+| ExprExtra (S′) |  | → ^ S |  | → ε | → ε |
+| Term (T) | → num |  | → ( S ) |  |  |
+...
+[functions] @(84, 599) {$note} We need three functions:{{br}}`ParseExpr()`, `ParseExprExtra()`, and `ParseTerm()`.
+% EOF is the end-of-input marker shown as $ in the source table. Blank cells are errors.
+---
+### Implementing LL(1) Parsing
+...
+[name] @(84, 184) {$note, w=324px, color=emp} **ParseExpr()**
+...
+[look] @(84, 241) {$note, w=324px} `Peek()` is lookahead.
+[choices] @(84, 280) {$table, w=324px, size=24px, pad=12px, colwidths=(45%,55%)} | Token | Production |
+|:---|:---|
+| num | S → T S′ |
+| '(' | S → T S′ |
+...
+[calls] @(84, 488) {$note, w=324px} Expand the RHS in order:{{br}}first Term,{{br}}then ExprExtra.
+% Parser sketches retain the course lexer interface. Error() must not return.
+...
+[function] @(450, 177) {$code, w=740px, size=27px} ```cpp
+void ParseExpr() {
+    ParseTerm();
+    ParseExprExtra();
+}
+```
+...
+!anim function exit
+[function2] @(450, 177) {$code, w=740px, size=27px} ```cpp
+void ParseExpr() {
+  switch (lexer.Peek()) {
+    case num:
+    case '(':
+      ParseTerm();
+      ParseExprExtra();
+      return;
+    default:
+      Error();
+  }
+}
+```
+
+---
+% PowerPoint slides 6.
+### Implementing LL(1) Parsing
+...
+[name] @(84, 184) {$note, w=324px, color=emp} **ParseExprExtra()**
+...
+[choices] @(84, 280) {$table, w=324px, size=24px, pad=12px, colwidths=(45%,55%)} | Token | Production |
+|:---|:---|
+| ^ | S′ → ^ S |
+| ) or EOF | S′ → ε |
+...
+[recurse] @(84, 470) {$note, w=324px} After `^`, parse a{{br}}whole Expr. This gives{{br}}{{color=emp|right association}}.
+...
+[empty] @(84, 607) {$note, w=324px} ε consumes no token.
+...
+[function] @(450, 171) {$code, w=740px, size=26px} ```cpp
+void ParseExprExtra() {
+  switch (lexer.Peek()) {
+    case '^':
+      lexer.Use('^');
+      ParseExpr();
+      return;
+    case ')':
+    case EOF:
+      return;
+    default:
+      Error();
+  }
+}
+```
+---
+% PowerPoint slides 7.
+### Implementing LL(1) Parsing
+...
+[name] @(84, 184) {$note, w=324px, color=emp} **ParseTerm()**
+...
+[choices] @(84, 280) {$table, w=324px, size=24px, pad=12px, colwidths=(45%,55%)} | Token | Production |
+|:---|:---|
+| num | T → num |
+| ( | T → ( S ) |
+...
+[paren] @(84, 465) {$note, w=324px} Parentheses contain{{br}}another full expression.
+...
+[use] @(84, 567) {$note, w=324px, size=25px} `Use(expected)` checks{{br}}and consumes the token.
+% Use(expected) is assumed to report an error on a mismatch.
+% Normalize source smart quotes and use Error() consistently.
+% The top-level driver must also require EOF after parsing the input.
+...
+[function] @(450, 171) {$code, w=740px, size=25px} ```cpp
+void ParseTerm() {
+  switch (lexer.Peek()) {
+    case num:
+      lexer.Use();
+      return;
+    case '(':
+      lexer.Use('(');
+      ParseExpr();
+      lexer.Use(')');
+      return;
+    default:
+      Error();
+  }
+}
+```
+
+---
+### ParseStatement()
+% The source slide is code-only; the heading names the function.
+[function] @(84, 164) {$code, size=24px} ```cpp
+ASTNode ParseStatement() {
+  if (lexer.None()) Error("Expected Statement.");
+
+  using namespace emplex;
+  switch (lexer.Peek()) {
+    case Lexer::ID_VAR:   return ParseStatement_Var();
+    case Lexer::ID_IF:    return ParseStatement_If();
+    case Lexer::ID_WHILE: return ParseStatement_While();
+    case Lexer::ID_PRINT: return ParseStatement_Print();
+    case '{':            return ParseStatement_Block();
+    // List other statement starts here...
+    default:             return ParseStatement_Expression();
+  }
+}
+```
+...
+[result] @(84, 670) {$note} The selected parser returns an {{color=emp|ASTNode}}.
+---
+### AST Node Types
+{$code, size=24px} ```cpp
+enum class ASTType {
+  NONE=0,
+  BLOCK, IF, WHILE, BREAK, CONTINUE, RETURN,      // Controllers
+  CALL, CALL_JS, OP1, OP2, INDEX,                 // Functions
+  LIT_CHAR, LIT_DOUBLE, LIT_INT, LIT_STRING, VAR, // Leaves
+  UNKNOWN
+};
+```
+---
+### An `ASTNode` Structure
+{$code, size=24px} ```cpp
+class ASTNode {
+protected:
+  ASTType node_type = ASTType::UNKNOWN;  // Type of this AST node
+  Token token;                           // Original token for node
+  size_t symbol_id = 0;                  // Unique ID if symbol in table
+  std::vector<ASTNode> children{};       // Any sub-trees under this node
+
+  std::string extra_info;                // Extra info for debugging
+```
+---
+### Example Parsing function with `ATSNode` return
+{$code, size=24px}```cpp
+  [[nodiscard]] ASTNode Parse_Block() {
+    Token token = lexer.Use('{');
+    symbols.IncScope();
+    ASTNode block = ASTNode{ASTType::BLOCK, token};
+
+    while (lexer.Peek() != '}') {
+      ASTNode line_node = Parse_Statement();
+      block.AddChild( std::move(line_node) );
+    }
+    lexer.Use('}', "Missing '}' (open on line ", token.line_id, ")");
+    symbols.DecScope();
+
+    return block;
+  }
+```
+---
+### More complex `Term` parsing...
+{$code, size=20px}```cpp
+  [[nodiscard]] ASTNode Parse_Term() {
+    Token token = lexer.Use();
+
+    switch (token) {
+      case '!': case '-':     return ASTNode{ASTType::OP1, token, Parse_Term()};
+      case Lexer::ID_LIT_INT: return ASTNode{ASTType::LIT_INT, token};
+      case Lexer::ID_ID:      return Parse_ID_Token(token);
+      case '(': {
+        ASTNode out_node = Parse_Expression();
+        lexer.Use(')', "Missing parenthesis");
+        return out_node;
+        } break;
+      default: return TokenError("Unexpected token in Term: ", token);
+    }
+  }
+
+```
+---
+### Parse Trees
+[expr] @(84, 166) {$body} Consider: `1 + (2 + (3 + 4)) + 5`
+[grammar] @(84, 244) {$rule, w=300px, size=26px} S → E | S + E{{br}}E → ( S ) | number
+[outer:parse,branches] @(896, 242) {$node, color=id, size=23px} S
+[edge_left:parse,edges] {$edge} !line (896, 256) (608, 265)
+[edge_plus_outer:parse,edges] {$edge} !line (896, 256) (1121, 265)
+[edge_five_e:parse,edges] {$edge} !line (896, 256) (1185, 265)
+[left:parse,branches] @(608, 279) {$node, color=id, size=23px} S
+[edge_one_s:parse,edges] {$edge} !line (608, 293) (415, 302)
+[edge_plus_left:parse,edges] {$edge} !line (608, 293) (479, 302)
+[edge_paren_e:parse,edges] {$edge} !line (608, 293) (800, 302)
+[one_s:parse,branches] @(415, 316) {$node, color=id, size=23px} S
+[edge_one_e:parse,edges] {$edge} !line (415, 330) (415, 339)
+[one_e:parse,branches] @(415, 353) {$node, color=id, size=23px} E
+[edge_one:parse,edges] {$edge} !line (415, 367) (415, 376)
+[one:parse,leaves] @(415, 390) {$node, color=orange, size=23px} 1
+[plus_left:parse,leaves] @(479, 316) {$node, color=neon_green, size=23px} +
+[paren_e:parse,branches] @(800, 316) {$node, color=id, size=23px} E
+[edge_open_a:parse,edges] {$edge} !line (800, 330) (543, 339)
+[edge_middle:parse,edges] {$edge} !line (800, 330) (736, 339)
+[edge_close_a:parse,edges] {$edge} !line (800, 330) (1057, 339)
+[open_a:parse,leaves] @(543, 353) {$node, color=neon_green, size=23px} (
+[middle:parse,branches] @(736, 353) {$node, color=id, size=23px} S
+[edge_two_s:parse,edges] {$edge} !line (736, 367) (608, 376)
+[edge_plus_middle:parse,edges] {$edge} !line (736, 367) (672, 376)
+[edge_inner_e:parse,edges] {$edge} !line (736, 367) (864, 376)
+[two_s:parse,branches] @(608, 390) {$node, color=id, size=23px} S
+[edge_two_e:parse,edges] {$edge} !line (608, 404) (608, 413)
+[two_e:parse,branches] @(608, 427) {$node, color=id, size=23px} E
+[edge_two:parse,edges] {$edge} !line (608, 441) (608, 450)
+[two:parse,leaves] @(608, 464) {$node, color=orange, size=23px} 2
+[plus_middle:parse,leaves] @(672, 390) {$node, color=neon_green, size=23px} +
+[inner_e:parse,branches] @(864, 390) {$node, color=id, size=23px} E
+[edge_open_b:parse,edges] {$edge} !line (864, 404) (736, 413)
+[edge_inner:parse,edges] {$edge} !line (864, 404) (864, 413)
+[edge_close_b:parse,edges] {$edge} !line (864, 404) (992, 413)
+[open_b:parse,leaves] @(736, 427) {$node, color=neon_green, size=23px} (
+[inner:parse,branches] @(864, 427) {$node, color=id, size=23px} S
+[edge_three_s:parse,edges] {$edge} !line (864, 441) (800, 450)
+[edge_plus_inner:parse,edges] {$edge} !line (864, 441) (864, 450)
+[edge_four_e:parse,edges] {$edge} !line (864, 441) (928, 450)
+[three_s:parse,branches] @(800, 464) {$node, color=id, size=23px} S
+[edge_three_e:parse,edges] {$edge} !line (800, 478) (800, 487)
+[three_e:parse,branches] @(800, 501) {$node, color=id, size=23px} E
+[edge_three:parse,edges] {$edge} !line (800, 515) (800, 524)
+[three:parse,leaves] @(800, 538) {$node, color=orange, size=23px} 3
+[plus_inner:parse,leaves] @(864, 464) {$node, color=neon_green, size=23px} +
+[four_e:parse,branches] @(928, 464) {$node, color=id, size=23px} E
+[edge_four:parse,edges] {$edge} !line (928, 478) (928, 487)
+[four:parse,leaves] @(928, 501) {$node, color=orange, size=23px} 4
+[close_b:parse,leaves] @(992, 427) {$node, color=neon_green, size=23px} )
+[close_a:parse,leaves] @(1057, 353) {$node, color=neon_green, size=23px} )
+[plus_outer:parse,leaves] @(1121, 279) {$node, color=neon_green, size=23px} +
+[five_e:parse,branches] @(1185, 279) {$node, color=id, size=23px} E
+[edge_five:parse,edges] {$edge} !line (1185, 293) (1185, 302)
+[five:parse,leaves] @(1185, 316) {$node, color=orange, size=23px} 5
+...
+[question] @(84, 384) {$note, w=295px} Do we really need{{br}}such a complex tree{{br}}to record this{{br}}expression?
+...
+!anim @parse hide 0.5s
+>>>
+[answer] @(84, 555) {$note, w=315px} {{color=emp|NO!}} Use an{{br}}{{color=emp|Abstract Syntax Tree}}.
+[ast_outer] @(820, 268) {$node, size=38px, color=neon_pink} +
+[ast_left] @(650, 365) {$node, size=38px, color=neon_pink} +
+[ast_five] @(1090, 365) {$node, size=38px, color=orange} 5
+[ast_one] @(490, 461) {$node, size=38px, color=orange} 1
+[ast_middle] @(800, 461) {$node, size=38px, color=neon_pink} +
+[ast_two] @(685, 551) {$node, size=38px, color=orange} 2
+[ast_inner] @(990, 551) {$node, size=38px, color=neon_pink} +
+[ast_three] @(900, 645) {$node, size=38px, color=orange} 3
+[ast_four] @(1120, 645) {$node, size=38px, color=orange} 4
+[ast_edge_left:ast_edges] {$edge} !line (820, 285) (650, 348)
+[ast_edge_five:ast_edges] {$edge} !line (820, 285) (1090, 348)
+[ast_edge_one:ast_edges] {$edge} !line (650, 382) (490, 444)
+[ast_edge_middle:ast_edges] {$edge} !line (650, 382) (800, 444)
+[ast_edge_two:ast_edges] {$edge} !line (800, 478) (685, 534)
+[ast_edge_inner:ast_edges] {$edge} !line (800, 478) (990, 534)
+[ast_edge_three:ast_edges] {$edge} !line (990, 568) (900, 628)
+[ast_edge_four:ast_edges] {$edge} !line (990, 568) (1120, 628)
+---
+% PowerPoint slides 10.
+### ParseStatement_While()
+% The source slide is code-only; the heading names the function.
+[function] @(84, 166) {$code, size=25px} ```cpp
+ASTNode ParseStatement_While() {
+  lexer.Use(Lexer::ID_WHILE);
+  lexer.Use('(');
+  ASTNode condition = ParseStatement_Expression();
+  lexer.Use(')');
+  ASTNode body = ParseStatement();
+  return ASTNode{"WHILE", condition, body};
+}
+```
+...
+[while] @(640, 509) {$node, w=220px, size=32px, color=neon_pink} WHILE
+[condition_edge:ast_edges] {$edge} !line (640, 526) (405, 592)
+[condition] @(405, 609) {$node, w=260px, size=31px, color=emp} condition
+...
+[body_edge:ast_edges] {$edge} !line (640, 526) (875, 592)
+[body] @(875, 609) {$node, w=260px, size=31px, color=emp} body
+---
+% PowerPoint slides 11.
+### How do we build our AST?
+[categories] @(84, 170) {$table, size=25px, pad=16px, colwidths=(16%,38%,46%)} | Node type | When used? | Examples |
+|:---|:---|:---|
+| {{color=emp|Leaf}} | Tokens that need no inputs | Variables or literals |
+| {{color=neon_pink|Internal}} | Important production rules | Plus, assign, if, print |
+| {{color=id|Skipped}} | Direct transitions or syntax not needed later | Parentheses; var declarations; `Expr3 → Expr2` |
+...
+[leaf] @(84, 490) {$note} **Leaves** supply values. **Internal nodes** describe operations.
+...
+[skip] @(84, 572) {$note} For a skipped rule, pass its useful subtree up to the parent.
+% Declaration information may be stored in the symbol table; retain any initializer work.
+% The examples preserve the categories in the course slides.
+---
+% PowerPoint slides 12.
+### What sort of data structure?
+We have two basic options:
+...
+- A {{color=emp|single data structure}} containing all the information we might need.
+...
+- A {{color=emp|base class}} with subclasses for each possible node type.
+...
+The first is quicker to implement.
+...
+The second will serve you better in the long term.
+---
+% PowerPoint slides 13.
+### Structures in an AST
+What are the leaves of the abstract syntax tree?
+...
+- A literal number.
+...
+- A variable.
+...
+- Commands or functions with no arguments.
+...
+- Strings, in the future.
+...
+A grammar rule with only terminals on its RHS will {{color=emp|typically produce a leaf}}.
+...
+These are the first rules reduced in a bottom-up parse.
+---
+% PowerPoint slides 14–28.
+### Abstract Syntax Trees
+[expr] @(84, 165) {$body} Draw the parse tree for: `1 + 2 * (3 + 4) + 5`
+[rule_s] @(84, 253) {$rule, w=285px, size=26px} S → E | S + E
+[rule_e] @(84, 301) {$rule, w=285px, size=26px} E → T | E * T
+[rule_t] @(84, 349) {$rule, w=300px, size=26px} T → ( S ) | number
+[explain] @(84, 465) {$note, w=300px} Which rules should{{br}}be represented{{br}}in the AST?
+% Reveal the complete parse tree after the drawing prompt.
+...
+[sum_outer:tree,branches] @(881, 235) {$node, color=id, size=25px} S
+[edge_sum_left:tree,edges] {$edge} !line (881, 249) (577, 265)
+[edge_plus_outer:tree,edges] {$edge} !line (881, 249) (1109, 265)
+[edge_five_e:tree,edges] {$edge} !line (881, 249) (1185, 265)
+[sum_left:tree,branches] @(577, 279) {$node, color=id, size=25px} S
+[edge_one_s:tree,edges] {$edge} !line (577, 293) (425, 309)
+[edge_plus_left:tree,edges] {$edge} !line (577, 293) (501, 309)
+[edge_product:tree,edges] {$edge} !line (577, 293) (729, 309)
+[one_s:tree,branches] @(425, 323) {$node, color=id, size=25px} S
+[edge_one_e:tree,edges] {$edge} !line (425, 337) (425, 353)
+[one_e:tree,branches] @(425, 367) {$node, color=id, size=25px} E
+[edge_one_t:tree,edges] {$edge} !line (425, 381) (425, 397)
+[one_t:tree,branches] @(425, 411) {$node, color=id, size=25px} T
+[edge_one:tree,edges] {$edge} !line (425, 425) (425, 441)
+[one:tree,leaves] @(425, 455) {$node, color=orange, size=25px} 1
+[plus_left:tree,leaves] @(501, 323) {$node, color=neon_green, size=25px} +
+[product:tree,branches] @(729, 323) {$node, color=id, size=25px} E
+[edge_two_e:tree,edges] {$edge} !line (729, 337) (577, 353)
+[edge_times:tree,edges] {$edge} !line (729, 337) (653, 353)
+[edge_paren_t:tree,edges] {$edge} !line (729, 337) (881, 353)
+[two_e:tree,branches] @(577, 367) {$node, color=id, size=25px} E
+[edge_two_t:tree,edges] {$edge} !line (577, 381) (577, 397)
+[two_t:tree,branches] @(577, 411) {$node, color=id, size=25px} T
+[edge_two:tree,edges] {$edge} !line (577, 425) (577, 441)
+[two:tree,leaves] @(577, 455) {$node, color=orange, size=25px} 2
+[times:tree,leaves] @(653, 367) {$node, color=neon_green, size=25px} *
+[paren_t:tree,branches] @(881, 367) {$node, color=id, size=25px} T
+[edge_open:tree,edges] {$edge} !line (881, 381) (729, 397)
+[edge_sum_inner:tree,edges] {$edge} !line (881, 381) (881, 397)
+[edge_close:tree,edges] {$edge} !line (881, 381) (1033, 397)
+[open:tree,leaves] @(729, 411) {$node, color=neon_green, size=25px} (
+[sum_inner:tree,branches] @(881, 411) {$node, color=id, size=25px} S
+[edge_three_s:tree,edges] {$edge} !line (881, 425) (805, 441)
+[edge_plus_inner:tree,edges] {$edge} !line (881, 425) (881, 441)
+[edge_four_e:tree,edges] {$edge} !line (881, 425) (957, 441)
+[three_s:tree,branches] @(805, 455) {$node, color=id, size=25px} S
+[edge_three_e:tree,edges] {$edge} !line (805, 469) (805, 485)
+[three_e:tree,branches] @(805, 499) {$node, color=id, size=25px} E
+[edge_three_t:tree,edges] {$edge} !line (805, 513) (805, 529)
+[three_t:tree,branches] @(805, 543) {$node, color=id, size=25px} T
+[edge_three:tree,edges] {$edge} !line (805, 557) (805, 573)
+[three:tree,leaves] @(805, 587) {$node, color=orange, size=25px} 3
+[plus_inner:tree,leaves] @(881, 455) {$node, color=neon_green, size=25px} +
+[four_e:tree,branches] @(957, 455) {$node, color=id, size=25px} E
+[edge_four_t:tree,edges] {$edge} !line (957, 469) (957, 485)
+[four_t:tree,branches] @(957, 499) {$node, color=id, size=25px} T
+[edge_four:tree,edges] {$edge} !line (957, 513) (957, 529)
+[four:tree,leaves] @(957, 543) {$node, color=orange, size=25px} 4
+[close:tree,leaves] @(1033, 411) {$node, color=neon_green, size=25px} )
+[plus_outer:tree,leaves] @(1109, 279) {$node, color=neon_green, size=25px} +
+[five_e:tree,branches] @(1185, 279) {$node, color=id, size=25px} E
+[edge_five_t:tree,edges] {$edge} !line (1185, 293) (1185, 309)
+[five_t:tree,branches] @(1185, 323) {$node, color=id, size=25px} T
+[edge_five:tree,edges] {$edge} !line (1185, 337) (1185, 353)
+[five:tree,leaves] @(1185, 367) {$node, color=orange, size=25px} 5
+% Source 15: retain number leaves.
+...
+!anim explain text Only {{color=orange|number}} is used{{br}}as a leaf in this{{br}}expression.
+!anim rule_t text T → ( S ) | {{color=orange|number}}
+!anim one textsize 33px 0.5s
+!anim two textsize 33px 0.5s
+!anim three textsize 33px 0.5s
+!anim four textsize 33px 0.5s
+!anim five textsize 33px 0.5s
+% Source 16: punctuation is already captured by the tree structure.
+...
+!anim explain text Parentheses control{{br}}the grouping, but{{br}}need no AST node.
+!anim open color neon_pink 0.4s
+!anim close color neon_pink 0.4s
+% Source 17: pass through unary rules and remove punctuation.
+...
+!anim explain text Skip direct transitions.{{br}}Pass each useful{{br}}subtree to its parent.
+!anim one_s hide 0.4s
+!anim edge_one_s hide 0.4s
+!anim one_e hide 0.4s
+!anim edge_one_e hide 0.4s
+!anim one_t hide 0.4s
+!anim edge_one_t hide 0.4s
+!anim two_e hide 0.4s
+!anim edge_two_e hide 0.4s
+!anim two_t hide 0.4s
+!anim edge_two_t hide 0.4s
+!anim paren_t hide 0.4s
+!anim edge_paren_t hide 0.4s
+!anim open hide 0.4s
+!anim edge_open hide 0.4s
+!anim three_s hide 0.4s
+!anim edge_three_s hide 0.4s
+!anim three_e hide 0.4s
+!anim edge_three_e hide 0.4s
+!anim three_t hide 0.4s
+!anim edge_three_t hide 0.4s
+!anim four_e hide 0.4s
+!anim edge_four_e hide 0.4s
+!anim four_t hide 0.4s
+!anim edge_four_t hide 0.4s
+!anim close hide 0.4s
+!anim edge_close hide 0.4s
+!anim five_e hide 0.4s
+!anim edge_five_e hide 0.4s
+!anim five_t hide 0.4s
+!anim edge_five_t hide 0.4s
+!anim edge_five point 1 (881, 249) 0.7s
+!anim edge_one point 1 (577, 293) 0.7s
+!anim edge_two point 1 (729, 337) 0.7s
+!anim edge_sum_inner point 1 (729, 337) 0.7s
+!anim edge_three point 1 (881, 425) 0.7s
+!anim edge_four point 1 (881, 425) 0.7s
+!anim one move (425, 640) 0.7s
+!anim edge_one point 2 (425, 620) 0.7s
+!anim two move (577, 640) 0.7s
+!anim edge_two point 2 (577, 620) 0.7s
+!anim three move (805, 640) 0.7s
+!anim edge_three point 2 (805, 620) 0.7s
+!anim four move (957, 640) 0.7s
+!anim edge_four point 2 (957, 620) 0.7s
+!anim five move (1185, 640) 0.7s
+!anim edge_five point 2 (1185, 620) 0.7s
+% Source 18: operator productions become the internal AST nodes.
+...
+!anim explain text Rules with operators{{br}}become nodes for{{br}}those operators.
+!anim rule_s text S → E | {{color=neon_pink|S + E}}
+!anim rule_e text E → T | {{color=neon_pink|E * T}}
+% Source 19–21: replace this production with its operator.
+...
+!anim sum_inner color neon_pink 0.4s
+!anim plus_inner color neon_pink 0.4s
+>>>
+!anim sum_inner text +
+!anim sum_inner textsize 38px 0.5s
+!anim plus_inner hide 0.4s
+!anim edge_plus_inner hide 0.4s
+% Source 22–23: replace this production with its operator.
+...
+!anim product color neon_pink 0.4s
+!anim times color neon_pink 0.4s
+>>>
+!anim product text *
+!anim product textsize 38px 0.5s
+!anim times hide 0.4s
+!anim edge_times hide 0.4s
+% Source 24–25: replace this production with its operator.
+...
+!anim sum_left color neon_pink 0.4s
+!anim plus_left color neon_pink 0.4s
+>>>
+!anim sum_left text +
+!anim sum_left textsize 38px 0.5s
+!anim plus_left hide 0.4s
+!anim edge_plus_left hide 0.4s
+% Source 26–27: replace this production with its operator.
+...
+!anim sum_outer color neon_pink 0.4s
+!anim plus_outer color neon_pink 0.4s
+>>>
+!anim sum_outer text +
+!anim sum_outer textsize 38px 0.5s
+!anim plus_outer hide 0.4s
+!anim edge_plus_outer hide 0.4s
+% Source 28: space out the surviving nodes to finish the AST.
+...
+!anim sum_outer move (835, 260) 0.9s
+!anim sum_left move (675, 360) 0.9s
+!anim five move (1100, 360) 0.9s
+!anim one move (455, 460) 0.9s
+!anim product move (815, 460) 0.9s
+!anim two move (680, 550) 0.9s
+!anim sum_inner move (1010, 550) 0.9s
+!anim three move (920, 640) 0.9s
+!anim four move (1140, 640) 0.9s
+!anim edge_sum_left point 1 (835, 280) 0.9s
+!anim edge_sum_left point 2 (675, 340) 0.9s
+!anim edge_five point 1 (835, 280) 0.9s
+!anim edge_five point 2 (1100, 340) 0.9s
+!anim edge_one point 1 (675, 380) 0.9s
+!anim edge_one point 2 (455, 440) 0.9s
+!anim edge_product point 1 (675, 380) 0.9s
+!anim edge_product point 2 (815, 440) 0.9s
+!anim edge_two point 1 (815, 480) 0.9s
+!anim edge_two point 2 (680, 530) 0.9s
+!anim edge_sum_inner point 1 (815, 480) 0.9s
+!anim edge_sum_inner point 2 (1010, 530) 0.9s
+!anim edge_three point 1 (1010, 570) 0.9s
+!anim edge_three point 2 (920, 620) 0.9s
+!anim edge_four point 1 (1010, 570) 0.9s
+!anim edge_four point 2 (1140, 620) 0.9s
+>>>
+!anim explain text {{color=emp|DONE!}}{{br}}The AST preserves{{br}}the operations and{{br}}their grouping.
+---
+% PowerPoint slides 35.
+### Class Problem
+[given] @(84, 167) {$body} Given the grammar:
+[grammar] @(84, 233) {$code, size=29px} ```
+S → E | S + E | S - E
+E → T | E * T | E / T
+T → ( S ) | number
+```
+...
+[task] @(84, 435) {$body} Draw the {{color=id|parse tree}} and {{color=emp|abstract syntax tree}} for this expression:
+[expression] @(640, 571) {$node, w=1112px, size=40px, color=orange} `1 * (2 - (3 / 4 + 5)) * 6`
+% This exercise is visible in the source deck; leave the solution for class discussion.

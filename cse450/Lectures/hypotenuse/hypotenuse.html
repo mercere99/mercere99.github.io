@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CSE 450 — Running the hypotenuse WAT program</title>
+  <style>
+    :root { color-scheme: dark; font: 20px/1.5 Helvetica, Arial, sans-serif; }
+    body { max-width: 940px; margin: 3rem auto; padding: 0 1.4rem; background: #08111f; color: #f4f1e8; }
+    h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); line-height: 1.15; margin-bottom: 1rem; }
+    h2 { font-size: 1.15rem; margin-top: 2rem; }
+    .course, a { color: #5de4c7; }
+    form { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; margin: 2rem 0 1rem; }
+    label { display: grid; gap: .4rem; }
+    input, button { font: inherit; border-radius: .25rem; padding: .65rem; }
+    input { width: 8rem; background: #102233; color: inherit; border: 1px solid #8aa5b5; }
+    button { background: #5de4c7; border: 1px solid #5de4c7; color: #08111f; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: wait; }
+    :focus-visible { outline: 3px solid #ffd166; outline-offset: 3px; }
+    #result { display: block; font-size: 2rem; color: #ffd166; min-height: 1.5em; }
+    #status { color: #8cd9ff; }
+    #status.error { color: #ffb4ab; }
+    code, pre { font-family: Menlo, Consolas, monospace; }
+    pre { background: #102233; padding: 1rem; overflow-x: auto; font-size: .85rem; }
+    .detail { font-size: .85rem; color: #b7c8d3; }
+  </style>
+</head>
+<body>
+  <p class="course">CSE 450 · Lecture 11</p>
+  <h1>Running WebAssembly</h1>
+  <p>The browser loads <code>hypotenuse.wasm</code>. JavaScript passes two
+    numbers to its exported <code>CalcHypotenuse</code> function and displays the result.</p>
+  <form id="inputs">
+    <label>Side a <input id="side-a" type="number" min="0" max="1000000" step="any" value="3" required></label>
+    <label>Side b <input id="side-b" type="number" min="0" max="1000000" step="any" value="4" required></label>
+    <button id="calculate" type="submit" disabled>Calculate in Wasm</button>
+  </form>
+  <output id="result" for="side-a side-b" aria-live="polite"></output>
+  <p id="status" role="status">Loading hypotenuse.wasm…</p>
+  <p class="detail">Try (3, 4), (5, 12), or (1.5, 2). The arithmetic runs in Wasm.
+    This classroom example accepts side lengths from 0 to 1,000,000.</p>
+
+  <h2>The JavaScript call</h2>
+  <pre id="call">Waiting for the module…</pre>
+  <p><a href="hypotenuse.wat">Read the WAT source</a></p>
+  <details>
+    <summary>Build and run locally</summary>
+    <p>In the directory containing this HTML file and the WAT file:</p>
+    <pre>wat2wasm hypotenuse.wat -o hypotenuse.wasm
+python3 -m http.server 8000 --bind 127.0.0.1</pre>
+    <p>Open <a href="http://localhost:8000/hypotenuse.html">http://localhost:8000/hypotenuse.html</a>.
+      Rebuild the binary and reload the page after changing the WAT source.</p>
+  </details>
+
+  <script>
+    const form = document.querySelector('#inputs');
+    const button = document.querySelector('#calculate');
+    const result = document.querySelector('#result');
+    const status = document.querySelector('#status');
+    const call = document.querySelector('#call');
+
+    async function run_program() {
+      // 1. Fetch the binary file. The browser does not execute the WAT text.
+      const response = await fetch('hypotenuse.wasm', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`hypotenuse.wasm: HTTP ${response.status}`);
+      }
+      const buffer = await response.arrayBuffer();
+
+      // 2. Compile and instantiate the module, then obtain its exported function.
+      const { instance } = await WebAssembly.instantiate(buffer);
+      const { CalcHypotenuse } = instance.exports;
+      if (typeof CalcHypotenuse !== 'function') {
+        throw new Error('The module must export a function named CalcHypotenuse.');
+      }
+
+      // 3. Call Wasm whenever the form is submitted. Instantiate only once.
+      function calculate(event) {
+        if (event) event.preventDefault();
+        if (!form.reportValidity()) return;
+        const a = document.querySelector('#side-a').valueAsNumber;
+        const b = document.querySelector('#side-b').valueAsNumber;
+        const c = CalcHypotenuse(a, b);
+        result.textContent = `Hypotenuse = ${c}`;
+        call.textContent = `instance.exports.CalcHypotenuse(${a}, ${b})\n// returned ${c}`;
+      }
+
+      form.addEventListener('submit', calculate);
+      button.disabled = false;
+      status.textContent = 'Wasm loaded. Export: CalcHypotenuse(f64, f64) → f64';
+      calculate();
+    }
+
+    run_program().catch(error => {
+      status.classList.add('error');
+      status.textContent = `Could not load Wasm: ${error.message} ` +
+        'Build hypotenuse.wasm, serve this directory over HTTP, and reload.';
+      call.textContent = 'See “Build and run locally” below.';
+      console.error(error);
+    });
+  </script>
+</body>
+</html>

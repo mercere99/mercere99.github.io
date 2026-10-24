@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CSE 450: Project 3</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1 id="cse-450-project-3-compiling-computation">CSE 450 Project 3:
+Compiling Computation</h1>
+<h3 id="check-in-sunday-october-25th-by-midnight">Check In: Sunday,
+October 25th, by Midnight</h3>
+<h3 id="project-due-sunday-november-1st-by-midnight">Project Due:
+Sunday, November 1st, by Midnight</h3>
+<p>Your first two projects executed programs directly. In this project,
+you will build your first <strong>compiler</strong>: a C++ program that
+translates a small numeric language, <strong>Strix</strong>, into
+<strong>WebAssembly Text (WAT)</strong>. The supplied
+<code>wat2wasm</code> assembler converts that text into a WebAssembly
+binary that a browser can run.</p>
+<p>Your compiler supplies the computation. This project’s browser
+playground supplies the interface: it can call your compiled functions
+and use a function named <code>Shade</code> to draw an image. Arithmetic
+produces gradients; conditionals produce shapes; loops can produce
+fractals. You do not need to write JavaScript or canvas code.</p>
+<p>Cite outside code, resources, and AI assistance in code comments or
+your README, and be prepared to explain every part of your submission.
+The <a href="syllabus.html">syllabus</a> contains the full course
+policy.</p>
+<h2 id="what-you-are-building">What you are building</h2>
+<pre class="text"><code>Strix source    → lexer
+                → parser
+                → AST
+                → semantic analysis
+                → WAT
+wat2wasm        → Wasm
+supplied runner → RESULTS</code></pre>
+<p>Run your compiler like this:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./Project3</span> program.strix <span class="op">&gt;</span> program.wat</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">wat2wasm</span> program.wat <span class="at">-o</span> program.wasm</span></code></pre></div>
+<p>The compiler takes one source filename. Standard output contains only
+the WAT module. Diagnostics go to standard error. Successful compilation
+returns exit status 0; an invalid source program returns 1 and produces
+no WAT. Parse and check the complete program before emitting output; an
+output string or stream buffer makes this straightforward.
+<code>--ast</code> is a supplied debugging option that prints the tree
+to standard error and still generates WAT normally.</p>
+<p>Your output does not need to look like the instructor’s WAT. We
+assemble it and execute its exported functions to check their
+behavior.</p>
+<h2 id="from-marquee-to-strix">From Marquee+ to Strix</h2>
+<p>You can reuse the ideas behind your Project 2 expressions, ASTs,
+scoped symbol table, conditionals, and loops. These are the deliberate
+language changes:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Marquee+</th>
+<th>Strix in Project 3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Every value is a string</td>
+<td>Every source value is a <code>double</code></td>
+</tr>
+<tr>
+<td>Empty string is false; nonempty is true</td>
+<td>Zero is false; nonzero is true</td>
+</tr>
+<tr>
+<td>Newlines terminate simple statements</td>
+<td>Semicolons terminate simple statements</td>
+</tr>
+<tr>
+<td>Top-level statements execute in order</td>
+<td>A module contains named functions</td>
+</tr>
+<tr>
+<td><code>SHOW</code> and <code>WAIT</code></td>
+<td>The host calls functions and observes their return values</td>
+</tr>
+<tr>
+<td>Uppercase keywords</td>
+<td>Lowercase, case-sensitive keywords</td>
+</tr>
+</tbody>
+</table>
+<p>Strings, durations, the clock, and string operators are not part of
+this project. There are no calls from one Strix function to another yet
+(those arrive in Project 4). JavaScript can call any exported function
+now.</p>
+<h2 id="lexical-rules">Lexical rules</h2>
+<p>A supplied <code>lexer.emplex</code> and its generated
+<code>lexer.hpp</code> are included as a starting point. Use Emplex for
+your lexer; you may adapt these rules, but submit both files and keep
+them consistent. The same lexer reserves tokens for later projects;
+recognizing a token does not make that construct legal in this
+project.</p>
+<ul>
+<li>Source files use ASCII. NULL or non-ASCII bytes are errors.</li>
+<li>Identifiers match <code>[a-zA-Z_][a-zA-Z0-9_]*</code> and are
+case-sensitive. Names beginning with <code>__</code> are reserved for
+the implementation.</li>
+<li>Reserved words are <code>function</code>, <code>double</code>,
+<code>int</code>, <code>string</code>, <code>void</code>,
+<code>if</code>, <code>else</code>, <code>while</code>,
+<code>break</code>, <code>continue</code>, and <code>return</code>. Only
+<code>double</code> is a legal type here, but you’ll want to reserve the
+others for future projects.</li>
+<li>Numeric literals are decimal integers (<code>42</code>,
+<code>1_000</code>), hexadecimal integers (<code>0x2A</code>,
+<code>0xff</code>), or decimals (<code>3.5</code>,
+<code>1_000.25</code>). Single underscores may occur only between
+digits. Decimals need a digit on <strong>both</strong> sides of the
+period; <code>.5</code>, <code>5.</code>, exponent notation, and
+duration suffixes are not supported.</li>
+<li>All numeric literals become <code>double</code> values in this
+project. Hex magnitudes must fit an unsigned 64-bit integer; decimal
+literals must convert to a finite double. A minus sign is an operator,
+not part of the literal.</li>
+<li>Whitespace, including newlines, is ignored. <code>//</code> comments
+end at the newline. <code>/* ... */</code> comments end at the first
+<code>*/</code> and do not nest. An unterminated block comment is an
+error.</li>
+</ul>
+<h2 id="functions">Functions</h2>
+<pre class="strix"><code>function Add(double a, double b) : double {
+  return a + b;
+}</code></pre>
+<p>A program contains one or more function definitions. A function has a
+unique name, zero or more comma-separated typed parameters, a return
+type, and a braced body. Currently, parameters and returns must all be
+<code>double</code>. Functions can appear only at the top level, and
+nothing else may appear there in Project 3.</p>
+<p>Export every source function under its original name. Functions do
+not execute when the compiler runs or when the module loads: the host
+invokes an export.</p>
+<p>Each function body must end with a direct
+<code>return expression;</code> statement. Conditional early returns are
+allowed. We do not require a general analysis of whether every path
+returns or whether statements are reachable. Thus a function whose two
+<code>if</code> branches both return still needs a final return under
+this simple syntactic rule. Validate unreachable source code just like
+reachable code.</p>
+<p>Parameters are local variables and may be assigned. Each call has its
+own parameter and local storage.</p>
+<h2 id="statements-and-scope">Statements and scope</h2>
+<pre class="text"><code>statement → type ID &quot;=&quot; expression &quot;;&quot;
+          | &quot;if&quot; &quot;(&quot; expression &quot;)&quot; statement (&quot;else&quot; statement)?
+          | &quot;while&quot; &quot;(&quot; expression &quot;)&quot; statement
+          | &quot;return&quot; expression &quot;;&quot;
+          | &quot;break&quot; &quot;;&quot;
+          | &quot;continue&quot; &quot;;&quot;
+          | expression &quot;;&quot;
+          | &quot;{&quot; statement* &quot;}&quot;
+          | &quot;;&quot;</code></pre>
+<p><code>type</code> is <code>double</code>. <strong>Declarations
+require initializers.</strong> Empty statements and empty nested blocks
+are allowed. <code>else</code> attaches to the nearest unmatched
+<code>if</code>. An expression statement discards its resulting value
+while preserving effects such as assignment.</p>
+<p>Braces create lexical scopes. Parameters and declarations immediately
+inside a function’s outer braces share one scope. A name cannot be
+declared twice in the same scope; a nested block may shadow it. A
+declaration becomes visible <strong>after its initializer</strong>. This
+means:</p>
+<pre class="strix"><code>function ScopeExample() : double {
+  double x = 10;
+  {
+    double x = x + 1; // initializer reads the outer x; new inner x becomes 11
+    x = 20;
+  }
+  return x;           // 10
+}</code></pre>
+<p>A name outside its scope or before its declaration is an error.
+Function names and local-variable names use separate namespaces;
+duplicate function names remain errors.</p>
+<p>Only braces introduce scopes. An unbraced declaration in an
+<code>if</code> or <code>while</code> body belongs to its surrounding
+scope. All local storage initially contains zero on each function call;
+executing a declaration evaluates its initializer. If control flow skips
+a declaration, its storage stays zero. A loop executes a body
+declaration’s initializer each time it reaches that declaration. Prefer
+braces around bodies containing declarations.</p>
+<h3 id="conditions-and-loops">Conditions and loops</h3>
+<p>Zero (including “negative zero”) is false. Every other double is
+true, including fractional values, infinities, and NaN. Comparisons and
+<code>!</code> produce <code>0.0</code> or <code>1.0</code>. Convert
+truth by comparing a value with zero; <strong>do not truncate a double
+to an integer</strong>. Truncation would incorrectly make
+<code>0.5</code> false.</p>
+<p><code>while</code> rechecks its condition before each iteration.
+<code>break</code> exits the innermost enclosing loop.
+<code>continue</code> jumps to that loop’s condition. Both are errors
+outside a loop. <code>return</code> exits the entire function, including
+from inside nested blocks or loops.</p>
+<pre class="strix"><code>function SumExceptThree(double limit) : double {
+  double sum = 0;
+  double i = 0;
+  while (i &lt; limit) {
+    i = i + 1;
+    if (i == 3) continue;
+    sum = sum + i;
+  }
+  return sum;
+}</code></pre>
+<p><code>SumExceptThree(5)</code> returns 12 when called by the supplied
+host.</p>
+<h2 id="expressions">Expressions</h2>
+<p>Terminals are numeric literals, variable names, and parenthesized
+expressions. The following table lists precedence from strongest to
+weakest:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Operators</th>
+<th>Associativity</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unary <code>-</code>, <code>!</code></td>
+<td>Right</td>
+<td>Numeric negation; logical negation</td>
+</tr>
+<tr>
+<td><code>*</code>, <code>/</code></td>
+<td>Left</td>
+<td>Multiplication; floating-point division</td>
+</tr>
+<tr>
+<td><code>+</code>, <code>-</code></td>
+<td>Left</td>
+<td>Addition; subtraction</td>
+</tr>
+<tr>
+<td><code>==</code>, <code>!=</code>, <code>&lt;</code>,
+<code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code></td>
+<td>Non-associative</td>
+<td>Numeric comparison, producing a double 0 or 1</td>
+</tr>
+<tr>
+<td><code>=</code></td>
+<td>Right</td>
+<td>Assign and return the stored value</td>
+</tr>
+</tbody>
+</table>
+<p>All operands are evaluated left to right. Assignment evaluates its
+right side and stores the result in its left-side variable; that result
+is also the value of the assignment expression. Chained assignment
+therefore works. The left side must be a variable reference, optionally
+parenthesized.</p>
+<p><code>a &lt; b &lt; c</code> and <code>a == b != c</code> are errors.
+Parentheses explicitly permit a comparison result to participate in
+another comparison, such as <code>(a &lt; b) == 1</code>.</p>
+<p>Arithmetic follows WebAssembly <code>f64</code> behavior;
+floating-point division by zero produces an infinity or NaN. Your
+compiler does not diagnose runtime numeric conditions. There is no
+integer remainder operator in Project 3.</p>
+<h2 id="compiler-organization">Compiler organization</h2>
+<p>The starter provides a generated lexer, a command-line driver,
+numeric helpers, AST storage, and a scoped symbol table. These pieces
+are usable as supplied. Your main implementation work is in three
+files:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>File</th>
+<th>Class and entry point</th>
+<th>Your work</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Parser.hpp</code></td>
+<td><code>Parser::ParseProgram</code></td>
+<td>Read tokens, parse functions and expressions, resolve names, and
+build ASTs.</td>
+</tr>
+<tr>
+<td><code>Semantics.hpp</code></td>
+<td><code>SemanticAnalyzer::AnalyzeProgram</code></td>
+<td>Visit the AST to check assignment targets, loop context, and
+required returns.</td>
+</tr>
+<tr>
+<td><code>Translate.hpp</code></td>
+<td><code>WATTranslator::GenerateModule</code></td>
+<td>Visit expressions and statements, then return a complete WAT
+module.</td>
+</tr>
+</tbody>
+</table>
+<p>The semantic and translation visitors include a completed
+number-literal case. Read <code>START-HERE.md</code> for the
+implementation order and each file’s header for its role, interfaces,
+and remaining work.</p>
+<p>The starter uses <code>ASTNode</code> values with
+<code>std::vector&lt;ASTNode&gt;</code> children, following the DiceLang
+class example. Each node directly owns its subtrees; you do not need
+owning pointers or a separate allocation helper. <code>ASTKind</code>
+identifies the node’s operation, and <code>AST.hpp</code> documents the
+children in their required order. <code>number_value</code> holds a
+converted literal; <code>variable_id</code> identifies a resolved
+declaration. These fields are relevant only to the node kinds documented
+there. Because every Project 3 source value is a double, the scaffold
+has no type enum or expression-type annotations. Those can be added when
+multiple types arrive in Project 4.</p>
+<p>The AST is data; visitors perform operations on it. A switch on
+<code>ASTKind</code> that dispatches to handlers is a suitable visitor
+implementation. Inspect nodes by reference, rather than copying subtrees
+during traversal. You may use a different class organization, but retain
+clear responsibilities for parsing, checking, and translation. Do not
+generate WAT as a side effect of parsing.</p>
+<p>Resolve variable names to stable symbol IDs while parsing. A scope
+map can be popped without deleting the associated variable record. In
+generated WAT, each source declaration gets its own local ID even when
+two declarations share a source name. Declare all Wasm locals at the
+beginning of their function. The supplied <code>SymbolTable</code>
+manages one function at a time. Parameters and the outer function body
+share its initial scope; push/pop scopes for nested braced blocks.
+Resolve a declaration’s initializer before registering the new name, so
+a shadowing initializer can refer to the outer variable. Keep IDs rather
+than references to vector elements that could move as the program is
+built.</p>
+<p>Useful stack contracts:</p>
+<ul>
+<li>An expression leaves exactly one value on the operand stack.</li>
+<li>A statement leaves no value. Use <code>drop</code> for an unused
+expression result.</li>
+<li>An assignment expression can use <code>local.tee</code> to store and
+retain its value.</li>
+<li>An <code>if</code> or <code>br_if</code> consumes an
+<code>i32</code> condition. Source comparisons still produce doubles, so
+convert comparison results when used as source values.</li>
+<li>A <code>while</code> needs an outer <code>block</code> for exit and
+an inner <code>loop</code> for repetition. Maintain a stack of loop
+labels so nested <code>break</code> and <code>continue</code> work.</li>
+</ul>
+<p>For example, a complete WAT module for <code>Add</code> is:</p>
+<pre class="wat"><code>(module
+  (func $add (export &quot;Add&quot;) (param $a f64) (param $b f64) (result f64)
+    (f64.add (local.get $a) (local.get $b))
+  )
+)</code></pre>
+<p>Consult <a
+href="https://developer.mozilla.org/en-US/docs/WebAssembly/Guides/Understanding_the_text_format">MDN’s
+text-format guide</a> and the <a
+href="https://github.com/WebAssembly/wabt">WABT tools</a> when
+needed.</p>
+<h2 id="errors">Errors</h2>
+<p>Report <code>ERROR (line N): useful explanation</code> on standard
+error, return 1, and leave standard output empty. Stop at the first
+error your implementation finds; we do not require a particular ordering
+among independent errors. Check:</p>
+<ul>
+<li>Invalid characters, malformed literals, and unterminated
+comments.</li>
+<li>Missing punctuation and any other invalid syntax.</li>
+<li>Unsupported types or language features.</li>
+<li>Unknown variables, duplicate declarations, and duplicate function
+names.</li>
+<li>Illegal assignment targets and chained comparisons.</li>
+<li><code>break</code> or <code>continue</code> outside a loop.</li>
+<li>Missing final returns and definitions in an invalid scope.</li>
+</ul>
+<p>Exact message wording is not prescribed. Tests require a line number
+and a source diagnostic; a compiler crash or an unimplemented-feature
+placeholder is not an acceptable error report. Diagnostics should
+identify the actual problem. For an invalid character or an unknown
+variable reference, use the line where that character or identifier
+occurs, including after multiline comments.</p>
+<h2 id="building-testing-and-viewing-your-output">Building, testing, and
+viewing your output</h2>
+<p>You need a C++20 compiler, Node.js 18 or newer, WABT
+(<code>wat2wasm</code>), and Python 3 for the local web server. No npm
+dependencies are required. The package README has setup instructions for
+macOS, Linux/WSL, and the course Linux systems.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span>                  <span class="co"># builds Project3</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> doctor           <span class="co"># checks Node and wat2wasm</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> check-in         <span class="co"># runs the designated early tests</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> tests            <span class="co"># compiles, assembles, AND executes all public cases</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> examples         <span class="co"># compiles the supplied example programs</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> serve            <span class="co"># starts a local server; Ctrl-C stops it</span></span></code></pre></div>
+<p>Open <a
+href="http://localhost:8000/web/">http://localhost:8000/web/</a> and
+click a module under <strong>Built examples</strong>. Start with
+<strong>growing-square.wasm</strong>, then press <strong>Play</strong>
+or move the time slider. <strong>Refresh list</strong> shows newly
+compiled programs, and <strong>Reload module</strong> fetches the
+selected example’s latest build. You can also choose a
+<code>.wasm</code> file from your computer; it loads immediately. You
+may choose the same file again, including after recompiling it.</p>
+<p><code>make examples</code> tries every example and lists successful
+builds even if other examples fail. It still returns failure if any
+example fails. This lets you try the growing square while loops or other
+advanced features are unfinished. Compiled files stay in
+<code>build/examples</code>; a generated <code>index.json</code>
+supplies the browser’s list. No files need to be copied into
+<code>web/</code>.</p>
+<p>The <strong>Test results</strong> page displays the CLI report and
+can independently rerun compiled positive cases in the browser.
+Compilation errors are checked by the CLI, not by the browser.</p>
+<p>The public suite contains 130 source fixtures, including positive
+cases with multiple calls and invalid programs. Expected behavior is in
+<code>tests/manifest.json</code>; tests are not comparisons against a
+particular WAT file. Logs and generated WAT/Wasm go in
+<code>build/tests</code>. Timeouts turn accidental infinite loops into
+failed tests. <code>make tests</code> returns a nonzero status if any
+case fails; missing tools also fail visibly.</p>
+<p>The package includes <code>tests/COVERAGE.md</code>, which maps the
+public edge cases to the rules they exercise. Its case count measures
+coverage, not grading points; related failures may come from one
+underlying issue.</p>
+<p>To compile your own example with the same pipeline:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">node</span> tools/course.mjs compile my_program.strix</span></code></pre></div>
+<p>The output is <code>build/examples/my_program.wasm</code>; click
+<strong>Refresh list</strong> to see it. Avoid using the same basename
+for two different custom programs, since the second would replace the
+first.</p>
+<h3 id="the-image-interface">The image interface</h3>
+<pre class="strix"><code>function Shade(double x, double y, double time) : double {
+    return (x + 1 &lt; time / 10) * (y + 1 &lt; time / 10);
+}</code></pre>
+<p>This first animation needs only parameters, arithmetic, comparisons,
+and a return. Each comparison produces 0 or 1, so their product is 1
+inside the square and 0 outside. At time 0 the image is black; over 20
+seconds a white square grows from the bottom-left corner.
+<strong>Play</strong> repeats that interval; the slider lets you examine
+any time directly.</p>
+<p>The viewer samples <code>x</code> and <code>y</code> in
+<code>[-1,1]</code>, with positive <code>y</code> upward, and passes
+time in seconds. Return brightness in <code>[0,1]</code>; the viewer
+clamps finite values and displays non-finite values as black. All
+rendering occurs in a worker so <strong>Stop</strong> can terminate a
+bad loop. The viewer currently uses 160 × 160 samples.</p>
+<p>After the growing square, try the gradient, moving rings, and
+Mandelbrot fractal. Every example is ordinary Strix input to your
+compiler. <code>Shade</code> is a viewer convention, not a language
+keyword or a required name in ordinary test programs.</p>
+<h2 id="check-in-and-submission">Check-in and submission</h2>
+<p>The October 25 check-in is worth <strong>25%</strong> of the project
+grade. It uses the 16 fixtures marked <code>checkin: true</code> in the
+manifest: exported functions, parameters, expressions, declarations, and
+assignments. Run <code>make check-in</code>. Full check-in credit
+requires these cases to compile, assemble, and return correct results.
+Partial credit reflects working portions of that group. This milestone
+does not require loops or the full language.</p>
+<p>The final submission is worth <strong>75%</strong>. Complete the
+language, preserve the check-in behavior, and verify the full test
+suite. Generalized implementations may also be tested with additional
+programs obeying this specification.</p>
+<p>For the check-in, also include an initial README identifying passing
+tests and a <code>my_tests/</code> directory with at least one original,
+specification-conforming program, as required by the syllabus. To
+automate that case, reference it as
+<code>../my_tests/your-case.strix</code> in the test manifest (see
+<code>TESTING.md</code>).</p>
+<p>Submit all C++ sources and headers, <code>lexer.emplex</code>,
+<code>lexer.hpp</code>, the Makefile, the supplied runner and fixtures,
+your own additional tests, and a README explaining your design, known
+limitations, and outside resources. The default Makefile target must
+produce <code>Project3</code>. Do not submit <code>build/</code> or
+compiled executables. Verify a clean command-line build on the course
+Linux systems; IDE-only builds are insufficient. Commit and push
+progress regularly.</p>
+<p>An optional creative extension is your own <code>Shade</code>
+program. Another is a carefully specified numeric operator with tests.
+Finish the core compiler first; extra-credit work must be identified in
+the README and follows the syllabus extra-credit policy.</p>
+</body>
+</html>

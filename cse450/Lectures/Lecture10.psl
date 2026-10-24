@@ -1,0 +1,957 @@
+!set baseurl https://www.cse.msu.edu/~cse450/Lectures/Lecture10.psl
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #CCCCFF
+!set visitedlinkcolor #CCCCFF
+!set size 30
+
+!set palette focus #FFD166
+!set palette id #8CD9FF
+!set palette done #B6A0D6
+!set palette emp #80FF80
+!set palette explain #DF97FF
+
+!style note {size=27px, w=1112px}
+!style code {font=Menlo, size=23px, w=740px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+!style node {size=22px, pad=0px, align=center, fill=#173749, stroke=#8CD9FF, textcolor=#F4F1E8, thick=2}
+!style edge {color=#8AA5B5, thick=2}
+
+# CSE450 Translation of Programming Languages
+## Lecture 10: Writing Code in WebAssembly Text (WAT)
+---
+### What is WebAssembly?
+[wasm] @(84, 185) {$note, w=1100px, size=32px} **{{color=emp|WebAssembly (Wasm)}}** is a portable binary format designed for safe, efficient web development.
+...
+[browsers] @(84, 300) {$note, w=1100px, size=30px} Wasm has implementations in all major web browsers.
+...
+[wat] @(84, 390) {$note, w=1100px, size=32px} **{{color=emp|WebAssembly Text (WAT)}}** is a human-readable text format that can be converted to Wasm.
+...
+[compilers] @(84, 535) {$note, w=1100px, size=30px} Compilers can target Wasm, including Emscripten for C/C++ and toolchains for Rust.
+---
+### Example WebAssembly Text Program
+[module] @(70, 170) {$code, w=740px, size=23px} ```
+(module
+
+
+
+
+
+
+
+)
+```
+...
+[f0] {color=focus, thick=3, fill=none, round=0} !rect (75,182.0) (730,32.199999999999996)
+[explain] @(850, 185) {$note, w=345px, size=27px, color=explain} Begin with a `module` form. Parentheses delimit the module and its nested forms.
+...
+!anim f0 hide 0.15s
+[f1] {color=focus, thick=3, fill=none, round=0} !rect (75,439.59999999999997) (730,32.199999999999996)
+!anim explain text The closing parenthesis ends the module.
+...
+!anim f1 hide 0.15s
+!anim module hide 0.15s
+[skeleton] @(70, 170) {$code, w=740px, size=23px} ```
+(module
+  (func $Fun1
+    (param $var0 f64) (param $var1 f64)
+    (result f64)
+
+    ;; Function body goes here
+  )
+
+)
+```
+[f2] {color=focus, thick=3, fill=none, round=0} !rect (75,214.2) (730,32.199999999999996)
+!anim explain text `func` introduces a function.
+...
+!anim explain text `$Fun1` is its internal WAT identifier.
+...
+!anim f2 hide 0.15s
+[f3] {color=focus, thick=3, fill=none, round=0} !rect (75,246.39999999999998) (730,32.199999999999996)
+!anim explain text Each `param` gives a parameter name and type.
+...
+!anim explain text `f64` is a 64-bit floating-point type.
+...
+!anim f3 hide 0.15s
+[f4] {color=focus, thick=3, fill=none, round=0} !rect (75,278.6) (730,32.199999999999996)
+!anim explain text `result` gives the function’s return type.
+...
+!anim f4 hide 0.15s
+!anim skeleton hide 0.15s
+[exported] @(70, 170) {$code, w=740px, size=23px} ```
+(module
+  (func $Fun1
+    (param $var0 f64) (param $var1 f64)
+    (result f64)
+
+    ;; Function body goes here
+  )
+  (export "CalcHypotenuse" (func $Fun1))
+)
+```
+[f5] {color=focus, thick=3, fill=none, round=0} !rect (75,407.4) (730,32.199999999999996)
+!anim explain text `export` exposes the function as `CalcHypotenuse` to JavaScript.
+...
+[purpose] @(850, 440) {$note, w=345px, size=27px, color=emp} Two sides of a right triangle go in. The hypotenuse length comes out.
+---
+### The Operand Stack
+[context] @(70, 150) {$note, w=1120px, size=25px} Inside `$Fun1`, with parameters `$var0` and `$var1` of type `f64`.
+[label] @(850, 350) {$note, w=345px, size=25px, color=id} Stack (bottom → top)
+[stack] @(850, 395) {$note, w=345px, size=31px, color=emp} [ ]
+[explain] @(850, 195) {$note, w=345px, size=27px, color=explain} Instructions consume and produce stack values.
+...
+[op0] @(70, 190) {$code, w=740px, size=26px, pad=6px} ```
+local.get $var0
+```
+!anim explain text Push the first parameter.
+!anim stack text [ a ]
+...
+[op1] @(70, 250) {$code, w=740px, size=26px, pad=6px} ```
+local.get $var0
+```
+!anim explain text Push the first parameter again.
+!anim stack text [ a, a ]
+...
+[op2] @(70, 310) {$code, w=740px, size=26px, pad=6px} ```
+f64.mul
+```
+!anim explain text Pop two values, multiply, then push the product.
+!anim stack text [ a² ]
+...
+[op3] @(70, 370) {$code, w=740px, size=26px, pad=6px} ```
+local.get $var1
+```
+!anim explain text Push the second parameter.
+!anim stack text [ a², b ]
+...
+[op4] @(70, 430) {$code, w=740px, size=26px, pad=6px} ```
+local.get $var1
+```
+!anim explain text Push the second parameter again.
+!anim stack text [ a², b, b ]
+...
+[op5] @(70, 490) {$code, w=740px, size=26px, pad=6px} ```
+f64.mul
+```
+!anim explain text Pop two values, multiply, then push the product.
+!anim stack text [ a², b² ]
+---
+% PowerPoint slides 7–10.
+### Flat and Folded WAT
+[v0] @(70, 170) {$code, w=740px, size=23px} ```
+(module
+  (func $Fun1
+    (param $var0 f64) (param $var1 f64)
+    (result f64)
+    (f64.mul (local.get $var0) (local.get $var0))
+    local.get $var1
+    local.get $var1
+    f64.mul
+  )
+  (export "CalcHypotenuse" (func $Fun1))
+)
+```
+[explain] @(850, 195) {$note, w=345px, size=27px, color=explain} Fold the first multiplication around its two operands.
+...
+!anim v0 hide 0.15s
+!anim explain text Fold the second multiplication in the same way.
+[v1] @(70, 170) {$code, w=740px, size=23px} ```
+(module
+  (func $Fun1
+    (param $var0 f64) (param $var1 f64)
+    (result f64)
+    (f64.mul (local.get $var0) (local.get $var0))
+    (f64.mul (local.get $var1) (local.get $var1))
+  )
+  (export "CalcHypotenuse" (func $Fun1))
+)
+```
+...
+!anim v1 hide 0.15s
+!anim explain text Add the two squared values.
+[v2] @(70, 170) {$code, w=740px, size=23px} ```
+(module
+  (func $Fun1
+    (param $var0 f64) (param $var1 f64)
+    (result f64)
+    (f64.mul (local.get $var0) (local.get $var0))
+    (f64.mul (local.get $var1) (local.get $var1))
+    f64.add
+  )
+  (export "CalcHypotenuse" (func $Fun1))
+)
+```
+...
+!anim v2 hide 0.15s
+!anim explain text Take the square root to obtain the hypotenuse.
+[v3] @(70, 170) {$code, w=740px, size=23px} ```
+(module
+  (func $Fun1
+    (param $var0 f64) (param $var1 f64)
+    (result f64)
+    (f64.mul (local.get $var0) (local.get $var0))
+    (f64.mul (local.get $var1) (local.get $var1))
+    f64.add
+    f64.sqrt
+  )
+  (export "CalcHypotenuse" (func $Fun1))
+)
+```
+[formula] @(850, 455) {$note, w=345px, size=40px, color=emp} √(a² + b²)
+{color=emp} !line (0.684, 0.635) (0.795, 0.635)
+...
+!anim v3 hide 0.15s
+!anim explain text Nest the addition inside the square root. The evaluation order is unchanged.
+[v4] @(70, 170) {$code, w=740px, size=22px} ```
+(module
+  (func $Fun1
+    (param $var0 f64) (param $var1 f64)
+    (result f64)
+    (f64.sqrt
+      (f64.add
+        (f64.mul (local.get $var0) (local.get $var0))
+        (f64.mul (local.get $var1) (local.get $var1))
+      )
+    )
+  )
+  (export "CalcHypotenuse" (func $Fun1))
+)
+```
+---
+### Parsing a Function Signature
+[source] @(70, 135) {$code, w=1140px, size=23px} ```
+function CalcHypotenuse(double sideA, double sideB) : double {
+  double c_sqr = sideA * sideA + sideB * sideB;
+  return sqrt(c_sqr);
+}
+```
+[grammar] @(70, 310) {$code, w=755px, size=23px} ```
+FUNCTION → 'function' ID '(' PARAMS ')'
+           ':' TYPE '{' BLOCK '}'
+```
+[symtitle] @(865, 310) {$note, w=330px, size=28px, color=emp} **Symbol Table**
+[explain] @(70, 595) {$note, w=755px, size=26px, color=explain} Recognize the function keyword.
+[cursor] {color=focus, thick=3, fill=none, round=0} !rect (82,146) (114,33)
+...
+!anim cursor hide 0s
+[cursor1] {color=focus, thick=3, fill=none, round=0} !rect (207,146) (195,33)
+!anim explain text Record the function name.
+[symfun] @(865, 362) {$note, w=330px, size=23px} {{color=id|CalcHypotenuse}} : {{color=focus|function}}
+...
+!anim cursor1 hide 0s
+[cursor2] {color=focus, thick=3, fill=none, round=0} !rect (402,146) (14,33)
+!anim explain text Consume '(', then parse the parameter list.
+[params] @(70, 420) {$code, w=755px, size=23px} ```
+PARAMS → ε | TYPE ID EXTRA_PS
+EXTRA_PS → ε | ',' TYPE ID EXTRA_PS
+```
+...
+!anim cursor2 hide 0s
+[cursor3] {color=focus, thick=3, fill=none, round=0} !rect (416,146) (167,33)
+[symA] @(865, 465) {$note, w=330px, size=23px} {{color=id|sideA}} : {{color=focus|double}} (id: 0)
+!anim explain text Allocate symbol 0 for sideA.
+...
+[symparams] @(885, 395) {$note, w=330px, size=23px} params: 0
+!anim explain text Add parameter 0 to the function’s ordered parameter list.
+...
+!anim cursor3 hide 0s
+[cursor4] {color=focus, thick=3, fill=none, round=0} !rect (582,146) (28,33)
+!anim explain text The comma selects another TYPE ID pair.
+...
+!anim cursor4 hide 0s
+[cursor5] {color=focus, thick=3, fill=none, round=0} !rect (610,146) (167,33)
+[symB] @(865, 502) {$note, w=330px, size=23px} {{color=id|sideB}} : {{color=focus|double}} (id: 1)
+!anim symparams text params: 0, 1
+!anim explain text Allocate symbol 1 for sideB and append it to the parameter list.
+...
+!anim cursor5 hide 0s
+[cursor6] {color=focus, thick=3, fill=none, round=0} !rect (776,146) (42,33)
+!anim params hide 0.15s
+!anim explain text End the parameter list with ε. Consume ')' and ':'.
+...
+!anim cursor6 hide 0s
+[cursor7] {color=focus, thick=3, fill=none, round=0} !rect (825,146) (95,33)
+[symret] @(885, 425) {$note, w=330px, size=23px} return type: {{color=focus|double}}
+!anim explain text Record double as the return type.
+...
+!anim cursor7 hide 0s
+[cursor8] {color=focus, thick=3, fill=none, round=0} !rect (925,146) (20,33)
+!anim explain text Consume '{' and begin parsing the function body.
+---
+% PowerPoint slides 24–31.
+### Parsing the Local Declaration
+[source] @(70, 135) {$code, w=1140px, size=23px} ```
+function CalcHypotenuse(double sideA, double sideB) : double {
+  double c_sqr = sideA * sideA + sideB * sideB;
+  return sqrt(c_sqr);
+}
+```
+[symtitle] @(865, 310) {$note, w=330px, size=28px, color=emp} **Symbol Table**
+[symfun] @(865, 362) {$note, w=330px, size=23px} {{color=id|CalcHypotenuse}} : {{color=focus|function}}
+[symparams] @(885, 395) {$note, w=330px, size=23px} params: 0, 1
+[symret] @(885, 425) {$note, w=330px, size=23px} return type: {{color=focus|double}}
+[symA] @(865, 465) {$note, w=330px, size=23px} {{color=id|sideA}} : {{color=focus|double}} (id: 0)
+[symB] @(865, 502) {$note, w=330px, size=23px} {{color=id|sideB}} : {{color=focus|double}} (id: 1)
+[g1] @(70, 310) {$code, w=755px, size=23px, pad=6px} ```
+BLOCK → ε | STATEMENT BLOCK
+```
+...
+[g2] @(70, 375) {$code, w=755px, size=23px, pad=6px} ```
+STATEMENT → ';' | DECLARATION ';' | …
+```
+...
+[g3] @(70, 440) {$code, w=755px, size=23px, pad=6px} ```
+DECLARATION → TYPE ID ('=' EXPR)?
+```
+...
+[cursor] {color=focus, thick=3, fill=none, round=0} !rect (106,179) (90,33)
+[explain] @(70, 590) {$note, w=755px, size=26px, color=explain} Read the declaration type: double.
+...
+!anim cursor hide 0s
+[cursor1] {color=focus, thick=3, fill=none, round=0} !rect (207,179) (69,33)
+!anim explain text Allocate symbol 2 for the local variable c_sqr.
+[symC] @(865, 539) {$note, w=330px, size=23px} {{color=id|c_sqr}} : {{color=focus|double}} (id: 2)
+...
+!anim cursor1 hide 0s
+[cursor2] {color=focus, thick=3, fill=none, round=0} !rect (287,179) (20,33)
+!anim explain text The '=' starts an initializer expression.
+...
+!anim cursor2 hide 0s
+[cursor3] {color=focus, thick=3, fill=none, round=0} !rect (315,179) (410,33)
+[g4] @(70, 505) {$code, w=755px, size=23px, pad=6px} ```
+EXPR → …
+```
+!anim explain text Parse `sideA * sideA + sideB * sideB` with precedence.
+---
+% PowerPoint slides 32–41.
+### Building the Abstract Syntax Tree
+[source] @(70, 135) {$code, w=1140px, size=23px} ```
+function CalcHypotenuse(double sideA, double sideB) : double {
+  double c_sqr = sideA * sideA + sideB * sideB;
+  return sqrt(c_sqr);
+}
+```
+[symtitle] @(865, 310) {$note, w=330px, size=28px, color=emp} **Symbol Table**
+[symfun] @(865, 362) {$note, w=330px, size=23px} {{color=id|CalcHypotenuse}} : {{color=focus|function}}
+[symparams] @(885, 395) {$note, w=330px, size=23px} params: 0, 1
+[symret] @(885, 425) {$note, w=330px, size=23px} return type: {{color=focus|double}}
+[symA] @(865, 465) {$note, w=330px, size=23px} {{color=id|sideA}} : {{color=focus|double}} (id: 0)
+[symB] @(865, 502) {$note, w=330px, size=23px} {{color=id|sideB}} : {{color=focus|double}} (id: 1)
+[symC] @(865, 539) {$note, w=330px, size=23px} {{color=id|c_sqr}} : {{color=focus|double}} (id: 2)
+[explain] @(70, 655) {$note, w=1120px, size=25px, color=explain} Create the function node and its assignment statement.
+[fn] {$node} !rect (250.0,307) (160,46) Function:0
+...
+[e_assign] {$edge} !line (330,353) (200,372)
+[assign] {$node} !rect (167.5,372) (65,46) =
+...
+[e_dest] {$edge} !line (200,418) (95,437)
+[dest] {$node} !rect (54.0,437) (82,46) Var:2
+...
+[e_plus] {$edge} !line (200,418) (275,437)
+[plus] {$node} !rect (242.5,437) (65,46) +
+...
+[e_mulA] {$edge} !line (275,483) (195,502)
+[mulA] {$node} !rect (162.5,502) (65,46) *
+...
+[e_a1] {$edge} !line (195,548) (145,577)
+[a1] {$node} !rect (104.0,577) (82,46) Var:0
+...
+[e_a2] {$edge} !line (195,548) (235,577)
+[a2] {$node} !rect (194.0,577) (82,46) Var:0
+!anim explain text The first product reads sideA twice. Each reference points to symbol 0.
+...
+!anim explain text The addition combines the two products.
+!anim plus stroke focus 0.2s
+...
+[e_mulB] {$edge} !line (275,483) (365,502)
+[mulB] {$node} !rect (332.5,502) (65,46) *
+...
+[e_b1] {$edge} !line (365,548) (325,577)
+[b1] {$node} !rect (284.0,577) (82,46) Var:1
+[e_b2] {$edge} !line (365,548) (415,577)
+[b2] {$node} !rect (374.0,577) (82,46) Var:1
+!anim explain text The second product reads sideB twice, using symbol 1.
+...
+[semicolon] @(850, 620) {$note, w=345px, size=23px, color=emp} The semicolon ends the declaration statement.
+...
+[e_ret] {$edge} !line (330,353) (585,372)
+[ret] {$node} !rect (535.0,372) (100,46) return
+...
+[e_sqrt] {$edge} !line (585,418) (585,442)
+[sqrt] {$node} !rect (540.0,442) (90,46) sqrt
+...
+[e_value] {$edge} !line (585,488) (585,517)
+[value] {$node} !rect (544.0,517) (82,46) Var:2
+!anim explain text Add return → sqrt → Var:2 for return sqrt(c_sqr).
+...
+!anim semicolon text The closing brace ends the function body.
+---
+% PowerPoint slides 42–52.
+### Generating the Function Header
+[symtitle] @(70, 170) {$note, w=330px, size=28px, color=emp} **Symbol Table**
+[symfun] @(70, 222) {$note, w=330px, size=23px} {{color=id|CalcHypotenuse}} : {{color=focus|function}}
+[symparams] @(90, 255) {$note, w=330px, size=23px} params: 0, 1
+[symret] @(90, 285) {$note, w=330px, size=23px} return type: {{color=focus|double}}
+[symA] @(70, 325) {$note, w=330px, size=23px} {{color=id|sideA}} : {{color=focus|double}} (id: 0)
+[symB] @(70, 362) {$note, w=330px, size=23px} {{color=id|sideB}} : {{color=focus|double}} (id: 1)
+[symC] @(70, 399) {$note, w=330px, size=23px} {{color=id|c_sqr}} : {{color=focus|double}} (id: 2)
+[explain] @(500, 570) {$note, w=710px, size=28px, color=explain} Begin a module.
+[h0] @(500, 170) {$code, w=710px, size=23px, pad=6px} ```
+(module
+```
+...
+!anim explain text Use the function symbol to name the WAT function.
+[h1] @(500, 225) {$code, w=710px, size=23px, pad=6px} ```
+  (func $CalcHypotenuse
+```
+...
+!anim explain text Emit parameters in order. Map double to f64.
+[h2] @(500, 280) {$code, w=710px, size=23px, pad=6px} ```
+    (param $var0 f64) (param $var1 f64)
+```
+...
+!anim explain text Emit the return type as (result f64).
+[h3] @(500, 335) {$code, w=710px, size=23px, pad=6px} ```
+    (result f64)
+```
+...
+!anim explain text Declare the function’s local variables before its instructions.
+[h4] @(500, 390) {$code, w=710px, size=23px, pad=6px} ```
+    ;; Variables
+```
+...
+!anim explain text c_sqr becomes the local $var2. Parameters already occupy indices 0 and 1.
+[h5] @(500, 445) {$code, w=710px, size=23px, pad=6px} ```
+    (local $var2 f64) ;; c_sqr
+```
+---
+### Generating Code from the AST
+[fn] {$node} !rect (224.00000000000003,172.93) (131.2,46) Function:0
+[e_assign] {$edge} !line (289.6,218.93) (183.0,232.07999999999998)
+[assign] {$node} !rect (156.35,232.07999999999998) (53.3,46) =
+[e_dest] {$edge} !line (183.0,278.08) (96.9,291.23)
+[dest] {$node} !rect (63.28000000000001,291.23) (67.24,46) Var:2
+[e_plus] {$edge} !line (183.0,278.08) (244.5,291.23)
+[plus] {$node} !rect (217.85,291.23) (53.3,46) +
+[e_mulA] {$edge} !line (244.5,337.23) (178.89999999999998,350.38)
+[mulA] {$node} !rect (152.24999999999997,350.38) (53.3,46) *
+[e_mulB] {$edge} !line (244.5,337.23) (318.3,350.38)
+[mulB] {$node} !rect (291.65000000000003,350.38) (53.3,46) *
+[e_a1] {$edge} !line (178.89999999999998,396.38) (137.89999999999998,418.63)
+[a1] {$node} !rect (104.27999999999997,418.63) (67.24,46) Var:0
+[e_a2] {$edge} !line (178.89999999999998,396.38) (211.7,418.63)
+[a2] {$node} !rect (178.07999999999998,418.63) (67.24,46) Var:0
+[e_b1] {$edge} !line (318.3,396.38) (285.5,418.63)
+[b1] {$node} !rect (251.88,418.63) (67.24,46) Var:1
+[e_b2] {$edge} !line (318.3,396.38) (359.29999999999995,418.63)
+[b2] {$node} !rect (325.67999999999995,418.63) (67.24,46) Var:1
+[e_ret] {$edge} !line (289.6,218.93) (498.7,232.07999999999998)
+[ret] {$node} !rect (457.7,232.07999999999998) (82.0,46) return
+[e_sqrt] {$edge} !line (498.7,278.08) (498.7,295.78)
+[sqrt] {$node} !rect (461.8,295.78) (73.8,46) sqrt
+[e_value] {$edge} !line (498.7,341.78) (498.7,364.03)
+[value] {$node} !rect (465.08,364.03) (67.24,46) Var:2
+[symbols] @(65, 500) {$note, w=475px, size=23px} {{color=id|sideA}} (id: 0) · {{color=id|sideB}} (id: 1) · {{color=id|c_sqr}} (id: 2)
+...
+!anim dest fill focus 0.2s
+!anim dest textcolor #08111F 0.2s
+[explain] @(65, 550) {$note, w=465px, size=26px, color=explain} Assignment: remember destination 2, then generate its right-hand expression.
+[destnote] @(65, 645) {$note, w=460px, size=25px, color=emp} Destination: 2
+...
+[context] @(560, 140) {$note, w=650px, size=22px, color=id} Body of $CalcHypotenuse; $var2 is declared as f64.
+...
+!anim dest fill done 0.2s
+!anim a1 fill focus 0.2s
+!anim a1 textcolor #08111F 0.2s
+[emit0] @(560, 181) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(local.get $var0)
+```
+!anim explain text Read sideA and push its value.
+!anim destnote hide 0.15s
+...
+!anim a1 fill done 0.2s
+!anim a1 textcolor #08111F 0.2s
+!anim a1 stroke id 0.2s
+!anim a2 fill focus 0.2s
+!anim a2 textcolor #08111F 0.2s
+[emit1] @(560, 215) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(local.get $var0)
+```
+!anim explain text Read sideA again.
+...
+!anim a2 fill done 0.2s
+!anim a2 textcolor #08111F 0.2s
+!anim a2 stroke id 0.2s
+!anim mulA fill focus 0.2s
+!anim mulA textcolor #08111F 0.2s
+[emit2] @(560, 249) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(f64.mul)
+```
+!anim explain text Emit multiply after visiting both children.
+...
+!anim mulA fill done 0.2s
+!anim mulA textcolor #08111F 0.2s
+!anim mulA stroke id 0.2s
+!anim b1 fill focus 0.2s
+!anim b1 textcolor #08111F 0.2s
+[emit3] @(560, 283) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(local.get $var1)
+```
+!anim explain text Read sideB and push its value.
+...
+!anim b1 fill done 0.2s
+!anim b1 textcolor #08111F 0.2s
+!anim b1 stroke id 0.2s
+!anim b2 fill focus 0.2s
+!anim b2 textcolor #08111F 0.2s
+[emit4] @(560, 317) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(local.get $var1)
+```
+!anim explain text Read sideB again.
+...
+!anim b2 fill done 0.2s
+!anim b2 textcolor #08111F 0.2s
+!anim b2 stroke id 0.2s
+!anim mulB fill focus 0.2s
+!anim mulB textcolor #08111F 0.2s
+[emit5] @(560, 351) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(f64.mul)
+```
+!anim explain text Multiply the second pair.
+...
+!anim mulB fill done 0.2s
+!anim mulB textcolor #08111F 0.2s
+!anim mulB stroke id 0.2s
+!anim plus fill focus 0.2s
+!anim plus textcolor #08111F 0.2s
+[emit6] @(560, 385) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(f64.add)
+```
+!anim explain text Add the two products.
+...
+!anim plus fill done 0.2s
+!anim plus textcolor #08111F 0.2s
+!anim plus stroke id 0.2s
+!anim assign fill focus 0.2s
+!anim assign textcolor #08111F 0.2s
+[emit7] @(560, 419) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(local.set $var2)
+```
+!anim explain text Store the result in c_sqr. local.set consumes it.
+...
+!anim assign fill done 0.2s
+!anim assign textcolor #08111F 0.2s
+!anim assign stroke id 0.2s
+!anim assign fill focus 0.2s
+!anim assign textcolor #08111F 0.2s
+[emit8] @(560, 453) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(local.get $var2)
+```
+!anim explain text Assignment is an expression here: put its value back on the stack.
+...
+!anim assign fill done 0.2s
+!anim assign textcolor #08111F 0.2s
+!anim assign stroke id 0.2s
+!anim fn fill focus 0.2s
+!anim fn textcolor #08111F 0.2s
+[emit9] @(560, 487) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(drop)
+```
+!anim explain text This statement does not use the assignment value. Drop it.
+...
+!anim fn fill done 0.2s
+!anim fn textcolor #08111F 0.2s
+!anim fn stroke id 0.2s
+!anim value fill focus 0.2s
+!anim value textcolor #08111F 0.2s
+[emit10] @(560, 521) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(local.get $var2)
+```
+!anim explain text The return expression reads c_sqr.
+...
+!anim value fill done 0.2s
+!anim value textcolor #08111F 0.2s
+!anim value stroke id 0.2s
+!anim sqrt fill focus 0.2s
+!anim sqrt textcolor #08111F 0.2s
+[emit11] @(560, 555) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(f64.sqrt)
+```
+!anim explain text Compute its square root.
+...
+!anim sqrt fill done 0.2s
+!anim sqrt textcolor #08111F 0.2s
+!anim sqrt stroke id 0.2s
+!anim ret fill focus 0.2s
+!anim ret textcolor #08111F 0.2s
+[emit12] @(560, 589) {$code, w=650px, size=21px, pad=0px, thick=0px, round=0px} ```
+(return)
+```
+!anim explain text Return the f64 value to the caller.
+...
+!anim explain text Close the function, export CalcHypotenuse, then close the module.
+[close] @(530, 630) {$note, w=650px, size=20px, color=emp} &nbsp;&nbsp;&nbsp;&nbsp;) ;; End function{{br}}&nbsp;&nbsp;&nbsp;&nbsp;(export "CalcHypotenuse" (func $CalcHypotenuse)){{br}}) ;; End module
+---
+% PowerPoint slides 80; revisited in 88.
+### The Generated WAT Program
+[full] @(70, 150) {$code, w=765px, size=18px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local $var2 f64)       ;; c_sqr
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (local.set $var2)
+    (local.get $var2)       ;; Assignment result
+    (drop)                ;; Unused by statement
+    (local.get $var2)
+    (f64.sqrt)
+    (return)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+[explain] @(870, 180) {$note, w=330px, size=27px, color=explain} Each operator follows its operands in the emitted instruction stream.
+...
+[assign] @(870, 335) {$note, w=330px, size=27px, color=explain} The assignment leaves a value. The enclosing statement discards it.
+...
+[implicit] @(870, 495) {$note, w=330px, size=25px, color=explain} At the function’s end, the final f64 can also be returned implicitly. The later source examples omit `(return)`.
+---
+### How Do I Run This WAT Code?
+[s1] @(84, 175) {$note, w=1112px, size=32px} **1. Convert WAT to Wasm.**
+[command] @(84, 250) {$code, w=1112px, size=28px, pad=6px} ```bash
+wat2wasm hypotenuse.wat -o hypotenuse.wasm
+```
+...
+[s2] @(84, 365) {$note, w=1112px, size=32px} **2. Write an HTML file that loads the Wasm module.**
+...
+[s3] @(84, 470) {$note, w=1112px, size=32px} **3. Serve the files and open the HTML page in a browser.**
+[serve] @(84, 550) {$note, w=1112px, size=27px, color=emp} Use an HTTP server so fetch can load hypotenuse.wasm.
+---
+### Loading Wasm in JavaScript
+[fetch] @(70, 180) {$code, w=760px, size=23px, pad=6px} ```javascript
+fetch('hypotenuse.wasm');
+```
+[explain] @(870, 180) {$note, w=330px, size=27px, color=explain} fetch starts the request and returns a Promise.
+...
+!anim fetch hide 0.15s
+[await] @(70, 180) {$code, w=760px, size=23px, pad=6px} ```javascript
+await fetch('hypotenuse.wasm');
+```
+!anim explain text await waits for the response inside an async function.
+...
+!anim await hide 0.15s
+[js0] @(70, 180) {$code, w=760px, size=21px, pad=6px} ```javascript
+const wasm_file = await fetch('hypotenuse.wasm');
+```
+!anim explain text Keep the response object.
+...
+[js1] @(70, 235) {$code, w=760px, size=21px, pad=6px} ```javascript
+const buffer = await wasm_file.arrayBuffer();
+```
+!anim explain text Read the response body as binary bytes.
+...
+[js2] @(70, 290) {$code, w=760px, size=21px, pad=6px} ```javascript
+const module = await WebAssembly.instantiate(buffer);
+```
+!anim explain text Compile and instantiate the Wasm module.
+...
+[js3] @(70, 345) {$code, w=760px, size=21px, pad=6px} ```javascript
+const { CalcHypotenuse } = module.instance.exports;
+```
+!anim explain text Get the exported function by name.
+...
+[js4] @(70, 400) {$code, w=760px, size=21px, pad=6px} ```javascript
+const x = 3.0; const y = 4.0;
+```
+!anim explain text Choose the two side lengths.
+...
+[js5] @(70, 455) {$code, w=760px, size=21px, pad=6px} ```javascript
+const result = CalcHypotenuse(x, y);
+```
+!anim explain text Call the exported function just like a JavaScript function.
+...
+[js6] @(70, 510) {$code, w=760px, size=21px, pad=6px} ```javascript
+console.log('Side1 = ' + x + '; Side2 = ' + y);
+```
+!anim explain text Print the inputs.
+...
+[js7] @(70, 565) {$code, w=760px, size=21px, pad=6px} ```javascript
+console.log('hypot = ' + result);
+```
+!anim explain text The hypotenuse is 5.
+---
+% PowerPoint slides 85–87.
+### Putting the Code in an HTML Script
+[async] @(70, 170) {$code, w=820px, size=21px} ```javascript
+async function run_program() {
+  const wasm_file = await fetch('hypotenuse.wasm');
+  const buffer = await wasm_file.arrayBuffer();
+  const module = await WebAssembly.instantiate(buffer);
+  const { CalcHypotenuse } = module.instance.exports;
+
+  const x = 3.0; const y = 4.0;
+  const result = CalcHypotenuse(x, y);
+  console.log('Side1 = ' + x + '; Side2 = ' + y);
+  console.log('hypot = ' + result);
+}
+run_program();
+```
+[explain] @(925, 185) {$note, w=285px, size=27px, color=explain} Wrap the awaits in an async function, then call it.
+...
+!anim async hide 0.15s
+[html] @(70, 170) {$code, w=820px, size=21px} ```html
+<script>
+  async function run_program() {
+    const wasm_file = await fetch('hypotenuse.wasm');
+    const buffer = await wasm_file.arrayBuffer();
+    const module = await WebAssembly.instantiate(buffer);
+    const { CalcHypotenuse } = module.instance.exports;
+  
+    const x = 3.0; const y = 4.0;
+    const result = CalcHypotenuse(x, y);
+    console.log('Side1 = ' + x + '; Side2 = ' + y);
+    console.log('hypot = ' + result);
+  }
+  run_program();
+</script>
+```
+!anim explain text Place the JavaScript inside an HTML script element.
+...
+!anim html hide 0.15s
+[page] @(70, 170) {$code, w=820px, size=21px} ```html
+<script>
+  async function run_program() {
+    const wasm_file = await fetch('hypotenuse.wasm');
+    const buffer = await wasm_file.arrayBuffer();
+    const module = await WebAssembly.instantiate(buffer);
+    const { CalcHypotenuse } = module.instance.exports;
+  
+    const x = 3.0; const y = 4.0;
+    const result = CalcHypotenuse(x, y);
+    document.body.innerHTML =
+      `<p>Side1=${x}; Side2=${y}; Hypotenuse=${result}</p>`;
+  }
+  run_program();
+</script>
+```
+!anim explain text Or display the result in the page body.
+[result] @(925, 410) {$note, w=285px, size=26px, color=emp} Side1=3; Side2=4; Hypotenuse=5
+---
+% PowerPoint slides 88–96.
+### Removing Redundant Instructions
+[opt0] @(70, 150) {$code, w=765px, size=19px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local $var2 f64)       ;; c_sqr
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (local.set $var2)
+    (local.get $var2)       ;; Assignment result
+    (drop)                ;; Unused by statement
+    (local.get $var2)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+[explain] @(870, 175) {$note, w=330px, size=26px, color=explain} Start with the generated program. At the end of this function, the result can be returned implicitly.
+...
+[h1] {color=focus, thick=3, fill=none, round=0} !rect (75,481.2) (755,26.599999999999998)
+[h2] {color=focus, thick=3, fill=none, round=0} !rect (75,507.79999999999995) (755,26.599999999999998)
+!anim explain text This get immediately followed by drop has no effect.
+...
+!anim h1 hide 0.15s
+!anim h2 hide 0.15s
+!anim opt0 hide 0.15s
+[opt1] @(70, 150) {$code, w=765px, size=19px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local $var2 f64)       ;; c_sqr
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (local.set $var2)
+    (local.get $var2)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+!anim explain text Remove the unused assignment value and its drop.
+...
+[h3] {color=focus, thick=3, fill=none, round=0} !rect (75,454.59999999999997) (755,53.199999999999996)
+!anim explain text The remaining set/get pair stores the sum, then immediately reloads it. Here, c_sqr has no later uses.
+...
+!anim h3 hide 0.15s
+!anim opt1 hide 0.15s
+[opt2] @(70, 150) {$code, w=765px, size=19px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local $var2 f64)       ;; c_sqr
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+!anim explain text Keep the sum on the stack for f64.sqrt and remove the set/get pair.
+...
+[h4] {color=focus, thick=3, fill=none, round=0} !rect (75,241.8) (755,26.599999999999998)
+!anim explain text Now $var2 is unused, so its local declaration can be removed.
+...
+!anim h4 hide 0.15s
+!anim opt2 hide 0.15s
+[opt3] @(70, 150) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+!anim explain text The result is a compact sequence of stack instructions.
+[format] @(870, 440) {$note, w=330px, size=26px, color=emp} Other WAT formats can make the same computation easier to read.
+---
+### Folding the Optimized Program
+[fold0] @(70, 150) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (local.get $var0)
+    (local.get $var0)
+    (f64.mul)
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+!anim fold0 hide 0.15s
+[explain] @(850, 185) {$note, w=345px, size=27px, color=explain} Fold the first product.
+[fold1] @(70, 170) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (f64.mul (local.get $var0) (local.get $var0))
+    (local.get $var1)
+    (local.get $var1)
+    (f64.mul)
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+!anim fold1 hide 0.15s
+!anim explain text Fold the second product.
+[fold2] @(70, 170) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (f64.mul (local.get $var0) (local.get $var0))
+    (f64.mul (local.get $var1) (local.get $var1))
+    (f64.add)
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+!anim fold2 hide 0.15s
+!anim explain text Fold the addition around the two products.
+[fold3] @(70, 170) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (f64.add
+      (f64.mul (local.get $var0) (local.get $var0))
+      (f64.mul (local.get $var1) (local.get $var1))
+    )
+    (f64.sqrt)
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+!anim fold3 hide 0.15s
+!anim explain text Fold the square root around the addition.
+[fold4] @(70, 170) {$code, w=765px, size=23px} ```
+(module
+  (func $CalcHypotenuse
+    (param $var0 f64) (param $var1 f64) (result f64)
+    (f64.sqrt
+      (f64.add
+        (f64.mul (local.get $var0) (local.get $var0))
+        (f64.mul (local.get $var1) (local.get $var1))
+      )
+    )
+  )
+  (export "CalcHypotenuse" (func $CalcHypotenuse))
+)
+```
+...
+[equiv] @(850, 410) {$note, w=345px, size=27px, color=emp} The folded and flat forms perform the same operations in the same order.
+---
+% PowerPoint slides 105.
+### Structure of a Compiler
+[stage0] {$node, size=25px, fill=#612245} !rect (440,146) (420,44) Source Language
+[stage1] {$node, size=25px, fill=#173749} !rect (440,210) (420,44) Lexical Analyzer
+[link1] {$edge} !arrow (650,190) (650,210)
+[stage2] {$node, size=25px, fill=#173749} !rect (440,266) (420,44) Syntax Analyzer
+[link2] {$edge} !arrow (650,254) (650,266)
+[stage3] {$node, size=25px, fill=#173749} !rect (440,322) (420,44) Semantic Analyzer
+[link3] {$edge} !arrow (650,310) (650,322)
+[stage4] {$node, size=25px, fill=#173749} !rect (440,378) (420,44) Int. Code Generator
+[link4] {$edge} !arrow (650,366) (650,378)
+[stage5] {$node, size=25px, fill=#654614} !rect (440,448) (420,44) Intermediate Code
+[link5] {$edge} !arrow (650,422) (650,448)
+[stage6] {$node, size=25px, fill=#173749} !rect (440,518) (420,44) Code Optimizer
+[link6] {$edge} !arrow (650,492) (650,518)
+[stage7] {$node, size=25px, fill=#173749} !rect (440,574) (420,44) Target Code Generator
+[link7] {$edge} !arrow (650,562) (650,574)
+[stage8] {$node, size=25px, fill=#1B5439} !rect (440,644) (420,44) Target Language
+[link8] {$edge} !arrow (650,618) (650,644)
+[front] @(925, 286) {$note, w=270px, size=32px} **Front End**
+[back] @(925, 540) {$note, w=270px, size=32px} **Back End**
+[frontbrace] {color=id, thick=3} !polyline (420,210) (400,210) (400,422) (420,422)
+[backbrace] {color=id, thick=3} !polyline (420,518) (400,518) (400,618) (420,618)
