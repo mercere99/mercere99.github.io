@@ -1,0 +1,149 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #CCCCFF
+!set visitedlinkcolor #CCCCFF
+!set size 30
+!set palette focus #FFD166
+!set palette id #8CD9FF
+!set palette emph #80FF80
+!set palette explain #DF97FF
+!style note {size=28px, w=1140px}
+!style code {font=Menlo, size=24px, w=750px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+# Curriculum Committee
+## October 30,2026
+---
+### Topics
+CurrComm has been busy!
+...
+- CSE 103 and CSE 104 at EUSC
+...
+- Updates to Computer Engineering degree
+...
+- Proposal to change Prerequisites for CSE 498
+...
+- Proposal Summary for B.S. in Artificial Intelligence
+...
+- Upcoming items...
+---
+!style course {size=24px, w=800px, color=#D0FFFF}
+!style newreq {size=24px, w=800px, color=#80FF80}
+!style oldreq {size=24px, w=800px, color=red}
+
+### Proposal to change Prerequisites for CSE 498
+...
+@(100,180) **Current Prerequisites**
+@(100,220) {$course} CSE 300: CS Ethics
+@(100,260) {$course} CSE 320: Architecture
+@(100,300) {$course} CSE 325: Systems
+@(100,340) {$course} CSE 335: Software Eng. I
+@(100,380) {$course} CSE 380: Data + Cloud
+@(100,420) {$course} Any TWO 400-level courses
+...
+@(650,180) **Proposed Prerequisites**
+@(650,220) {$course} CSE 300: CS Ethics
+@(650,260) {$course} CSE 320: Architecture
+@(650,300) {$course} CSE 325: Systems
+@(650,340) {$newreq} CSE 331: Algorithms + DS
+@(650,380) {$course} CSE 335: Software Eng. I
+@(650,420) {$newreq} CSE 336: Software Eng. II
+@(650,460) {$newreq} CSE 345: Foundations of AI
+@(650,500) {$course} CSE 380: Data + Cloud
+@(650,540) {$oldreq} ~~Any TWO 400-level courses~~
+
+---
+### Proposal Summary for Bachelors in AI
+!style course {size=24px, w=800px, color=#D0FFFF}
+!style aicourse {size=24px, w=800px, color=#80FF80}
+!style newcourse {size=24px, w=800px, color=#FF80FF}
+...
+[:both,l2,col1] @(50,180) {$course} CSE 231: Python
+[:both,l2,col1] @(50,220) {$course} CSE 232: C++
+[:both,l2,col1] @(50,260) {$course} CSE 235: Tools, Teamwork, Time
+[:both,l2,col1] @(50,300) {$course} CSE 260: Discrete Math
+...
+[:both,col2] @(480,180) {$course} CSE 300: CS Ethics
+[c320:cse,col2] @(480,220) {$course} CSE 320: Architecture
+[:cse,l3,col2]  @(480,260) {$course} CSE 325: Systems
+[:both,l3,col2] @(480,300) {$course} CSE 331: Algorithms + DS
+[:both,l3,col2] @(480,340) {$course} CSE 335: Software Eng. I
+[:both,l3,col2] @(480,380) {$course} CSE 336: Software Eng. II
+[:both,l3,col2] @(480,420) {$course} CSE 345: Foundations of AI
+[:both,l3,col2] @(480,460) {$course} CSE 380: Data + Cloud
+[:both,l3,col2] @(480,500) {$course} MTH 314: Matrix Algebra
+[:cse,l3,col2]  @(480,540) {$course} STT 351: Prob + Stats
+...
+[:cse,col3] @(900,180) {$course} Five CSE technical electives
+[c498:cse,col3] @(900,220) {$course} CSE 498: CS Capstone
+...
+!anim @cse textcolor red 1.0s
+!anim @cse textstyle strike=on
+
+...
+!anim @l2 move (50,240) 1.0s
+>>>
+[:ai,col1] @(50,180) {$aicourse} STT 180: Intro to Data Science
+...
+[:ai,l3,col2] @(480,580) {$aicourse} STT 380: Prob+Stats for Data Sci.
+...
+!anim c498 move (900,260) 1.0s
+>>>
+[:ai,col3] @(900,220) {$aicourse} CSE 404: Intro. Machine Learning
+...
+[:ai,oneof,col3] @(900,320) {w=800} **One of**:
+...
+[:ai,oneof,col3] @(900,360) {$aicourse} LIN 463: Intro Cog Science
+[:ai,oneof,col3] @(900,400) {$aicourse} NEU 300: Neurobiology
+[:ai,oneof,col3] @(900,440) {$aicourse} PHL 462: Philosophy of Mind
+...
+!anim c320 move (480,260) 1.0s
+!anim @l3 move (480,340) 1.0s
+>>>
+[:ai,col2] @(480,220) {$newcourse} CSE 301: AI Ethics
+[:ai,col2] @(480,300) {$newcourse} CSE 322: Embedded AI
+...
+!anim c498 move (900,340) 1.0s
+!anim @oneof move (900,400) 1.0s
+>>>
+[:ai,col3] @(900,260) {$newcourse} CSE 405: Deep Learning
+...
+[:ai,col3] @(900,300) {$newcourse} CSE 497: AI Capstone
+...
+!anim @col1 scale 0.65 1.0s
+!anim @col1 move (100,180) 1.0s
+!anim @col2 scale 0.65 1.0s
+!anim @col2 move (100,350) 1.0s
+!anim @col3 scale 0.65 1.0s
+!anim @col3 move (400,180) 1.0s
+>>>
+[:ai] @(700,180) Four AI technical electives
+...
+@(700,220) {$course} CSE 402	Biometrics and Pattern Recognition
+@(700,260) {$course} CSE 434	Autonomous vehicles
+@(700,300) {$course} CSE 435	Req. Analysis + Software Eng. in Practice
+@(700,340) {$course} CSE 440	Artificial Intelligence
+@(700,380) {$course} CSE 446	AI Agents
+@(700,420) {$course} CSE 482	Big Data Analysis
+...
+@(700,460) {$aicourse} STT 465	Bayesian Statistical Methods
+@(700,500) {$aicourse} STT 470	Modern Regression Modeling
+@(700,540) {$aicourse} MTH 483	Mathematical Machine Learning
+...
+@(700,580) {$newcourse} CSE 403	Computer Vision
+@(700,620) {$newcourse} CSE 442	Natural Language Processing
+@(700,660) {$newcourse} CSE 448	Evolutionary Machine Learning
+---
+### Upcoming Items
+CurrComm has a bunch of topics to work on this academic year.
+...
+- ABET Accreditation data collection
+...
+- More prerequisite updates:
+  - Add new courses as prereqs (CSE 235, CSE 336, and CSE 345)
+  - Respond to ECE 280 dropping linear algebra
+...
+- Review course goals for existing CS major
+...
+- Newsletter for students?
