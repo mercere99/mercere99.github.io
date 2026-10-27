@@ -513,6 +513,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!if expr … !else … !endif</td><td>Conditional lines (nestable). Truthy = non-zero number or non-empty string; combine with comparisons, e.g. <code>!if slide_num > 3</code> or <code>!if \${x*2} == 10</code>.</td></tr>
       <tr><td>!import(theme.psl)</td><td>Splice a PSL template into this slide. Use <code>!import("shared files/theme.psl")</code> for spaces. Imports resolve relative to the declaring file; imported images/media/backgrounds use the template folder. Imports may nest but cannot add slides; cycles warn. Template palette declarations join the document palette. Browser imports require reachable URLs (CORS applies); the VS Code extension reads local files.</td></tr>
       <tr><td>[shown text](https://…)<br>[](https://…)</td><td>Inline link, opens in a new tab. Leave the shown text blank to display the URL. Balanced parentheses are allowed inside the URL.</td></tr>
+      <tr><td>~~strikethrough~~</td><td>Strike through text; also supported as <code>{{s|text}}</code>. Combines with bold, italics, links, and other inline markup.</td></tr>
       <tr><td>first line{{br}}second line</td><td>Force a line break without starting a new text item or bullet. Other safe inline controls: <code>{{wbr}}</code>, <code>{{nbsp}}</code>, and <code>{{sub|text}}</code>, <code>{{sup|text}}</code>, <code>{{mark|text}}</code>, <code>{{u|text}}</code>, <code>{{s|text}}</code>, <code>{{small|text}}</code>, <code>{{nobr|text}}</code>.</td></tr>
       <tr><td>{{color=#d33|red text}}<br>{{color=warning|named color}}</td><td>Color part of a line with any CSS color or a document-palette name. Use <b>Insert ▸ Text Color…</b> to apply a color to highlighted editor text.</td></tr>
       <tr><td>Normal {{size=44px|large}} normal</td><td>Change font size within a line. Units may be <code>px</code>, <code>pt</code>, <code>em</code>, <code>rem</code>, or <code>%</code>; a number without a unit means pixels. Other inline markup works inside the resized text.</td></tr>
@@ -604,6 +605,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px s
       <tr><td>!anim @nodes fill white 0.5s<br>!anim @nodes stroke black 0.5s</td><td>Animate <code>fill</code>, <code>stroke</code>, <code>textcolor</code>, <code>opacity</code>, <code>thick</code>, or <code>round</code> across a selection.</td></tr>
       <tr><td>!anim word textsize 54px 0.7s</td><td>Animate font size.</td></tr>
       <tr><td>!anim box text **New label**<br>!anim timer text Remaining: 0.5s</td><td>Instantly replace an element's Markdown text. Everything after <code>text</code> is content, including duration-like text. Works on headings, paragraphs, bullets, and shapes that already contain text.</td></tr>
+      <tr><td>!anim word textstyle strike=on, bold=off<br>!anim @words textstyle italic=on, underline=off<br>!anim word textstyle reset</td><td>Instantly change the whole item's text style. <code>bold</code>, <code>italic</code>, <code>strike</code>, and <code>underline</code> accept <code>on</code>, <code>off</code>, or <code>reset</code>. Off removes existing markup or heading defaults; reset restores the current text's markup and theme defaults. Unspecified styles persist, including through text replacement. Same targets as <code>text</code>; omit duration or use <code>0s</code>. Use text replacement with inline markup to style only part of an item.</td></tr>
       <tr><td>!tag parser remove front_end<br>!tag optimizer add front_end</td><td>Change later tag membership. Put <code>&gt;&gt;&gt;</code> or <code>...</code> between membership changes and dependent animations.</td></tr>
       <tr><td>!anim @nodes front<br>!anim node z 20</td><td>Discrete layering: <code>z</code>, <code>front</code>, <code>back</code>, <code>forward</code>, and <code>backward</code>. Tag selections move as a layer block and retain internal source order.</td></tr>
     </table>
@@ -842,6 +844,7 @@ function inlineMd(s,palette){
   // Protect generated tags as tokens, rather than splitting the text at them:
   // emphasis may surround an inline control, but must never rewrite its attributes.
   const format=t=>renderInlineControls(t,palette).replace(/<[^>]*>/g,keep)
+    .replace(/~~(.+?)~~/g,"<s>$1</s>")
     .replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\*([^*]+)\*/g,"<i>$1</i>");
   h = renderInlineLinks(h,keep,t=>restore(format(t)));
   h = restore(format(h));
@@ -1803,6 +1806,19 @@ function extractPrefixes(line,namedStyles,warnings,whereStr){
 
 function parseAnim(target, verb, argsRaw, warnings, whereStr, vars){
   const bad=msg=>{warnings.push(`${whereStr}: ${msg}`); return null;};
+  if(verb==="textstyle"){
+    const duration=argsRaw.match(/\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+))s\s*$/i);
+    if(duration&&Number(duration[1])!==0) return bad("textstyle is discrete; omit the duration or use 0s");
+    const args=(duration?argsRaw.slice(0,duration.index):argsRaw).trim();
+    if(args==="reset") return {target,verb,dur:0,reset:true};
+    const styles={};
+    for(const part of args.replace(/\s*=\s*/g,"=").split(/\s*[,;]\s*|\s+/)){
+      const m=/^(bold|italic|strike|underline)=(on|off|reset)$/.exec(part);
+      if(!m) return bad("textstyle needs bold, italic, strike, or underline = on, off, or reset (e.g. strike=on, bold=off)");
+      styles[m[1]]=m[2];
+    }
+    return {target,verb,dur:0,styles};
+  }
   if(verb==="text"){
     const content=argsRaw.trim();
     return content ? {target,verb,dur:0,text:content} : bad("text needs replacement content");
@@ -1949,8 +1965,8 @@ function validateSlideAnimations(slide, warnings, slideIndex){
           warnings.push(`${at}: fill animation is not supported for ${subject}`); a.invalid=true;
         }else if(a.verb==="textcolor" && !item.text && ["line","arrow","polyline","curve","chart"].includes(kind)){
           warnings.push(`${at}: textcolor animation needs every element in ${describe(a.target)} to contain text`); a.invalid=true;
-        }else if(a.verb==="text" && !["h1","h2","h3","p","li"].includes(kind) && !item.text){
-          warnings.push(`${at}: text animation needs every element in ${describe(a.target)} to contain editable text`); a.invalid=true;
+        }else if(["text","textstyle"].includes(a.verb) && !["h1","h2","h3","p","li"].includes(kind) && !item.text){
+          warnings.push(`${at}: ${a.verb} animation needs every element in ${describe(a.target)} to contain editable text`); a.invalid=true;
         }else if(a.verb==="round" && !["rect","textbox","code"].includes(kind)){
           warnings.push(`${at}: round animation is not supported for ${subject}`); a.invalid=true;
         }
@@ -2628,7 +2644,34 @@ function itemTextElement(it){
 }
 function replaceItemText(it,text,render){
   const target=itemTextElement(it); if(!target) return false;
-  target.innerHTML=inlineMd(text,render.palette); it.currentText=text; return true;
+  target.innerHTML=inlineMd(text,render.palette); it.currentText=text;
+  applyItemTextStyle(it,target); return true;
+}
+// Overrides belong to the rendered item, so replay starts from the source and
+// later text replacements keep the styles selected in earlier phases.
+function applyItemTextStyle(it,target){
+  if(!it.textStyles) return;
+  const tags={bold:"b,strong",italic:"i,em",strike:"s,del",underline:"u"};
+  it.textStyleBase??={fontWeight:target.style.fontWeight,fontStyle:target.style.fontStyle};
+  target.style.fontWeight=it.textStyleBase.fontWeight;
+  target.style.fontStyle=it.textStyleBase.fontStyle;
+  for(const [name,value] of Object.entries(it.textStyles)){
+    // Strip only the selected semantic markup; preserve colors, links, code,
+    // and KaTeX's internal structure when changing surrounding prose.
+    for(const node of target.querySelectorAll(tags[name])){
+      if(!node.closest(".katex,code")) node.replaceWith(...node.childNodes);
+    }
+    if(name==="bold") target.style.fontWeight=value==="on"?"700":"400";
+    else if(name==="italic") target.style.fontStyle=value==="on"?"italic":"normal";
+    else if(name==="underline"&&value==="off"){
+      // Links carry a browser-default underline independent of <u> markup.
+      for(const link of target.querySelectorAll("a")) link.style.textDecorationLine="none";
+    }
+    else if(value==="on"){
+      const wrapper=document.createElement(name==="strike"?"s":"u");
+      wrapper.append(...target.childNodes); target.append(wrapper);
+    }
+  }
 }
 function makeItemAnim(a, render, warnings, it){
   if(!it){ warnings&&warnings.push(`animation targets unavailable element for “${a.target}”`); return null; }
@@ -2834,6 +2877,14 @@ function makeItemAnim(a, render, warnings, it){
     case "text":{
       const tgt=itemTextElement(it); if(!tgt) return null;
       replaceItemText(it,a.text,render); return null;
+    }
+    case "textstyle":{
+      it.textStyles=a.reset?{}:{...it.textStyles};
+      for(const [name,value] of Object.entries(a.styles||{})){
+        if(value==="reset") delete it.textStyles[name];
+        else it.textStyles[name]=value;
+      }
+      replaceItemText(it,it.currentText??it.def.text,render); return null;
     }
     case "textsize":{
       const tgt=it.foBody||it.inner||el;
@@ -4549,6 +4600,16 @@ Each press of the spacebar reveals the next chunk:
 !anim arr exit slidedown 0.6s
 !anim cap textsize 40px 0.7s
 ---
+### Change existing text styles
+[claim] This is ~~outdated~~ and **important**.
+...
+!anim claim textstyle strike=on, bold=off
+...
+!anim claim textstyle strike=off, bold=on, italic=on
+...
+% Reset restores the original inline markup and theme defaults.
+!anim claim textstyle reset
+---
 ### Named styles and temporary tag groups
 !style process {fill=#0097eb, stroke=#14324a, thick=4, round=20, textcolor=white, size=25}
 [lex:front_end] {$process} !rect (120,230) (260,85) **Lexical Analyzer**
@@ -4879,17 +4940,19 @@ const ANIM_HINTS={move:"(x, y) — destination", path:"(ctrlx, ctrly) (destx, de
   exit:"fade · slideleft · slideright · slideup · slidedown · shrink · spin",
   point:"n (x, y) — vertex number, then destination", size:"new width (fraction or px)",
   scale:"factor, e.g. 1.5", rotate:"degrees, optionally “around (x, y)”",
-  color:"any CSS color", textsize:"e.g. 44px", hide:"(no arguments)", show:"(no arguments)"};
+  color:"any CSS color", textsize:"e.g. 44px", text:"Replacement Markdown text",
+  textstyle:"strike=on, bold=off, italic=on, underline=off (or reset)", hide:"(no arguments)", show:"(no arguments)"};
+const instantTextAnim=verb=>["text","textstyle"].includes(verb);
 async function animDialog(){
   const labels=[...new Set((deck.slides[selected]?.items||[]).filter(i=>i.label).map(i=>i.label))];
   const v=await showDialog("Insert animation",[
     {key:"target",label:"Target label"+(labels.length?"":" (label an element first — e.g. [pic])"),list:labels,placeholder:labels[0]||"myLabel"},
     {key:"verb",label:"Effect",type:"select",options:[["move","Move to position"],["path","Move along a curve"],
       ["enter","Entrance effect"],["exit","Exit effect"],["hide","Fade out"],["show","Fade in"],
-      ["size","Resize image / video / embed"],["scale","Scale"],["rotate","Rotate"],["color","Change color (legacy)"],["textsize","Change text size"],["point","Move one vertex"],
+      ["size","Resize image / video / embed"],["scale","Scale"],["rotate","Rotate"],["color","Change color (legacy)"],["textsize","Change text size"],["textstyle","Change text style"],["text","Replace text"],["point","Move one vertex"],
       ...["fill","stroke","textcolor","opacity","thick","round","w","h","font","align","valign","pad","outer","rules","headerfill","headertext","bodyfill","bodytext","stripe","colwidths","colalign"].map(name=>[name,({fill:"Fill color",stroke:"Stroke / rule color",textcolor:"Text color",opacity:"Opacity",thick:"Stroke / rule width",round:"Corner radius",w:"Width",h:"Height",font:"Font family",align:"Text alignment",valign:"Vertical alignment",pad:"Padding",outer:"Table outer border",rules:"Table interior rules",headerfill:"Header fill",headertext:"Header text color",bodyfill:"Body fill",bodytext:"Body text color",stripe:"Alternating row fill",colwidths:"Column widths",colalign:"Column alignment"})[name]]) ],
      onChange:(el,body)=>{ const args=body.querySelector('[data-key="args"]'); if(args) args.placeholder=ANIM_HINTS[el.value]||PROPERTY_SCHEMA[el.value]?.type||"";
-       const duration=body.querySelector('[data-key="dur"]'); if(duration){duration.disabled=PROPERTY_SCHEMA[el.value]?.animation==="discrete";} }},
+       const duration=body.querySelector('[data-key="dur"]'); if(duration){duration.disabled=instantTextAnim(el.value)||PROPERTY_SCHEMA[el.value]?.animation==="discrete";} }},
     {key:"args",label:"Arguments",placeholder:ANIM_HINTS.move},
     {key:"dur",label:"Duration (seconds)",value:"0.7"},
     {key:"ease",label:"Easing",type:"select",options:[["","default (ease in-out)"],["linear","linear"],["easein","ease in"],["easeout","ease out"],["back","back (overshoot)"],["bounce","bounce"],["elastic","elastic"]]},
@@ -4898,7 +4961,7 @@ async function animDialog(){
   const lines=[];
   if(v.when==="after") lines.push(">>>");
   if(v.when==="click") lines.push("...");
-  const dur=PROPERTY_SCHEMA[v.verb]?.animation==="discrete"?"":(v.verb==="hide"||v.verb==="show")&&!v.args ? (v.dur&&v.dur!=="0.7"?` ${v.dur}s`:"") : ` ${v.dur||"0.7"}s`;
+  const dur=instantTextAnim(v.verb)||PROPERTY_SCHEMA[v.verb]?.animation==="discrete"?"":(v.verb==="hide"||v.verb==="show")&&!v.args ? (v.dur&&v.dur!=="0.7"?` ${v.dur}s`:"") : ` ${v.dur||"0.7"}s`;
   lines.push((v.ease?`{ease=${v.ease}} `:"")+`!anim ${v.target} ${v.verb}${v.args?" "+v.args:""}${dur}`);
   insertAtCursor(lines.join("\n"));
 }

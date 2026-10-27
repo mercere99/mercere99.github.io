@@ -269,7 +269,7 @@ dashes safely.</p>
 cells, shape labels):</p>
 <ul>
 <li><code>**bold**</code>, <code>*italic*</code>,
-<code>`code`</code></li>
+<code>~~strikethrough~~</code>, <code>`code`</code></li>
 <li>HTML entities such as <code>&amp;mdash;</code>,
 <code>&amp;rarr;</code>, <code>&amp;nbsp;</code>,
 <code>&amp;#x1F600;</code> render as characters. Raw tags do
@@ -528,12 +528,50 @@ their first-listed point)</td>
 <td style="text-align: left;"><code>textsize s</code></td>
 <td style="text-align: left;">Animate font size</td>
 </tr>
+<tr>
+<td style="text-align: left;"><code>text markdown</code></td>
+<td style="text-align: left;">Instantly replace Markdown text; the entire remainder of the line is content</td>
+</tr>
+<tr>
+<td
+style="text-align: left;"><code>textstyle strike=on, bold=off</code></td>
+<td style="text-align: left;">Instantly change whole-item text styles:
+<code>bold</code>, <code>italic</code>, <code>strike</code>,
+<code>underline</code>; values <code>on</code>, <code>off</code>,
+<code>reset</code></td>
+</tr>
 </tbody>
 </table>
 <pre><code>!anim dot move (0.75, 0.30) 1.2s
 !anim arr point 2 (0.80, 0.55) 1.2s   ← these two run together (one keypress)
 &gt;&gt;&gt;
 !anim dot color #c23b22 0.5s          ← starts when the move finishes</code></pre>
+<p>Change existing text’s formatting without repeating its content:</p>
+<pre><code>[claim] This statement is out of date.
+...
+!anim claim textstyle strike=on
+...
+!anim claim textstyle strike=off, bold=on, italic=on
+...
+!anim claim textstyle reset</code></pre>
+<p><code>textstyle</code> works on the same text elements as
+<code>text</code>, including tag selections. It changes the entire
+item’s text and keeps its label, tags, position, and transforms.
+Supported styles are <code>bold</code>, <code>italic</code>,
+<code>strike</code>, and <code>underline</code>. <code>on</code> applies
+the style throughout the item; <code>off</code> removes it even from
+existing inline markup (and overrides heading bold/italic defaults).
+Unspecified styles stay as they are. Use <code>bold=reset</code> to
+restore that style’s original inline markup and theme default, or
+<code>textstyle reset</code> to restore all four. Overrides persist
+through later <code>text</code> replacements; reset then uses the
+replacement’s markup. Replaying the slide starts fresh from the source.
+Inline code and math retain their internal formatting.</p>
+<p>Style changes are instantaneous at their animation step. Omit the
+duration (or use <code>0s</code>); use <code>...</code> for a click or
+<code>&gt;&gt;&gt;</code> for an automatic chain. To restyle only part
+of an item, use <code>text</code> with updated inline markup, such as
+<code>!anim claim text This is ~~out of date~~.</code></p>
 <p><strong>Timing model:</strong> consecutive <code>!anim</code> lines
 fire simultaneously. Put <code>...</code> between groups to wait for
 input, <code>&gt;&gt;&gt;</code> to auto-chain immediately, or
