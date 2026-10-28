@@ -1,3 +1,4 @@
+!set baseurl https://ofria.com/cse450/Lectures/Lecture16.psl
 !set bg #08111F
 !set color #F4F1E8
 !set accent #5DE4C7
@@ -53,12 +54,19 @@ count = 7;
 count = missing + 1;
 count = "hello";
 ```
-[context] @(855, 165) {$note, w=345px, color=focus} Suppose count is a declared int and missing has no declaration. Which assignments are legal?
+[context] @(855, 165) {$note, w=345px, color=focus} Assume `count` is declared `int` and `missing` has no declaration. Which assignments are legal?
 ...
-[answer] @(855, 370) {$note, w=345px, color=emp} Only the first. The others fail name resolution and type compatibility.
+[answer] @(70, 370) {$note, w=1000px, color=emp} Only the first. The others fail name resolution and type compatibility.
 ...
-[questions] @(70, 510) {$note} Semantic questions require context: Is this name visible? What type does it have? Does the operator accept these operands?
-[calls] @(70, 615) {$note, size=26px, color=explain} Calls also need a known signature, the right argument count, and compatible argument types.
+[questions] @(70, 430) {$note} Semantic questions require context: Is this name visible? What type does it have? Does the operator accept these operands?
+...
+[calls] @(70, 535) {$note, color=explain} Calls also need:
+...
+@(70, 585) {$note, color=explain} - a known signature
+...
+@(70, 635) {$note, color=explain} - the right argument count, and
+...
+@(70, 685) {$note, color=explain} - compatible argument types.
 ---
 % PowerPoint slide 4. Wasm validates declared machine types.
 ### WebAssembly Checks Operand Types
@@ -83,7 +91,7 @@ count = "hello";
 ### Extending Strix's Type System
 [table] @(70, 160) {$types, colwidths=(19%,21%,60%)} | Source type | Wasm type | Meaning |
 |---|---|---|
-| `double` | `f64` | 64-bit floating-point number |
+| `double` | `f64` | 64-bit floating-point number (done!) |
 | `int` | `i32` | Signed 32-bit integer |
 | `string` | `i32` | Byte offset of NUL-terminated ASCII text |
 ...
@@ -115,8 +123,8 @@ count = "hello";
 [dbody] @(680, 245) {$note, w=520px} Operations inspect runtime values and their types. A variable may hold values of different types over time.
 [dex] @(680, 420) {$note, w=520px, size=26px, color=id} Examples: Python, JavaScript, Ruby. Optional static tools can check annotations before execution.
 ...
-[assembly] @(70, 565) {$note, size=26px} Typical machine assembly offers little checking of source-level meanings. Typed Wasm instructions still cannot distinguish an int from a string offset.
-[tradeoff] @(70, 655) {$note, size=24px, color=explain} Static types catch errors early and guide code generation. Runtime checks still have a role.
+[assembly] @(70, 565) {$note} Typical machine assembly offers little checking of source-level meanings. Typed Wasm instructions still cannot distinguish an int from a string offset.
+[tradeoff] @(70, 655) {$note, color=explain} Static types catch errors early and guide code generation. Runtime checks still have a role.
 ---
 % PowerPoint slides 10-11. Every declaration has an initializer.
 ### Initializers and Assignments
@@ -156,7 +164,7 @@ double d = 7;       // Implicit promotion
 int i = int(-2.9);  // Explicit conversion
 double e = double(i);
 ```
-[explain] @(885, 165) {$note, w=315px} int to double is allowed implicitly. double to int requires an explicit cast.
+[explain] @(885, 165) {$note, w=315px} `int` to `double` is allowed implicitly. `double` to `int` requires an explicit cast.
 ...
 [value] @(70, 390) {$note, w=750px, color=emp} `int(-2.9)` truncates toward zero, producing -2.
 ...
@@ -165,8 +173,8 @@ double e = double(i);
 int i = 2.9;
 int j = int("12");
 ```
-[trap] @(885, 410) {$note, w=315px, size=26px, color=focus} An explicit double-to-int cast traps at runtime for NaN, infinity, or an out-of-range truncated result.
-[strings] @(70, 635) {$note, size=26px} Numeric casts accept numeric operands. string is not a numeric conversion target.
+[trap] @(885, 410) {$note, w=315px, color=focus} An explicit double-to-int cast traps at runtime for NaN, infinity, or an out-of-range truncated result.
+[strings] @(70, 640) {$note} Numeric casts accept numeric operands. string is NOT a numeric conversion target.
 ---
 ### Comparisons and Conditions
 [source] @(70, 165) {$code, w=760px, size=27px} ```cpp
@@ -175,21 +183,25 @@ function Positive(double x) : int {
   return answer;
 }
 ```
+...
 [change] @(890, 170) {$note, w=310px, color=emp} With typed Strix, comparisons and ! produce int 0 or 1.
 ...
-[conditions] @(70, 390) {$note} if and while accept int or double conditions. Zero is false. Other numeric values are true, including 0.5 and NaN.
+[conditions] @(70, 390) {$note} `if` and `while` accept int or double conditions. Zero is false. Other numeric values are true, including 0.5 and NaN.
 ...
-[string] @(70, 520) {$note, color=focus} A string cannot be a condition. To test whether text is nonempty, use `#text > 0`.
-[machine] @(70, 625) {$note, size=26px, color=id} Numeric comparisons produce i32 in Wasm. A double used as a condition still needs a comparison with zero.
+[string] @(70, 500) {$note, color=focus} A string can never be a condition. To test whether text is nonempty, use `#text > 0`.
+...
+[machine] @(70, 575) {$note, color=id} Numeric comparisons produce i32 in Wasm. A double used as a condition still needs a comparison with zero.
 ---
 % The original expression-tree examples are rebuilt as editable PSL nodes.
 ### Inferring an Expression's Type
 [source] @(70, 155) {$note, size=30px} Given `int x = 3;`, determine the type of `x + 2.5`.
+...
 [root] {$node} !rect (380, 275) (210, 75) +
 [left] {$node} !rect (150, 450) (210, 75) x
 [right] {$node} !rect (610, 450) (210, 75) 2.5
 [e1] {$edge} !line (435, 350) (255, 450)
 [e2] {$edge} !line (535, 350) (715, 450)
+...
 [explain] @(900, 270) {$note, w=300px, color=explain} Start with the children: variable declarations and literal forms supply their types.
 ...
 !anim left text x : int
@@ -198,6 +210,7 @@ function Positive(double x) : int {
 !anim root text + : double
 !anim root stroke emp
 !anim explain text Numeric addition uses the common type double. Record that result type on the parent node.
+...
 [conversion] @(70, 615) {$note, color=emp} Code generation must promote x to f64 before performing f64.add.
 ---
 ### AST Operation and Expression Type
@@ -208,12 +221,14 @@ Left child:      Variable(x), type int
 Right child:     Number(2.5), type double
 Expression type: double
 ```
+...
 [different] @(885, 170) {$note, w=315px} The AST kind tells us which operation to analyze. The source type tells us what value that operation produces.
 ...
 [annotation] @(70, 430) {$note, color=emp} Add source-type information to expressions, variables, and function signatures. Analyze child expressions before their parent.
 ...
-[emit] @(70, 555) {$note} The backend reads the annotations to select integer instructions, floating-point instructions, or string runtime operations.
-[pass] @(70, 650) {$note, size=25px, color=id} The semantic pass checks and annotates. It does not execute the source program.
+[emit] @(70, 540) {$note} The backend reads the annotations to select integer instructions, floating-point instructions, or string runtime operations.
+...
+[pass] @(70, 650) {$note, color=id} The semantic pass checks and annotates. It does NOT execute the source program.
 ---
 % PowerPoint slide 12: string + int is legal, but its result is a string.
 ### Checking an Assignment Tree
@@ -227,6 +242,7 @@ Expression type: double
 [e2] {$edge} !line (575, 325) (765, 400)
 [e3] {$edge} !line (720, 465) (620, 545)
 [e4] {$edge} !line (810, 465) (915, 545)
+...
 [explain] @(940, 260) {$note, w=270px, size=26px, color=explain} First check the right subtree.
 ...
 !anim plus text + : string
@@ -235,26 +251,29 @@ Expression type: double
 ...
 !anim assign stroke focus
 !anim assign text = : error
-[result] @(70, 650) {$note, size=26px, color=focus} The assignment fails: a string result cannot be stored in the int variable x.
+...
+[result] @(70, 650) {$note, color=focus} The assignment fails: a string result cannot be stored in the int variable x.
 ---
 % PowerPoint slides 11-12, updated to current literal and string rules.
 ### Assignment Practice
 [context] @(70, 155) {$note, size=29px} Assume `int x = 1;` and `string y = "hi";`. Check each statement independently.
-[a] @(70, 270) {$note, w=500px} `x = x + 2;`
-[b] @(70, 345) {$note, w=500px} `y = 'c';`
-[c] @(70, 420) {$note, w=500px} `y = x;`
-[d] @(70, 495) {$note, w=500px} `y = 'a' + 'b';`
-[e] @(70, 570) {$note, w=500px} `y = "" + 'c';`
+[a] @(70, 250) {$note, w=500px} `x = x + 2;`
+[b] @(70, 325) {$note, w=500px} `y = 'c';`
+[c] @(70, 400) {$note, w=500px} `y = x;`
+[d] @(70, 475) {$note, w=500px} `y = 'a' + 'b';`
+[e] @(70, 550) {$note, w=500px} `y = "" + 'c';`
 ...
-[aa] @(605, 270) {$note, w=595px, size=27px, color=emp} Valid: int addition, then int assignment.
+[aa] @(605, 250) {$note, w=595px, color=emp} Valid: int addition, then int assignment.
 ...
-[ba] @(605, 345) {$note, w=595px, size=27px, color=focus} Error: 'c' is an int.
-[ca] @(605, 420) {$note, w=595px, size=27px, color=focus} Error: x is an int, even if its value is 1.
+[ba] @(605, 325) {$note, w=595px, color=focus} Error: 'c' is an int.
 ...
-[da] @(605, 495) {$note, w=595px, size=27px, color=focus} Error: character-code addition produces int 195.
+[ca] @(605, 400) {$note, w=595px, color=focus} Error: x is an int.
 ...
-[ea] @(605, 570) {$note, w=595px, size=27px, color=emp} Valid: appending the character produces "c".
-[rule] @(70, 655) {$note, size=24px, color=id} A type rule depends on operand types, not how a programmer might intend to display a value.
+[da] @(605, 475) {$note, w=595px, size=27px, color=focus} Error: character-code addition produces int 195.
+...
+[ea] @(605, 550) {$note, w=595px, size=27px, color=emp} Valid: appending the character produces "c".
+...
+[rule] @(70, 620) {$note, color=id} A type rule depends on operand types, not how a programmer might intend to display a value.
 ---
 ### Checking Function Calls
 [source] @(70, 155) {$code, w=780px, size=25px} ```cpp
@@ -267,15 +286,16 @@ function Example() : double {
   return Half(count);
 }
 ```
-[signature] @(900, 170) {$note, w=300px, size=27px, color=explain} Half expects one double argument and returns double.
 ...
-[valid] @(900, 360) {$note, w=300px, size=27px, color=emp} Half(count) promotes int to double and returns 3.5.
+[signature] @(900, 170) {$note, w=300px, color=explain} Half expects one double argument and returns double.
 ...
-[errors] @(70, 510) {$note} `Half()` and `Half(1, 2)` have the wrong argument count. `Half("7")` has an incompatible argument type.
-[scope] @(70, 625) {$note, size=25px} Register a signature before its body to allow self-recursion. Calls can name the current function or an earlier definition. Forward calls are not supported.
+[valid] @(900, 330) {$note, w=300px, color=emp} Half(count) promotes int to double and returns 3.5.
+...
+[errors] @(70, 500) {$note} `Half()` and `Half(1, 2)` have the wrong argument count. `Half("7")` has an incompatible argument type.
+[scope] @(70, 610) {$note} Register a signature before its body to allow self-recursion. Calls can name the current function or an earlier definition. Forward calls are not supported.
 ---
 ### An Accepted Conversion Must Generate Code
-[wat] @(70, 150) {$code, w=780px, size=22px} ```wat
+[wat] @(70, 150) {$code, w=780px, size=25px} ```wat
 (module
   (func $half (param $x f64) (result f64)
     (local.get $x)
@@ -292,11 +312,12 @@ function Example() : double {
   (export "Example" (func $example))
 )
 ```
+...
 [convert] @(900, 175) {$note, w=300px, color=emp} The argument starts as i32. Convert it to f64 before calling Half.
 ...
-[missing] @(900, 370) {$note, w=300px, color=focus} Accepting the source call in the type checker does not perform this conversion.
+[missing] @(900, 330) {$note, w=300px, color=focus} Accepting the source call in the type checker does not perform this conversion.
 ...
-[other] @(70, 660) {$note, size=25px, color=id} Apply the same compatibility rule at initializers, assignments, returns, and each call argument.
+[other] @(900, 520) {$note, w=300px, color=id} Apply the compatibility rule at initializers, assignments, returns, and each call argument.
 ---
 ### A Semantic Visitor
 [pseudo] @(70, 160) {$code, w=780px, size=24px} ```text
@@ -312,11 +333,12 @@ CheckValueForDestination(value, expected):
     also accept int to double
     otherwise report a source error
 ```
-[context] @(900, 175) {$note, w=300px, size=27px} Resolve variable types from their bindings and call types from function signatures.
 ...
-[checks] @(900, 375) {$note, w=300px, size=27px, color=explain} Statement visitors also check numeric conditions, assignment targets, loop context, and return requirements.
+[context] @(900, 175) {$note, w=300px} Resolve variable types from their bindings and call types from function signatures.
 ...
-[all] @(70, 600) {$note, size=27px, color=emp} Check both branches and unreachable statements. Preserve source locations so a type error points to the relevant expression.
+[checks] @(900, 355) {$note, w=310px, color=explain} Statement visitors also check numeric conditions, assignment targets, loop context, and return requirements.
+...
+[all] @(70, 590) {$note, color=emp} Check both branches and unreachable statements. Preserve source locations so a type error points to the relevant expression.
 ---
 ### Type Errors and Runtime Traps
 [static] @(70, 165) {$note, w=535px, size=31px, color=emp} **Rejected during compilation**
@@ -335,18 +357,20 @@ s[i];
 int(1.0 / 0.0);
 ```
 ...
-[explain] @(70, 485) {$note} Types alone do not prove that a divisor is nonzero, an index is in bounds, or a numeric conversion is in range.
-[roles] @(70, 605) {$note, size=27px, color=explain} Semantic analysis rejects illegal source operations. Generated code and the runtime enforce checks that depend on values.
+[explain] @(70, 475) {$note} Types alone do not prove that a divisor is nonzero, an index is in bounds, or a numeric conversion is in range.
+...
+[roles] @(70, 575) {$note, color=explain} Semantic analysis rejects illegal source operations. Generated code and the runtime enforce checks that depend on values.
 ---
 ### Questions to Check Your Understanding
+...
 [a] @(70, 170) {$note, size=30px} Why is Wasm validation insufficient to enforce all Strix type rules?
 ...
-[aa] @(100, 250) {$note, size=27px, color=emp} int and string offsets both use i32, but their legal source operations differ.
+[aa] @(100, 250) {$note, color=emp} `int` and `string` offsets both use i32, but their legal source operations differ.
 ...
 [b] @(70, 355) {$note, size=30px} What is the source type of `2 < 3.0`? What conversion does its comparison need?
 ...
-[ba] @(100, 435) {$note, size=27px, color=emp} The result is int. Promote the left operand to double, then compare two f64 values.
+[ba] @(100, 435) {$note, color=emp} The result is int. Promote the left operand to double, then compare two f64 values.
 ...
 [c] @(70, 540) {$note, size=30px} What information should reach code generation after semantic analysis?
 ...
-[ca] @(100, 620) {$note, w=1100px, size=27px, color=emp} Resolved bindings and signatures, expression types, and enough context to emit each required conversion.
+[ca] @(100, 620) {$note, w=1100px, color=emp} Resolved bindings and signatures, expression types, and enough context to emit each required conversion.
