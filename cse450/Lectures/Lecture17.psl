@@ -1,3 +1,4 @@
+!set baseurl https://ofria.com/cse450/Lectures/Lecture17.psl
 !set bg #08111F
 !set color #F4F1E8
 !set accent #5DE4C7
@@ -19,15 +20,14 @@
 !style edge {color=#8AA5B5, thick=2}
 !style types {size=27px, w=1140px, pad=15px, headerfill=#173749, headertext=#5DE4C7, bodyfill=#102233, bodytext=#F4F1E8, stroke=#31505F, rules=rows, outer=1, colalign=(left,left,left)}
 
-% Lecture 17 resumes after Lecture 16, slide 9.
-% Slides 2-12 retain Lecture 16, slides 10-20, with calls labeled as a preview.
-% Slides 13-18 adapt all six slides in Lectures/Lecture-17 - WAT Memory.pptx.
-% Memory layout follows the current Strix specification and supplied runtime.
 % Wasm references:
 % https://webassembly.github.io/spec/core/syntax/modules.html
 % https://webassembly.github.io/spec/core/exec/instructions.html
 
-### Lecture 17: Types Recap
+# CSE450 Translation of Programming Languages
+## Lecture 16: Semantic Analysis and Type Checking
+---
+### Types Recap
 [check] @(70, 165) {$note, size=29px} **Semantic analysis** checks the AST using context: names must resolve, and operations must accept their operands' source types.
 [types] @(70, 295) {$note, size=29px} **Representations:** double uses f64; int uses i32; string uses an i32 byte offset. A character literal such as 'A' is an int.
 [meaning] @(70, 425) {$note, size=29px} **Source types guide code generation.** Wasm checks machine operand types, but cannot distinguish an int from a string offset.
@@ -238,7 +238,7 @@ int(1.0 / 0.0);
 ---
 % Memory PowerPoint slide 1: section divider for optional material.
 # WebAssembly Memory
-## Optional continuation: bytes, strings, and allocation
+## Bytes, strings, and allocation
 ---
 % Memory PowerPoint slide 2. Use the current course runtime's memory limits.
 ### Declaring Linear Memory
