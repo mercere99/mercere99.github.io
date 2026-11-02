@@ -1,4 +1,5 @@
 !set baseurl https://ofria.com/cse450/Lectures/Lecture17.psl
+!set baseurl https://ofria.com/cse450/Lectures/Lecture17.psl
 !set bg #08111F
 !set color #F4F1E8
 !set accent #5DE4C7
@@ -25,7 +26,7 @@
 % https://webassembly.github.io/spec/core/exec/instructions.html
 
 # CSE450 Translation of Programming Languages
-## Lecture 16: Semantic Analysis and Type Checking
+## Lecture 17: Semantic Analysis and Type Checking
 ---
 ### Types Recap
 [check] @(70, 165) {$note, size=29px} **Semantic analysis** checks the AST using context: names must resolve, and operations must accept their operands' source types.
@@ -134,11 +135,13 @@ Expression type: double
 [aa] @(605, 270) {$note, w=595px, size=27px, color=emp} Valid: int addition, then int assignment.
 ...
 [ba] @(605, 345) {$note, w=595px, size=27px, color=focus} Error: 'c' is an int.
+...
 [ca] @(605, 420) {$note, w=595px, size=27px, color=focus} Error: x is an int, even if its value is 1.
 ...
 [da] @(605, 495) {$note, w=595px, size=27px, color=focus} Error: character-code addition produces int 195.
 ...
 [ea] @(605, 570) {$note, w=595px, size=27px, color=emp} Valid: appending the character produces "c".
+...
 [rule] @(70, 655) {$note, size=24px, color=id} A type rule depends on operand types, not how a programmer might intend to display a value.
 ---
 ### Preview: Checking Function Calls
@@ -154,9 +157,10 @@ function Example() : double {
 ```
 [signature] @(900, 170) {$note, w=300px, size=27px, color=explain} Half expects one double argument and returns double.
 ...
-[valid] @(900, 360) {$note, w=300px, size=27px, color=emp} Half(count) promotes int to double and returns 3.5.
+[valid] @(900, 330) {$note, w=300px, size=27px, color=emp} Half(count) promotes int to double and returns 3.5.
 ...
 [errors] @(70, 510) {$note} `Half()` and `Half(1, 2)` have the wrong argument count. `Half("7")` has an incompatible argument type.
+...
 [scope] @(70, 625) {$note, size=25px} Source-level calls are a later language extension. A call needs a known signature; registering a signature before its body can support self-recursion.
 ---
 ### Preview: Conversions at Calls
@@ -197,9 +201,9 @@ CheckValueForDestination(value, expected):
     also accept int to double
     otherwise report a source error
 ```
-[context] @(900, 175) {$note, w=300px, size=27px} Resolve variable types from their bindings. Function signatures give parameter and return types.
+[context] @(900, 175) {$note, w=350px, size=27px} Resolve variable types from their bindings. Function signatures give parameter and return types.
 ...
-[checks] @(900, 375) {$note, w=300px, size=27px, color=explain} Statement visitors also check numeric conditions, assignment targets, loop context, and return requirements.
+[checks] @(900, 375) {$note, w=340px, size=27px, color=explain} Statement visitors also check numeric conditions, assignment targets, loop context, and return requirements.
 ...
 [all] @(70, 600) {$note, size=27px, color=emp} Check both branches and unreachable statements. Preserve source locations so a type error points to the relevant expression.
 ---
@@ -221,6 +225,7 @@ int(1.0 / 0.0);
 ```
 ...
 [explain] @(70, 485) {$note} Types alone do not prove that a divisor is nonzero, an index is in bounds, or a numeric conversion is in range.
+...
 [roles] @(70, 605) {$note, size=27px, color=explain} Semantic analysis rejects illegal source operations. Generated code and the runtime enforce checks that depend on values.
 ---
 ### Questions to Check Your Understanding
