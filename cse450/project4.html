@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CSE 450: Project 4</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1 id="cse-450-project-4-types-and-runtime-representation">CSE 450
+Project 4: Types and Runtime Representation</h1>
+<h3 id="check-in-sunday-november-15th-by-midnight">Check In: Sunday,
+November 15th, by Midnight</h3>
+<h3 id="project-due-sunday-november-22nd-by-midnight">Project Due:
+Sunday, November 22nd, by Midnight</h3>
+<p>Extend your Strix compiler with <strong>integers, numeric
+conversions, and strings</strong>. The goal is to make useful
+source-language abstractions work on a machine: a <code>string</code>
+and an <code>int</code> may both travel through Wasm as
+<code>i32</code>, but your compiler must distinguish what they mean and
+which operations are legal.</p>
+<p>The supplied text playground calls your compiled string-processing
+functions. You can build an uppercase converter, a cipher, or a sign
+formatter without writing browser code. This reconnects with Marquee:
+you are now compiling text transformations into WebAssembly.</p>
+<p>Remember to document outside resources and AI assistance, and submit
+only code you understand. See the <a
+href="syllabus.html">syllabus</a>.</p>
+<h2 id="starting-point-and-deliverable">Starting point and
+deliverable</h2>
+<p>All <a href="project3.html">Project 3 rules</a> continue except where
+this handout explicitly changes them. Your compiler now builds as
+<code>Project4</code> and still emits only WAT on standard output. It
+accepts a source filename and the optional <code>--ast</code> flag.
+Errors include an informative diagnostic and source line on standard
+error, exit status 1, and empty standard output. Both
+<code>ERROR (line N): ...</code> and Emplex’s
+<code>ERROR (line N:C): ...</code> are accepted; wording is not
+prescribed.</p>
+<p>The starter integrates the earlier compiler pipeline with typed
+declaration records, an extended AST, memory setup, tests, and the
+playground. Its baseline numeric behavior works immediately; the Project
+4 parser, type checker, and expression-generation extensions are student
+work. <code>START-HERE.md</code> identifies the extension points. You
+may also extend your own Project 3 using the supplied support files.</p>
+<p>Keep parsing, semantic analysis, and WAT generation separate.
+Annotate AST nodes with their source type during semantic analysis; let
+the backend choose instructions and conversions from those
+annotations.</p>
+<h2 id="types-and-numeric-expressions">Types and numeric
+expressions</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Source type</th>
+<th>Wasm representation</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>double</code></td>
+<td><code>f64</code></td>
+<td>64-bit floating point</td>
+</tr>
+<tr>
+<td><code>int</code></td>
+<td><code>i32</code></td>
+<td>Signed 32-bit integer</td>
+</tr>
+<tr>
+<td><code>string</code></td>
+<td><code>i32</code></td>
+<td>Byte offset of a NUL-terminated ASCII string in linear memory</td>
+</tr>
+</tbody>
+</table>
+<p>An integer or hexadecimal literal now has type <code>int</code>; a
+literal containing a decimal point has type <code>double</code>.
+Underscore separators and the other Project 3 lexical rules remain.
+Integer literal magnitudes must be between 0 and 2147483647 (inclusive),
+including hexadecimal literals. Larger magnitudes are compile-time
+errors. A leading minus is a separate unary operator and does not extend
+the allowed literal range.</p>
+<p>Runtime integer values still range from −2147483648 to 2147483647.
+The minimum value can be constructed as <code>(-2147483647 - 1)</code>;
+no special literal handling is required.</p>
+<p><code>int</code> may be implicitly promoted to <code>double</code> in
+arithmetic, assignments, initializers, and returns. <strong>Do not
+implicitly narrow a double to an int.</strong> Check compatibility
+first, then actually emit the conversion where needed; accepting an
+assignment in the type checker does not convert its value.</p>
+<pre class="strix"><code>function Example() : double {
+  int count = 7;
+  double result = count; // initializer needs i32 -&gt; f64 conversion
+  return result / 2.0;   // 3.5
+}</code></pre>
+<p>For explicit numeric conversion, support <code>int(expression)</code>
+and <code>double(expression)</code>. They have primary-expression
+precedence. Casting a type to itself is allowed and needs no conversion
+instruction. These casts do not accept strings; <code>string(...)</code>
+is not a cast in the core language.</p>
+<p>Numeric arithmetic uses the operands’ common type: double if either
+operand is double, otherwise int. Consequently <code>5/2</code> is 2
+while <code>5.0/2</code> is 2.5. Add <code>%</code> for signed integer
+remainder; it requires two ints.</p>
+<h3 id="native-wasm-numeric-behavior">Native Wasm numeric behavior</h3>
+<p><strong>Use the native Wasm instructions below. Their runtime
+behavior is already implemented by the Wasm engine.</strong> Your
+compiler selects the instructions and inserts required conversions. You
+do not need to generate extra overflow, division-by-zero, NaN, infinity,
+or conversion-range checks, simulate these operations in C++, catch
+their traps, or turn runtime traps into compiler errors.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Source operation</th>
+<th>Emit</th>
+<th>Behavior supplied by Wasm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Int <code>+</code>, <code>-</code>, <code>*</code></td>
+<td><code>i32.add</code>, <code>i32.sub</code>,
+<code>i32.mul</code></td>
+<td>Wrap modulo 2³²</td>
+</tr>
+<tr>
+<td>Int unary <code>-x</code></td>
+<td><code>i32.sub</code> with operands <code>0</code>,
+<code>x</code></td>
+<td>Wrapping negation</td>
+</tr>
+<tr>
+<td>Int <code>/</code></td>
+<td><code>i32.div_s</code></td>
+<td>Truncate toward zero; trap on zero divisor or minimum int divided by
+−1</td>
+</tr>
+<tr>
+<td>Int <code>%</code></td>
+<td><code>i32.rem_s</code></td>
+<td>Remainder has the dividend’s sign; trap on zero divisor</td>
+</tr>
+<tr>
+<td>Double <code>+</code>, <code>-</code>, <code>*</code>,
+<code>/</code>, unary <code>-</code></td>
+<td><code>f64.add</code>, <code>f64.sub</code>, <code>f64.mul</code>,
+<code>f64.div</code>, <code>f64.neg</code></td>
+<td>Native floating-point results, including infinities and NaNs</td>
+</tr>
+<tr>
+<td><code>int(double_value)</code></td>
+<td><code>i32.trunc_f64_s</code></td>
+<td>Truncate toward zero; trap on NaN, infinity, or an out-of-range
+truncated result</td>
+</tr>
+<tr>
+<td><code>double(int_value)</code> and implicit promotion</td>
+<td><code>f64.convert_i32_s</code></td>
+<td>Convert the signed int to double</td>
+</tr>
+<tr>
+<td>Numeric comparisons</td>
+<td>Signed <code>i32</code> comparisons or corresponding
+<code>f64</code> comparisons</td>
+<td>Produce int 0 or 1</td>
+</tr>
+</tbody>
+</table>
+<p>For example, <code>int(-2.9)</code> becomes −2 simply by using
+<code>i32.trunc_f64_s</code>. Use the signed forms (<code>_s</code>) for
+integer division, remainder, and ordered comparisons. Equality uses
+<code>i32.eq</code>/<code>i32.ne</code>. The behaviors above follow the
+<a
+href="https://webassembly.github.io/spec/core/exec/numerics.html">Wasm
+numeric specification</a>.</p>
+<p>Compile-time checks for invalid literals and incompatible source
+types still belong in your compiler. The conditions and string rules
+below describe the additional lowering and supplied runtime helpers.</p>
+<p>Comparisons and <code>!</code> now return <strong>int</strong> 0 or
+1. Their operands can still be int or double. Conditions still accept
+either numeric type: compare against zero, including for fractional
+doubles. Strings are not conditions. This preserves Project 3’s truth
+rule while introducing typed Boolean results. To lower conditions,
+compare ints with <code>i32</code> zero or doubles with <code>f64</code>
+zero; apply <code>i32.eqz</code> to the resulting truth value for
+<code>!</code>. This also handles fractional doubles and NaNs using
+ordinary Wasm comparisons.</p>
+<h2 id="exported-functions">Exported functions</h2>
+<p>As in Project 3, a module contains one or more functions that
+JavaScript can call. Parameters and results may now be <code>int</code>,
+<code>double</code>, or <code>string</code>. Export every function under
+its source name with the corresponding Wasm signature. Each function
+still returns a non-void value and ends with a direct
+<code>return expression;</code> statement.</p>
+<p>The function name <code>memory</code> is reserved for the memory
+export. It remains legal as a variable name. Names beginning
+<code>__</code> remain reserved.</p>
+<h2 id="strings-and-character-literals">Strings and character
+literals</h2>
+<p>A string literal uses double quotes. A character literal uses single
+quotes and represents an <code>int</code> ASCII code:</p>
+<pre class="strix"><code>string greeting = &quot;Hello&quot;;
+int letter = &#39;A&#39;; // 65</code></pre>
+<p>Both support <code>\n</code>, <code>\t</code>, <code>\r</code>,
+<code>\"</code>, <code>\'</code>, and <code>\\</code>. These escapes
+decode to one byte each. Other escapes, embedded NUL, raw newlines
+within literals, non-ASCII input, and character literals containing
+anything other than one decoded character are errors. <code>""</code> is
+a valid empty string; <code>''</code> is invalid.</p>
+<p>Strings have <strong>value semantics</strong>:</p>
+<ul>
+<li>Initializing or assigning a string variable copies the string’s
+bytes.</li>
+<li>A string parameter has an independent value. The supplied parameter
+prologue copies strings passed from JavaScript before source code can
+mutate them.</li>
+<li>A returned string must remain valid after the function returns. Its
+use must not expose mutable literal storage or a caller’s variable to
+unintended aliasing.</li>
+<li>Concatenation and repetition produce new string values. Their left
+string operand is captured before evaluating the right operand: with
+<code>s = "abc"</code>, <code>s + (s[0] = 'X')</code> produces
+<code>"abcX"</code>, while <code>s</code> becomes
+<code>"Xbc"</code>.</li>
+<li>A literal occurrence must retain its original bytes across
+calls.</li>
+</ul>
+<pre class="strix"><code>function Example() : string {
+  string a = &quot;abc&quot;;
+  string b = a;
+  b[0] = &#39;X&#39;;
+  return a + b; // &quot;abcXbc&quot;
+}</code></pre>
+<p>String-valued expressions are represented internally by pointers;
+copying is required at variable storage boundaries and at the host
+parameter boundary. Merely reading a variable for <code>#s</code> or
+<code>s[i]</code> need not allocate a copy. A simple correct approach
+also copies returned strings. Memory allocated for strings outlives the
+function that allocated it.</p>
+<h3 id="string-operations">String operations</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Expression</th>
+<th>Types</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>a + b</code></td>
+<td>string + string</td>
+<td>New concatenated string</td>
+</tr>
+<tr>
+<td><code>a + c</code></td>
+<td>string + int</td>
+<td>Append the character with ASCII code <code>c</code></td>
+</tr>
+<tr>
+<td><code>a * n</code></td>
+<td>string * int</td>
+<td>Repeat <code>a</code> exactly <code>n</code> times</td>
+</tr>
+<tr>
+<td><code>#a</code></td>
+<td>string</td>
+<td>Int character count, excluding NUL</td>
+</tr>
+<tr>
+<td><code>a[i]</code></td>
+<td>string indexed by int</td>
+<td>Int ASCII code at index <code>i</code></td>
+</tr>
+<tr>
+<td><code>a[i] = c</code></td>
+<td>string variable indexed by int, assigned int</td>
+<td>Update one byte; expression returns <code>c</code></td>
+</tr>
+</tbody>
+</table>
+<p>String + int means a <strong>character</strong>, not decimal number
+formatting. <code>"" + 65</code> is <code>"A"</code>. Int + string and
+int * string are not supported. Comparisons, subtraction, division, and
+remainder are not defined for strings in the core.</p>
+<p>Indexing binds more tightly than unary operators; <code>#s</code> is
+a length and <code>#s[0]</code> attempts to take the length of an int,
+which is an error. Read indexing may follow any string-valued primary,
+including a parenthesized expression. For indexed
+<strong>assignment</strong>, the base must be a string variable,
+optionally parenthesized. Assigning directly into a literal or
+concatenation result is an error.</p>
+<p>Index bounds are <code>0 &lt;= i &lt; #s</code>. Accessing the NUL
+terminator, a negative index, or another out-of-bounds index traps at
+runtime. Character stores and appended characters must be in
+<code>1..127</code>; zero and non-ASCII values trap. A negative
+repetition count traps; repeating zero times produces an empty
+string.</p>
+<p>These string checks are implemented in the <strong>supplied
+<code>Runtime.hpp</code> helpers</strong>. Use those helpers for checked
+indexing, character stores/appends, repetition, and allocation; you do
+not have to write those checks yourself. Wasm’s memory bounds checks
+alone do not enforce a string’s length. Your two student-written runtime
+routines are length and concatenation, described below.</p>
+<p>For indexed assignment, evaluate the base, then the index and bounds
+check, then the right-side expression, once each. Preserve the computed
+address and assigned value rather than reevaluating the left side to
+obtain the expression’s result. If a bounds check traps, the right side
+does not execute.</p>
+<h2 id="updated-precedence">Updated precedence</h2>
+<p>Strongest to weakest:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Operators</th>
+<th>Associativity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Numeric casts, parentheses; postfix indexing <code>[]</code></td>
+<td>Indexing is left-associative</td>
+</tr>
+<tr>
+<td>Unary <code>-</code>, <code>!</code>, <code>#</code></td>
+<td>Right</td>
+</tr>
+<tr>
+<td><code>*</code>, <code>/</code>, <code>%</code></td>
+<td>Left</td>
+</tr>
+<tr>
+<td><code>+</code>, <code>-</code></td>
+<td>Left</td>
+</tr>
+<tr>
+<td><code>==</code>, <code>!=</code>, <code>&lt;</code>,
+<code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code></td>
+<td>Non-associative</td>
+</tr>
+<tr>
+<td><code>=</code></td>
+<td>Right</td>
+</tr>
+</tbody>
+</table>
+<p>Casts, strings, and indexing use the supplied additional AST node
+kinds. Operator meaning is selected by source types. The Project 3
+assignment, scope, and evaluation-order rules remain.</p>
+<h2 id="memory-and-the-supplied-runtime">Memory and the supplied
+runtime</h2>
+<p>Use NUL-terminated ASCII strings in Wasm linear memory. A string
+pointer is a byte offset represented by <code>i32</code>. Reserve
+address 0 for the empty string’s NUL byte. Put literal bytes in
+<code>data</code> segments, including their terminators, and start the
+heap after all literal storage. Escape bytes correctly in WAT; the
+provided <code>WBytes</code> helper can produce byte escapes.</p>
+<p>The course runtime uses an allocation pointer that only moves
+forward. It starts with at least 16 pages and can grow to 256 pages (16
+MiB). The supplied allocator checks allocation sizes and traps if it
+cannot allocate. There is no garbage collection or <code>free</code>;
+discard the module to reclaim its memory. A skipped string declaration
+initially refers to the empty string at address 0.</p>
+<p>These exports form the interface used by both the browser and test
+runner:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Export</th>
+<th>Required behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>memory</code></td>
+<td>The module’s linear memory</td>
+</tr>
+<tr>
+<td><code>__alloc(size: i32) -&gt; i32</code></td>
+<td>Allocate <code>size</code> character bytes plus NUL; return the
+start offset</td>
+</tr>
+<tr>
+<td>Each source function</td>
+<td>Use its exact source name and lowered signature</td>
+</tr>
+<tr>
+<td><code>__heap</code></td>
+<td>Optional diagnostic export of the first unused byte</td>
+</tr>
+</tbody>
+</table>
+<p>The host encodes string arguments using <code>__alloc</code>, writes
+ASCII bytes and the terminator, and decodes string results from
+<code>memory</code>. Do not reserve an undocumented fixed address range
+for host inputs. The host reacquires its memory view after allocation
+because memory growth can replace the buffer.</p>
+<p><code>Runtime.hpp</code> is supplied. It implements allocation,
+copying, character creation, repetition, bounds checking, and checked
+character stores. Its helpers include:</p>
+<table>
+<thead>
+<tr>
+<th>Internal function</th>
+<th>Parameters → result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$__alloc</code></td>
+<td>size → pointer</td>
+</tr>
+<tr>
+<td><code>$__copy_bytes</code></td>
+<td>source, destination, byte count → no result</td>
+</tr>
+<tr>
+<td><code>$__copy</code></td>
+<td>source pointer → new independent string pointer</td>
+</tr>
+<tr>
+<td><code>$__char</code></td>
+<td>ASCII code → one-character string pointer</td>
+</tr>
+<tr>
+<td><code>$__repeat</code></td>
+<td>string pointer, count → new string pointer</td>
+</tr>
+<tr>
+<td><code>$__address</code></td>
+<td>string pointer, index → checked byte address</td>
+</tr>
+<tr>
+<td><code>$__store_char</code></td>
+<td>byte address, ASCII value → stored value</td>
+</tr>
+</tbody>
+</table>
+<p><strong>You implement <code>$__len</code> and <code>$__concat</code>
+in <code>StringRuntime.hpp</code>.</strong> The starter contains
+trapping stubs with the required signatures. The supplied support
+functions call them, so completing them unlocks the rest of the
+runtime.</p>
+<ul>
+<li><code>$__len(str: i32) -&gt; i32</code>: scan bytes until NUL and
+return the length.</li>
+<li><code>$__concat(a: i32, b: i32) -&gt; i32</code>: find both lengths,
+allocate their sum, copy both sequences in order, and return the new
+pointer. The allocator supplies the final terminator.</li>
+</ul>
+<p>The supplied module generator includes the runtime definitions, lays
+out literal strings, emits memory and heap definitions, and exports
+memory and <code>__alloc</code>. Students lower string expressions to
+the appropriate helpers and implement copying at assignments and
+returns. The supplied host-parameter prologue already protects the
+caller’s string buffer. You may replace the internal helpers if you
+preserve all language behavior and the required exported interface.</p>
+<h2 id="a-complete-text-transformation">A complete text
+transformation</h2>
+<pre class="strix"><code>function Transform(string text) : string {
+  int i = 0;
+  while (i &lt; #text) {
+    int c = text[i];
+    if (c &gt;= &#39;a&#39;) {
+      if (c &lt;= &#39;z&#39;) text[i] = c - &#39;a&#39; + &#39;A&#39;;
+    }
+    i = i + 1;
+  }
+  return text;
+}</code></pre>
+<p><code>Transform("Hello!")</code> returns <code>"HELLO!"</code>. The
+caller’s original string remains unchanged. The playground expects a
+function taking one string and returning one string; its default name is
+<code>Transform</code>, but the name can be changed in the page. Each
+transformation loads a fresh instance to reclaim earlier allocations.
+The compiler itself must support all signatures in this specification,
+not just this viewer convention.</p>
+<h2 id="errors-and-testing">Errors and testing</h2>
+<p>Continue reporting Project 3 errors. Inherited source-byte validation
+is supplied; detecting raw NUL bytes is not new Project 4 work. Add
+checks for incompatible initializers, assignments and returns, invalid
+operator types, illegal indexing or indexed assignment, invalid
+literals, and unsupported casts. Source-level calls are outside Project
+4. Validate all source before generation. A runtime bounds or arithmetic
+trap is different from a compiler diagnostic.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> doctor</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> check-in</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> tests</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> examples</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> serve</span></code></pre></div>
+<p>Open <a
+href="http://localhost:8000/web/">http://localhost:8000/web/</a> and
+click a module under <strong>Built examples</strong>. <strong>Refresh
+list</strong> shows newly compiled programs; <strong>Reload
+module</strong> fetches the selected example’s latest build. You can
+also choose a local <code>.wasm</code> file, which loads immediately;
+choose it again after recompiling. The examples include uppercase
+conversion, ROT13, and a boxed sign. The generic function panel also
+accepts a JSON argument list; JSON strings are marshaled through module
+memory automatically. Select <code>string</code> when a function returns
+a string pointer.</p>
+<p>The 128 required source fixtures cover a compact set of earlier
+regressions, typed numeric operations, strings, important runtime
+boundaries, and invalid programs. <code>make tests</code> compiles,
+assembles, and executes the programs; a module that returns the wrong
+result fails. Tests use a fresh module per fixture and preserve that
+instance between calls in a fixture. Inspect <code>build/tests</code>
+for logs.</p>
+<p>Use <code>make numeric-tests</code>, <code>make string-tests</code>,
+or <code>make regression-tests</code> while working on one part. Run one
+case with <code>make tests TEST_FLAGS="--test test-056"</code>. Numeric
+cases do not require the string memory interface yet; string cases check
+the complete interface. The default suite still runs every required
+case. <code>tests/COVERAGE.md</code> maps all cases to features. Case
+counts are debugging information, not individual grading weights.</p>
+<p>To automate an original test, create a <code>.strix</code> file under
+<code>my_tests/</code> and reference it as
+<code>../my_tests/your-case.strix</code> in
+<code>tests/manifest.json</code>. See <code>TESTING.md</code> for the
+schema. Source files are not discovered automatically. Tests accept
+either diagnostic format above and do not require exact wording.
+Additional grading cases follow the same required scope; staff stress
+checks of supplied infrastructure do not introduce extra student
+requirements.</p>
+<h2 id="implementation-milestones-and-grading">Implementation milestones
+and grading</h2>
+<p>A recommended sequence is:</p>
+<ol type="1">
+<li>Build and run the supplied numeric baseline.</li>
+<li>Parse int types and literals, annotate types, and select numeric
+instructions.</li>
+<li>Emit promotions and casts; finish numeric comparisons and
+diagnostics.</li>
+<li>Parse strings/characters and postfix indexing using the supplied AST
+fields.</li>
+<li>Implement length and concatenation in WAT; the module/runtime wiring
+is supplied.</li>
+<li>Lower string operations, indexing, mutation, and value copying.</li>
+<li>Run the full suite and the text-transformation examples.</li>
+</ol>
+<p>The November 15 check-in is <strong>25%</strong> of the grade and is
+intentionally small. Its six positive fixtures cover int literals/basic
+arithmetic, signed division, mixed arithmetic, and promotion in
+initializers, assignments, and returns. Strings, explicit casts,
+remainder, and new error checks are not required yet.
+<code>make check-in</code> selects exactly that group. Full check-in
+credit requires those features, a README, and an original test; partial
+credit reflects working portions. This is a feature milestone, not a
+requirement to pass 25% of the final suite. Inherited regression passes
+do not replace the milestone. The final <strong>75%</strong> covers the
+completed Project 4 language.</p>
+<p>For the check-in, also include an initial README identifying passing
+tests and a <code>my_tests/</code> directory with at least one original,
+specification-conforming program. To automate that case, reference it as
+<code>../my_tests/your-case.strix</code> in the test manifest (see
+<code>TESTING.md</code>).</p>
+<p>Submit sources, generated lexer and Emplex definitions, Makefile,
+runtime, runner, fixtures, added tests, and a README with design notes,
+limitations, and resource citations. The default build must produce
+<code>Project4</code>. Exclude binaries and <code>build/</code>, test a
+clean build on the course Linux systems, and commit/push regularly.</p>
+<p>Optional extensions include string equality or an additional text
+transformation. Specify semantics and provide tests; complete the
+required compiler first.</p>
+</body>
+</html>

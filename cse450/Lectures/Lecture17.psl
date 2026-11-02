@@ -1,0 +1,336 @@
+!set bg #08111F
+!set color #F4F1E8
+!set accent #5DE4C7
+!set font Helvetica, Arial, sans-serif
+!set headfont Helvetica, Arial, sans-serif
+!set linkcolor #CCCCFF
+!set visitedlinkcolor #CCCCFF
+!set size 30
+
+!set palette focus #FFD166
+!set palette id #8CD9FF
+!set palette done #B6A0D6
+!set palette emp #80FF80
+!set palette explain #DF97FF
+
+!style note {size=28px, w=1140px}
+!style code {font=Menlo, size=24px, w=750px, pad=12px, fill=#102233, color=#F4F1E8, stroke=#31505F}
+!style node {size=26px, pad=8px, align=center, fill=#173749, stroke=#8CD9FF, textcolor=#F4F1E8, thick=2}
+!style edge {color=#8AA5B5, thick=2}
+!style types {size=27px, w=1140px, pad=15px, headerfill=#173749, headertext=#5DE4C7, bodyfill=#102233, bodytext=#F4F1E8, stroke=#31505F, rules=rows, outer=1, colalign=(left,left,left)}
+
+% Lecture 17 resumes after Lecture 16, slide 9.
+% Slides 2-12 retain Lecture 16, slides 10-20, with calls labeled as a preview.
+% Slides 13-18 adapt all six slides in Lectures/Lecture-17 - WAT Memory.pptx.
+% Memory layout follows the current Strix specification and supplied runtime.
+% Wasm references:
+% https://webassembly.github.io/spec/core/syntax/modules.html
+% https://webassembly.github.io/spec/core/exec/instructions.html
+
+### Lecture 17: Types Recap
+[check] @(70, 165) {$note, size=29px} **Semantic analysis** checks the AST using context: names must resolve, and operations must accept their operands' source types.
+[types] @(70, 295) {$note, size=29px} **Representations:** double uses f64; int uses i32; string uses an i32 byte offset. A character literal such as 'A' is an int.
+[meaning] @(70, 425) {$note, size=29px} **Source types guide code generation.** Wasm checks machine operand types, but cannot distinguish an int from a string offset.
+[numeric] @(70, 555) {$note, size=29px, color=emp} **Numeric rules:** int can promote to double. 5 / 2 is 2; 5.0 / 2 is 2.5. The remainder operator % requires two ints.
+
+---
+### Explicit Numeric Conversions
+[good] @(70, 165) {$code, w=750px, size=27px} ```cpp
+// Inside a function:
+double d = 7;       // Implicit promotion
+int i = int(-2.9);  // Explicit conversion
+double e = double(i);
+```
+[explain] @(885, 165) {$note, w=315px} int to double is allowed implicitly. double to int requires an explicit cast.
+...
+[value] @(70, 390) {$note, w=750px, color=emp} `int(-2.9)` truncates toward zero, producing -2.
+...
+[bad] @(70, 480) {$code, w=750px, size=27px} ```cpp
+// INVALID declarations:
+int i = 2.9;
+int j = int("12");
+```
+[trap] @(885, 410) {$note, w=315px, size=26px, color=focus} An explicit double-to-int cast traps at runtime for NaN, infinity, or an out-of-range truncated result.
+[strings] @(70, 635) {$note, size=26px} Numeric casts accept numeric operands. string is not a numeric conversion target.
+---
+### Comparisons and Conditions
+[source] @(70, 165) {$code, w=760px, size=27px} ```cpp
+function Positive(double x) : int {
+  int answer = x > 0.0;
+  return answer;
+}
+```
+[change] @(890, 170) {$note, w=310px, color=emp} With typed Strix, comparisons and ! produce int 0 or 1.
+...
+[conditions] @(70, 390) {$note} if and while accept int or double conditions. Zero is false. Other numeric values are true, including 0.5 and NaN.
+...
+[string] @(70, 520) {$note, color=focus} A string cannot be a condition. To test whether text is nonempty, use `#text > 0`.
+[machine] @(70, 625) {$note, size=26px, color=id} Numeric comparisons produce i32 in Wasm. A double used as a condition still needs a comparison with zero.
+---
+% The original expression-tree examples are rebuilt as editable PSL nodes.
+### Inferring an Expression's Type
+[source] @(70, 155) {$note, size=30px} Given `int x = 3;`, determine the type of `x + 2.5`.
+[root] {$node} !rect (380, 275) (210, 75) +
+[left] {$node} !rect (150, 450) (210, 75) x
+[right] {$node} !rect (610, 450) (210, 75) 2.5
+[e1] {$edge} !line (435, 350) (255, 450)
+[e2] {$edge} !line (535, 350) (715, 450)
+[explain] @(900, 270) {$note, w=300px, color=explain} Start with the children: variable declarations and literal forms supply their types.
+...
+!anim left text x : int
+!anim right text 2.5 : double
+...
+!anim root text + : double
+!anim root stroke emp
+!anim explain text Numeric addition uses the common type double. Record that result type on the parent node.
+[conversion] @(70, 615) {$note, color=emp} Code generation must promote x to f64 before performing f64.add.
+---
+### AST Operation and Expression Type
+[fields] @(70, 165) {$code, w=750px, size=26px} ```text
+AST operation:   Binary
+Operator:        +
+Left child:      Variable(x), type int
+Right child:     Number(2.5), type double
+Expression type: double
+```
+[different] @(885, 170) {$note, w=315px} The AST kind tells us which operation to analyze. The source type tells us what value that operation produces.
+...
+[annotation] @(70, 430) {$note, color=emp} Add source-type information to expressions, variables, and function signatures. Analyze child expressions before their parent.
+...
+[emit] @(70, 555) {$note} The backend reads the annotations to select integer instructions, floating-point instructions, or string runtime operations.
+[pass] @(70, 650) {$note, size=25px, color=id} The semantic pass checks and annotates. It does not execute the source program.
+---
+% PowerPoint slide 12: string + int is legal, but its result is a string.
+### Checking an Assignment Tree
+[source] @(70, 155) {$note, size=30px} Given `int x = 1;` and `string y = "hi";`, is `x = y + 3;` legal?
+[assign] {$node} !rect (430, 260) (190, 65) =
+[target] {$node} !rect (190, 400) (190, 65) x : int
+[plus] {$node} !rect (670, 400) (190, 65) +
+[y] {$node} !rect (520, 545) (200, 65) y : string
+[three] {$node} !rect (820, 545) (190, 65) 3 : int
+[e1] {$edge} !line (475, 325) (285, 400)
+[e2] {$edge} !line (575, 325) (765, 400)
+[e3] {$edge} !line (720, 465) (620, 545)
+[e4] {$edge} !line (810, 465) (915, 545)
+[explain] @(940, 260) {$note, w=270px, size=26px, color=explain} First check the right subtree.
+...
+!anim plus text + : string
+!anim plus stroke emp
+!anim explain text string + int is legal: append the character with that ASCII code. Its result is string.
+...
+!anim assign stroke focus
+!anim assign text = : error
+[result] @(70, 650) {$note, size=26px, color=focus} The assignment fails: a string result cannot be stored in the int variable x.
+---
+% PowerPoint slides 11-12, updated to current literal and string rules.
+### Assignment Practice
+[context] @(70, 155) {$note, size=29px} Assume `int x = 1;` and `string y = "hi";`. Check each statement independently.
+[a] @(70, 270) {$note, w=500px} `x = x + 2;`
+[b] @(70, 345) {$note, w=500px} `y = 'c';`
+[c] @(70, 420) {$note, w=500px} `y = x;`
+[d] @(70, 495) {$note, w=500px} `y = 'a' + 'b';`
+[e] @(70, 570) {$note, w=500px} `y = "" + 'c';`
+...
+[aa] @(605, 270) {$note, w=595px, size=27px, color=emp} Valid: int addition, then int assignment.
+...
+[ba] @(605, 345) {$note, w=595px, size=27px, color=focus} Error: 'c' is an int.
+[ca] @(605, 420) {$note, w=595px, size=27px, color=focus} Error: x is an int, even if its value is 1.
+...
+[da] @(605, 495) {$note, w=595px, size=27px, color=focus} Error: character-code addition produces int 195.
+...
+[ea] @(605, 570) {$note, w=595px, size=27px, color=emp} Valid: appending the character produces "c".
+[rule] @(70, 655) {$note, size=24px, color=id} A type rule depends on operand types, not how a programmer might intend to display a value.
+---
+### Preview: Checking Function Calls
+[source] @(70, 155) {$code, w=780px, size=25px} ```cpp
+function Half(double x) : double {
+  return x / 2.0;
+}
+
+function Example() : double {
+  int count = 7;
+  return Half(count);
+}
+```
+[signature] @(900, 170) {$note, w=300px, size=27px, color=explain} Half expects one double argument and returns double.
+...
+[valid] @(900, 360) {$note, w=300px, size=27px, color=emp} Half(count) promotes int to double and returns 3.5.
+...
+[errors] @(70, 510) {$note} `Half()` and `Half(1, 2)` have the wrong argument count. `Half("7")` has an incompatible argument type.
+[scope] @(70, 625) {$note, size=25px} Source-level calls are a later language extension. A call needs a known signature; registering a signature before its body can support self-recursion.
+---
+### Preview: Conversions at Calls
+[wat] @(70, 150) {$code, w=780px, size=22px} ```wat
+(module
+  (func $half (param $x f64) (result f64)
+    (local.get $x)
+    (f64.const 2)
+    (f64.div))
+  (func $example (result f64)
+    (local $count i32)
+    (i32.const 7)
+    (local.set $count)
+    (local.get $count)
+    (f64.convert_i32_s)
+    (call $half))
+  (export "Half" (func $half))
+  (export "Example" (func $example))
+)
+```
+[convert] @(900, 175) {$note, w=300px, color=emp} The argument starts as i32. Convert it to f64 before calling Half.
+...
+[missing] @(900, 370) {$note, w=300px, color=focus} Accepting the source call in the type checker does not perform this conversion.
+...
+[other] @(70, 660) {$note, size=25px, color=id} Emit required conversions at initializers, assignments, and returns; later, at call arguments too.
+---
+### A Semantic Visitor
+[pseudo] @(70, 160) {$code, w=780px, size=24px} ```text
+AnalyzeExpression(node):
+    analyze each child expression
+    look up this operation's type rule
+    reject incompatible operand types
+    record and return the result type
+
+CheckValueForDestination(value, expected):
+    actual = AnalyzeExpression(value)
+    accept actual == expected
+    also accept int to double
+    otherwise report a source error
+```
+[context] @(900, 175) {$note, w=300px, size=27px} Resolve variable types from their bindings. Function signatures give parameter and return types.
+...
+[checks] @(900, 375) {$note, w=300px, size=27px, color=explain} Statement visitors also check numeric conditions, assignment targets, loop context, and return requirements.
+...
+[all] @(70, 600) {$note, size=27px, color=emp} Check both branches and unreachable statements. Preserve source locations so a type error points to the relevant expression.
+---
+### Type Errors and Runtime Traps
+[static] @(70, 165) {$note, w=535px, size=31px, color=emp} **Rejected during compilation**
+[bad] @(70, 250) {$code, w=535px, size=25px} ```cpp
+// Separate invalid fragments:
+int n = "hi";
+double r = 5.0 % 2;
+if ("hello") return 1;
+```
+...
+[runtime] @(680, 165) {$note, w=520px, size=31px, color=emp} **Well typed, but may trap**
+[good] @(680, 250) {$code, w=520px, size=25px} ```cpp
+// Given int n, int i, string s:
+10 / n;
+s[i];
+int(1.0 / 0.0);
+```
+...
+[explain] @(70, 485) {$note} Types alone do not prove that a divisor is nonzero, an index is in bounds, or a numeric conversion is in range.
+[roles] @(70, 605) {$note, size=27px, color=explain} Semantic analysis rejects illegal source operations. Generated code and the runtime enforce checks that depend on values.
+---
+### Questions to Check Your Understanding
+[a] @(70, 170) {$note, size=30px} Why is Wasm validation insufficient to enforce all Strix type rules?
+...
+[aa] @(100, 250) {$note, size=27px, color=emp} int and string offsets both use i32, but their legal source operations differ.
+...
+[b] @(70, 355) {$note, size=30px} What is the source type of `2 < 3.0`? What conversion does its comparison need?
+...
+[ba] @(100, 435) {$note, size=27px, color=emp} The result is int. Promote the left operand to double, then compare two f64 values.
+...
+[c] @(70, 540) {$note, size=30px} What information should reach code generation after semantic analysis?
+...
+[ca] @(100, 620) {$note, w=1100px, size=27px, color=emp} Resolved bindings and signatures, expression types, and enough context to emit each required conversion.
+---
+% Memory PowerPoint slide 1: section divider for optional material.
+# WebAssembly Memory
+## Optional continuation: bytes, strings, and allocation
+---
+% Memory PowerPoint slide 2. Use the current course runtime's memory limits.
+### Declaring Linear Memory
+[intro] @(70, 155) {$note} Linear memory is a separate, byte-addressed region. Our string values are i32 offsets into it.
+[module] @(70, 265) {$code, w=1140px, size=30px} ```wat
+(module
+  (memory (export "memory") 16 256)
+)
+```
+...
+[pages] @(70, 440) {$note, color=emp} Each page is 65,536 bytes (64 KiB). Start with 16 pages (1 MiB); allow growth up to 256 pages (16 MiB).
+...
+[export] @(70, 550) {$note} The export makes the memory available to the host, such as JavaScript through `instance.exports.memory`.
+[zero] @(70, 655) {$note, size=25px, color=id} New memory starts with zero bytes. Data segments can initialize selected locations.
+---
+% Memory PowerPoint slide 3. Reserve address 0 for the empty string.
+### Initializing String Bytes
+[module] @(70, 150) {$code, w=1140px, size=27px} ```wat
+(module
+  (memory (export "memory") 16 256)
+  (data (i32.const 1) "Hello!\00")
+)
+```
+...
+[bytes] @(70, 350) {$types, size=25px, pad=12px, colwidths=(23%,9%,9%,9%,9%,9%,9%,9%,14%), colalign=(left,center,center,center,center,center,center,center,center)} | Byte offset | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| Byte (hex) | 00 | 48 | 65 | 6C | 6C | 6F | 21 | 00 |
+| Character | NUL | H | e | l | l | o | ! | NUL |
+...
+[terminator] @(70, 540) {$note} `\00` writes one zero byte, the NUL terminator. "Hello!" has six characters but occupies seven bytes.
+[empty] @(70, 640) {$note, size=26px, color=emp} Address 0 represents the empty string. "Hello!" starts at 1; the first unused byte is 8.
+---
+% Memory PowerPoint slide 4. Name the heap pointer consistently with the runtime.
+### Tracking the First Unused Byte
+[module] @(70, 155) {$code, w=1140px, size=27px} ```wat
+(module
+  (memory (export "memory") 16 256)
+  (data (i32.const 1) "Hello!\00")
+  (global $__heap (mut i32) (i32.const 8))
+)
+```
+...
+[global] @(70, 390) {$note} `$__heap` is a global holding an i32 offset. `mut` allows it to change; without `mut`, a global is immutable.
+...
+[allocate] @(70, 505) {$note, color=emp} To reserve three character bytes: start at 8, put the terminator at 11, then advance the heap pointer to 12.
+[metadata] @(70, 620) {$note, size=26px, color=id} Updating the pointer tracks reserved space; it does not grow memory. This simple heap only moves forward and never frees individual strings.
+---
+% Memory PowerPoint slide 5. Simplified allocator for explaining the stack.
+% Add this function inside the module on the previous slide.
+### Allocating a String: The Core Idea
+[allocator] @(70, 150) {$code, w=800px, size=22px} ```wat
+(func $alloc_str (param $size i32) (result i32)
+  (local $null_pos i32)
+  (global.get $__heap) ;; Keep start for return
+  (i32.add (global.get $__heap)
+           (local.get $size))
+  (local.set $null_pos)
+  (i32.store8 (local.get $null_pos) (i32.const 0))
+  (i32.add (local.get $null_pos) (i32.const 1))
+  (global.set $__heap)
+)
+```
+[where] @(920, 155) {$note, w=285px, size=26px} Add this function inside the module. size counts characters; reserve one extra byte for NUL.
+...
+[stack] @(920, 335) {$note, w=285px, size=26px, color=emp} The original heap pointer stays on the operand stack. It becomes the function's i32 result.
+...
+[example] @(70, 510) {$note, w=800px, size=27px, color=explain} With heap = 8 and size = 3: return 8, store NUL at 11, and set heap = 12.
+[assume] @(70, 620) {$note, size=25px, color=focus} Teaching version: assume size is nonnegative, enough memory exists, and arithmetic does not overflow. The supplied allocator also checks limits and grows memory.
+---
+% Memory PowerPoint slide 6. Forward byte copy; assumes nonoverlapping regions.
+% Add this function inside the same module as the memory declaration.
+### Copying Bytes in Linear Memory
+[copy] @(70, 150) {$code, w=820px, size=21px} ```wat
+(func $copy_bytes
+  (param $src i32) (param $dest i32) (param $size i32)
+  (loop $copy_loop
+    (if (i32.eqz (local.get $size)) (then (return)))
+    (local.get $dest)
+    (i32.load8_u (local.get $src))
+    (i32.store8)
+    (local.set $src
+      (i32.add (local.get $src) (i32.const 1)))
+    (local.set $dest
+      (i32.add (local.get $dest) (i32.const 1)))
+    (local.set $size
+      (i32.sub (local.get $size) (i32.const 1)))
+    (br $copy_loop)
+  )
+)
+```
+[load] @(930, 155) {$note, w=275px, size=25px} load8_u reads one byte and zero-extends it to i32. store8 writes the low byte to dest.
+...
+[loop] @(930, 335) {$note, w=275px, size=25px, color=emp} Advance both offsets; decrease the count. Copy size character bytes into a destination with NUL already reserved.
+...
+[assume] @(930, 555) {$note, w=275px, size=24px, color=focus} Assume valid, nonoverlapping regions and a nonnegative byte count.
