@@ -1,0 +1,121 @@
+{
+  "$schema": "./schema/characteristics.schema.json",
+  "description": "The eight Characteristics.",
+  "license": "CC BY-SA 4.0",
+  "attribution": "Based on the material for Ars Magica, ©1993–2024, licensed by Trident, Inc. d/b/a Atlas Games®, under Creative Commons Attribution-ShareAlike 4.0 International license 4.0 (\"CC-BY-SA 4.0\")",
+  "count": 8,
+  "records": [
+    {
+      "id": "characteristic.intelligence",
+      "name": "Intelligence",
+      "abbreviation": "Int",
+      "text": "Intelligence represents the power to analyze and synthesize concepts, as well as simple memory. It is important for Abilities that require thought power and is paramount for the Hermetic Arts. A character with low Intelligence is not necessarily stupid—common sense, street savvy, wisdom, and the ability to learn are not described by Intelligence.",
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "verbatim",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "characteristic.perception",
+      "name": "Perception",
+      "abbreviation": "Per",
+      "text": "Perception quantifies the ability to notice things, as well as powers of intuition. While sometimes conscious, Perception often works intuitively — your character simply notices something. The storyguide may also let you roll Perception when checking various Knowledges, to see if you have insight into a certain fact or concept. Perception is important for Abilities such as Awareness, Hunt, and Folk Ken.",
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "verbatim",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "characteristic.strength",
+      "name": "Strength",
+      "abbreviation": "Str",
+      "text": "Strength measures physical power: lifting, pushing, shoving, heaving, and moving. Strength is important when hefting a melee weapon and when using brute, physical force against something or someone. People with high Strength are often bigger than those with low Strength, assuming they have the same Size.",
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "verbatim",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "characteristic.stamina",
+      "name": "Stamina",
+      "abbreviation": "Sta",
+      "text": "Stamina represents the limits of a character's exertion, as well as how much physical punishment he can sustain. It is staying power, both mental and physical, and one of its most important components is simply the will to live. Spellcasting relies on Stamina. Stamina also measures someone's ability to carry a load for an extended period, ignore fatigue, and withstand wounds.",
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "verbatim",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "characteristic.presence",
+      "name": "Presence",
+      "abbreviation": "Pre",
+      "text": "Presence describes a character's appearance, demeanor, and charisma. It is important for making a good impression, as well as for leading people. Presence also measures how imposing or intimidating a person is. Even if not physically attractive, a person with high Presence might still have a demeanor that commands respect.",
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "verbatim",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "characteristic.communication",
+      "name": "Communication",
+      "abbreviation": "Com",
+      "text": "Communication represents the aptitude for self-expression. It is important when attempting to influence or communicate with someone, verbally or otherwise. A positive Communication score suggests a character who is comfortable with or confident in his relationships with other people.",
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "verbatim",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "characteristic.dexterity",
+      "name": "Dexterity",
+      "abbreviation": "Dex",
+      "text": "Dexterity means being able to move with agility and to manipulate objects accurately and skillfully. It includes hand-eye coordination, fine motor control, and bodily grace. Dexterity also helps determine how well your character swings a sword or throws a knife.",
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "verbatim",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "characteristic.quickness",
+      "name": "Quickness",
+      "abbreviation": "Qik",
+      "text": "Quickness indicates reaction speed and reflexes, and helps determine who acts first when two people are trying to do something with great haste. It also describes how well your character does something in a hurry. Your effective Quickness is usually modified by your Encumbrance. See [page 403](#encumbrance) for more information on Encumbrance.",
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "verbatim",
+      "ruleset": [
+        "definitive"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+# License
+
+Unless a third-party notice states otherwise, project content is licensed under the Creative Commons
+Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
+https://creativecommons.org/licenses/by-sa/4.0/
+
+## Scope of the two licenses
+
+Original application source code is additionally offered under the MIT license
+(see LICENSE-MIT), at the recipient's option. This is a choice of licenses for
+that code, not a requirement to comply with both licenses at once.
+
+- Original program code, including TypeScript/TSX, CSS, HTML, Python, shell
+  scripts, build configuration, and automated test code: CC BY-SA 4.0 OR MIT.
+- Ars Magica game content, including the records under `data/`, published
+  character fixtures under `test/golden/`, copied or adapted rules text, and
+  game-content portions of generated sheets: CC BY-SA 4.0 only.
+- Project prose documentation: CC BY-SA 4.0, unless explicitly marked otherwise.
+- Third-party dependencies and other separately attributed material: their own
+  licenses, which this project does not replace.
+
+Location and file extension do not override these distinctions. In particular,
+the MIT option does not extend to Ars Magica content embedded in a source file
+or a test fixture. Bundling code and game data together does not make the game
+data available under MIT. Preserve attribution and license notices for each.
+
+LICENSE-MIT is the standard MIT text for eligible original code; it is not an
+alternative license for every file in this repository.
+
+## Player-created records and generated output
+
+Using the application does not by itself grant this project rights in a
+player's original character, campaign notes, or other contributions, or publish
+them under either project license. Embedded licensed game content retains its
+existing terms. Adaptations of licensed material must comply with CC BY-SA 4.0
+when shared. Generated sheets should preserve the game-content attribution,
+license link, indication of changes, and applicable trademark statements.
+
+Official licensing and trademark conditions:
+https://atlas-games.com/arsmagica/openars
+
+## Attribution
+
+Based on the material for Ars Magica, (c)1993-2024, licensed by Trident, Inc.
+d/b/a Atlas Games(R), under Creative Commons Attribution-ShareAlike 4.0
+International license 4.0 ("CC-BY-SA 4.0")
+
+Ars Magica Open License Logo (c)2024 Trident, Inc. The Ars Magica Open License
+Logo, Ars Magica, and Mythic Europe are trademarks of Trident, Inc., and are
+used with permission.
+
+Order of Hermes, Tremere, Doissetep, and Grimgroth are trademarks of Paradox
+Interactive AB and are used with permission.
+
+## Changes made
+
+The text in `data/` has been extracted from the licensed markdown corpus and
+restructured into machine-readable records. Each record carries an `adaptation`
+field recording how it was changed: `verbatim`, `abridged`, `restructured`, or
+`original`. Per-book attribution is generated in ATTRIBUTION.md.
+
+## Not included
+
+This repository contains no trade dress, graphic design, artwork, cartography,
+or logos from any Ars Magica publication. These are not covered by the open
+license.
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or sponsored by Atlas Games
+or Paradox Interactive AB.

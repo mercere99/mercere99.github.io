@@ -1,0 +1,118 @@
+{
+  "$schema": "../schema/rule.schema.json",
+  "description": "Character creation budgets, tables, and constraints. Hard rules ('may not') are errors; guidelines ('should not') are warnings.",
+  "license": "CC BY-SA 4.0",
+  "attribution": "Based on the material for Ars Magica, ©1993–2024, licensed by Trident, Inc. d/b/a Atlas Games®, under Creative Commons Attribution-ShareAlike 4.0 International license 4.0 (\"CC-BY-SA 4.0\")",
+  "source": { "book": "Ars Magica: Definitive Edition", "year": 2024 },
+  "adaptation": "restructured",
+  "ruleset": ["definitive"],
+
+  "characteristics": {
+    "points": 7,
+    "min": -3,
+    "max": 3,
+    "cost": { "3": 6, "2": 3, "1": 1, "0": 0, "-1": -1, "-2": -3, "-3": -6 }
+  },
+
+  "advancement": {
+    "note": "Cumulative experience to reach a score from zero. Arts use the triangular series n(n+1)/2; Abilities use five times that.",
+    "ability": [0, 5, 15, 30, 50, 75, 105, 140, 180, 225, 275, 330, 390, 455, 525, 600, 680, 765, 855, 950, 1050],
+    "art":     [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136, 153, 171, 190, 210]
+  },
+
+  "experience": {
+    "earlyChildhood": {
+      "years": 5,
+      "nativeLanguage": 75,
+      "points": 45,
+      "abilities": ["ability.area-lore", "ability.athletics", "ability.awareness", "ability.brawl", "ability.charm", "ability.folk-ken", "ability.guile", "ability.living-language", "ability.stealth", "ability.survival", "ability.swim"]
+    },
+    "laterLife": {
+      "perYear": 15,
+      "modifiers": [
+        { "virtue": "virtue.wealthy", "perYear": 20 },
+        { "flaw": "flaw.poor", "perYear": 10 }
+      ]
+    },
+    "apprenticeship": { "years": 15, "points": 240, "spellLevels": 120 },
+    "afterApprenticeship": { "perYear": 30 }
+  },
+
+  "abilityCapByAge": [
+    { "maxAge": 29, "cap": 5 },
+    { "maxAge": 35, "cap": 6 },
+    { "maxAge": 40, "cap": 7 },
+    { "maxAge": 45, "cap": 8 },
+    { "maxAge": null, "cap": 9 }
+  ],
+
+  "virtueFlawPoints": { "free": 0, "minor": 1, "major": 3 },
+
+  "characterTypes": {
+    "grog": {
+      "label": "Grog",
+      "maxFlawPoints": 3,
+      "virtuePointsPerFlawPoint": 1,
+      "confidence": null,
+      "constraints": [
+        { "id": "social-status-required", "severity": "error", "message": "Every character must take one Social Status." },
+        { "id": "vf-balance", "severity": "error", "message": "Virtue points may not exceed Flaw points." },
+        { "id": "flaw-budget", "severity": "error", "message": "Grogs may take up to 3 points of Flaws." },
+        { "id": "no-major", "severity": "error", "message": "Grogs may not take Major Virtues or Flaws." },
+        { "id": "no-hermetic", "severity": "error", "message": "Grogs may not take Hermetic Virtues or Flaws." },
+        { "id": "no-gift", "severity": "error", "message": "Grogs may not take The Gift." },
+        { "id": "no-story-flaws", "severity": "warning", "message": "Grogs should not take Story Flaws; those make a character central to stories." },
+        { "id": "max-personality-flaws", "severity": "warning", "value": 1, "message": "Grogs should not take more than one Personality Flaw." },
+        { "id": "single-take", "severity": "error", "message": "A Virtue or Flaw may be taken more than once only if its description allows it." }
+      ]
+    },
+    "companion": {
+      "label": "Companion",
+      "maxFlawPoints": 10,
+      "virtuePointsPerFlawPoint": 1,
+      "confidence": { "score": 1, "points": 3 },
+      "constraints": [
+        { "id": "social-status-required", "severity": "error", "message": "Every character must take one Social Status." },
+        { "id": "vf-balance", "severity": "error", "message": "Virtue points may not exceed Flaw points." },
+        { "id": "flaw-budget", "severity": "error", "message": "Companions may take up to 10 points of Flaws." },
+        { "id": "max-minor-flaws", "severity": "error", "value": 5, "message": "Companions may not have more than 5 Minor Flaws." },
+        { "id": "hermetic-requires-gift", "severity": "error", "message": "Companions may not take Hermetic Virtues or Flaws without The Gift." },
+        { "id": "max-story-flaws", "severity": "warning", "value": 1, "message": "A character should not have more than one Story Flaw." },
+        { "id": "max-personality-flaws", "severity": "warning", "value": 2, "message": "A character should not have more than two Personality Flaws." },
+        { "id": "max-major-personality-flaws", "severity": "error", "value": 1, "message": "A character may not have more than one Major Personality Flaw." },
+        { "id": "single-take", "severity": "error", "message": "A Virtue or Flaw may be taken more than once only if its description allows it." }
+      ]
+    },
+    "magus": {
+      "label": "Magus",
+      "maxFlawPoints": 10,
+      "virtuePointsPerFlawPoint": 1,
+      "confidence": { "score": 1, "points": 3 },
+      "required": ["virtue.the-gift", "virtue.hermetic-magus"],
+      "freeMinorVirtueFromHouse": true,
+      "constraints": [
+        { "id": "vf-balance", "severity": "error", "message": "Virtue points may not exceed Flaw points (plus the free House Virtue)." },
+        { "id": "flaw-budget", "severity": "error", "message": "Magi may take up to 10 points of Flaws." },
+        { "id": "max-minor-flaws", "severity": "error", "value": 5, "message": "Magi may not have more than 5 Minor Flaws." },
+        { "id": "required-virtues", "severity": "error", "message": "Magi must take The Gift and the Hermetic Magus Social Status." },
+        { "id": "max-major-hermetic-virtues", "severity": "error", "value": 1, "message": "Magi may not have more than one Major Hermetic Virtue." },
+        { "id": "hermetic-flaw-recommended", "severity": "warning", "message": "Magi should take at least one Hermetic Flaw." },
+        { "id": "max-story-flaws", "severity": "warning", "value": 1, "message": "A character should not have more than one Story Flaw." },
+        { "id": "max-personality-flaws", "severity": "warning", "value": 2, "message": "A character should not have more than two Personality Flaws." },
+        { "id": "max-major-personality-flaws", "severity": "error", "value": 1, "message": "A character may not have more than one Major Personality Flaw." },
+        { "id": "single-take", "severity": "error", "message": "A Virtue or Flaw may be taken more than once only if its description allows it." }
+      ]
+    }
+  },
+
+  "derived": {
+    "fatigueLevels": ["OK", "0", "-1", "-3", "-5", "Unconscious"],
+    "woundPenalties": { "note": "Each band spans 5 + Size points of damage.", "bands": [-1, -3, -5], "incapacitated": true },
+    "sizeVirtues": [
+      { "virtue": "virtue.large", "size": 1 },
+      { "virtue": "virtue.giant-blood", "size": 2 },
+      { "flaw": "flaw.small-frame", "size": -1 },
+      { "flaw": "flaw.dwarf", "size": -2 }
+    ]
+  }
+}

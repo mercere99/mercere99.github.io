@@ -1,0 +1,34 @@
+{
+  "$schema": "../schema/rule.schema.json",
+  "description": "How spell levels change when magnitudes are added or removed.",
+  "license": "CC BY-SA 4.0",
+  "attribution": "Based on the material for Ars Magica, ©1993–2024, licensed by Trident, Inc. d/b/a Atlas Games®, under Creative Commons Attribution-ShareAlike 4.0 International license 4.0 (\"CC-BY-SA 4.0\")",
+  "records": [
+    {
+      "id": "rule.magnitude-scaling",
+      "name": "Magnitude scaling",
+      "summary": "Each step of Range, Duration, or Target adds one magnitude. At level 5 and above a magnitude is five levels; below level 5 a magnitude is one level.",
+      "algorithm": {
+        "atOrAbove": { "threshold": 5, "levelsPerMagnitude": 5 },
+        "below": { "threshold": 5, "levelsPerMagnitude": 1 },
+        "note": "Apply magnitudes one at a time, re-checking the threshold after each step. A level 15 spell reduced by five magnitudes is level 2, not level -10: the first two magnitudes take it 15 → 10 → 5, and the remaining three take it 5 → 4 → 3 → 2."
+      },
+      "examples": [
+        {
+          "from": 15,
+          "magnitudes": 2,
+          "to": 25,
+          "note": "Voice→Sight and Sun→Moon on a level 15 spell."
+        },
+        { "from": 15, "magnitudes": -5, "to": 2 },
+        { "from": 5, "magnitudes": -1, "to": 4 },
+        { "from": 2, "magnitudes": 1, "to": 3 },
+        { "from": 4, "magnitudes": 1, "to": 5 },
+        { "from": 5, "magnitudes": 1, "to": 10 }
+      ],
+      "source": { "book": "Ars Magica: Definitive Edition", "year": 2024 },
+      "adaptation": "restructured",
+      "ruleset": ["definitive"]
+    }
+  ]
+}

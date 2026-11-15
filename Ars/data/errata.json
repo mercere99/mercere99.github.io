@@ -1,0 +1,18 @@
+{
+  "$schema": "./schema/errata.schema.json",
+  "description": "Corrections and observations against the source corpus, tracked for submission upstream. Corrections are applied by tools/ingest/errata.py after each ingest; never hand-edit data/*.json, it is regenerated.",
+  "records": [
+    {
+      "id": "errata.2026-09-01.prestigious-student-order",
+      "kind": "observation",
+      "file": "virtues.json",
+      "record": "virtue.prestigious-student",
+      "destination": "corpus",
+      "category": "formatting",
+      "status": "unreported",
+      "found": "2026-09-01",
+      "note": "The qualifier line reads '*General, Minor*', reversing the size-then-category order used by all 625 other entries. The extractor detects and normalizes this, and warns rather than guessing, so no data patch is needed. Recorded so the transcription can be normalized upstream.",
+      "citation": "Ars Magica: Definitive Edition, Virtues, 'Prestigious Student'"
+    }
+  ]
+}

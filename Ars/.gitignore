@@ -1,0 +1,8 @@
+ingest-warnings*.txt
+node_modules/
+dist/
+__pycache__/
+.env
+.env.*
+!.env.example
+.DS_Store

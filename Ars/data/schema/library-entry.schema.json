@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "library-entry.schema.json",
+  "title": "Library entry",
+  "description": "A ready-made character, beast, or covenant — either extracted from a published book or written for this project to fill a gap in coverage.",
+  "type": "object",
+  "required": ["id", "name", "entryType", "facets", "source", "adaptation"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^library\\.[a-z0-9-]+\\.[a-z0-9-]+$" },
+    "name": { "type": "string" },
+    "entryType": {
+      "enum": ["grog", "companion", "magus", "npc", "beast", "covenant", "group"]
+    },
+
+    "facets": {
+      "description": "Structured, closed-vocabulary dimensions. These drive the filter UI; anything open-ended belongs in `tags` instead.",
+      "type": "object",
+      "properties": {
+        "book": {
+          "description": "Slug of the source book. Redundant with `source` but denormalized so a single facet query answers 'a grog from Grogs'.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "published = extracted from licensed text; original = written for this project.",
+          "enum": ["published", "original"]
+        },
+        "house": {
+          "description": "Hermetic House, for magi. Note the trademark conditions on House names in LICENSE.",
+          "type": "string"
+        },
+        "realm": {
+          "type": "array",
+          "items": { "enum": ["magic", "faerie", "infernal", "divine", "mundane"] }
+        },
+        "socialStatus": { "type": "string" },
+        "role": {
+          "description": "What the entry is for at the table: turb, servant, artisan, antagonist, patron, mentor, quarry.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "power": {
+          "description": "Rough tier, for filtering rather than balance. Beasts use Might where they have it.",
+          "enum": ["trivial", "low", "moderate", "high", "legendary"]
+        },
+        "region": {
+          "description": "Tribunal or geographic setting, where the entry is tied to one.",
+          "type": "string"
+        },
+        "gift": { "enum": ["none", "gifted", "gentle", "blatant"] },
+        "sex": { "type": "string" }
+      },
+      "required": ["book", "origin"],
+      "additionalProperties": false
+    },
+
+    "tags": {
+      "description": "Open vocabulary for everything the facets do not cover: 'crossbow', 'covenant-born', 'suspicious-of-magi', 'good-first-grog'. Lowercase, hyphenated. Tags are additive and never load-bearing for rules.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9-]+$" }
+    },
+
+    "summary": {
+      "description": "One or two sentences: what this entry is and when a storyguide would reach for it. Written for this project, so `adaptation` is 'original' even when the stat block is verbatim.",
+      "type": "string"
+    },
+
+    "block": {
+      "description": "The stat block, in the same shape the engine consumes for a built character. Absent for covenants, which use the covenant schema.",
+      "type": "object"
+    },
+
+    "source": {
+      "type": "object",
+      "required": ["book", "year"],
+      "properties": {
+        "book": { "type": "string" },
+        "year": { "type": "integer" }
+      }
+    },
+    "adaptation": {
+      "enum": ["verbatim", "abridged", "restructured", "original"]
+    },
+    "ruleset": {
+      "type": "array",
+      "items": { "enum": ["arm5", "definitive"] }
+    }
+  },
+  "additionalProperties": false,
+
+  "examples": [
+    {
+      "id": "library.grog.original-marsh-warden",
+      "name": "Marsh Warden",
+      "entryType": "grog",
+      "facets": {
+        "book": "original",
+        "origin": "original",
+        "socialStatus": "covenfolk",
+        "role": ["turb", "guide"],
+        "power": "low",
+        "gift": "none"
+      },
+      "tags": ["spear", "wetland", "quiet", "good-first-grog"],
+      "summary": "A covenant-born watchman who knows the fen paths better than the roads. Written to fill a gap: the published grog templates are short on characters whose value is knowledge of the covenant's own terrain.",
+      "source": { "book": "Ars Ratiocinandi", "year": 2026 },
+      "adaptation": "original",
+      "ruleset": ["definitive"]
+    }
+  ]
+}

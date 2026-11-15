@@ -1,0 +1,384 @@
+{
+  "$schema": "./schema/rdt.schema.json",
+  "description": "Range, Duration, and Target options with their magnitude costs.",
+  "license": "CC BY-SA 4.0",
+  "attribution": "Based on the material for Ars Magica, ©1993–2024, licensed by Trident, Inc. d/b/a Atlas Games®, under Creative Commons Attribution-ShareAlike 4.0 International license 4.0 (\"CC-BY-SA 4.0\")",
+  "count": 25,
+  "records": [
+    {
+      "id": "rdt.range.personal",
+      "name": "Personal",
+      "parameter": "range",
+      "targetType": null,
+      "magnitudes": 0,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.duration.momentary",
+      "name": "Momentary",
+      "parameter": "duration",
+      "targetType": null,
+      "magnitudes": 0,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.individual",
+      "name": "Individual",
+      "parameter": "target",
+      "targetType": "object",
+      "magnitudes": 0,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.circle",
+      "name": "Circle",
+      "parameter": "target",
+      "targetType": "container",
+      "magnitudes": 0,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.taste",
+      "name": "Taste",
+      "parameter": "target",
+      "targetType": "sense",
+      "magnitudes": 0,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.range.touch",
+      "name": "Touch",
+      "parameter": "range",
+      "targetType": null,
+      "magnitudes": 1,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.range.eye",
+      "name": "Eye",
+      "parameter": "range",
+      "targetType": null,
+      "magnitudes": 1,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.duration.concentration",
+      "name": "Concentration",
+      "parameter": "duration",
+      "targetType": null,
+      "magnitudes": 1,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.duration.diameter",
+      "name": "Diameter",
+      "parameter": "duration",
+      "targetType": null,
+      "magnitudes": 1,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.part",
+      "name": "Part",
+      "parameter": "target",
+      "targetType": "object",
+      "magnitudes": 1,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.touch",
+      "name": "Touch",
+      "parameter": "target",
+      "targetType": "sense",
+      "magnitudes": 1,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.range.voice",
+      "name": "Voice",
+      "parameter": "range",
+      "targetType": null,
+      "magnitudes": 2,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.duration.sun",
+      "name": "Sun",
+      "parameter": "duration",
+      "targetType": null,
+      "magnitudes": 2,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.duration.ring",
+      "name": "Ring",
+      "parameter": "duration",
+      "targetType": null,
+      "magnitudes": 2,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.group",
+      "name": "Group",
+      "parameter": "target",
+      "targetType": "object",
+      "magnitudes": 2,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.room",
+      "name": "Room",
+      "parameter": "target",
+      "targetType": "container",
+      "magnitudes": 2,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.smell",
+      "name": "Smell",
+      "parameter": "target",
+      "targetType": "sense",
+      "magnitudes": 2,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.range.sight",
+      "name": "Sight",
+      "parameter": "range",
+      "targetType": null,
+      "magnitudes": 3,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.duration.moon",
+      "name": "Moon",
+      "parameter": "duration",
+      "targetType": null,
+      "magnitudes": 3,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.structure",
+      "name": "Structure",
+      "parameter": "target",
+      "targetType": "container",
+      "magnitudes": 3,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.hearing",
+      "name": "Hearing",
+      "parameter": "target",
+      "targetType": "sense",
+      "magnitudes": 3,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.range.arcane-connection",
+      "name": "Arcane Connection",
+      "parameter": "range",
+      "targetType": null,
+      "magnitudes": 4,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.duration.year",
+      "name": "Year",
+      "parameter": "duration",
+      "targetType": null,
+      "magnitudes": 4,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.boundary",
+      "name": "Boundary",
+      "parameter": "target",
+      "targetType": "container",
+      "magnitudes": 4,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    },
+    {
+      "id": "rdt.target.vision",
+      "name": "Vision",
+      "parameter": "target",
+      "targetType": "sense",
+      "magnitudes": 4,
+      "source": {
+        "book": "Ars Magica: Definitive Edition",
+        "year": 2024
+      },
+      "adaptation": "restructured",
+      "ruleset": [
+        "definitive"
+      ]
+    }
+  ]
+}

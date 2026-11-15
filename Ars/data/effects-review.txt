@@ -1,0 +1,187 @@
+# Entries mentioning a mechanic that received no effect.
+# Each needs either an entry in effects-manual.json or a deliberate
+# decision that it is narrative only.
+flaw.abandoned-apprentice	Abandoned Apprentice
+flaw.ability-block	Ability Block
+flaw.afflicted-tongue	Afflicted Tongue
+flaw.anchored-to-the-land	Anchored to the (Land)
+flaw.arthritis	Arthritis
+flaw.broken-vessel	Broken Vessel
+flaw.brutal-artist	Brutal Artist
+flaw.castratus	Castratus
+flaw.church-upbringing	Church Upbringing
+flaw.corrupted-abilities	Corrupted Abilities
+flaw.corrupted-arts	Corrupted Arts
+flaw.corrupted-spells	Corrupted Spells
+flaw.craving-for-travel	Craving for Travel
+flaw.deficient-form	Deficient Form
+flaw.deficient-technique	Deficient Technique
+flaw.devoted-parent-child	Devoted Parent/Child
+flaw.diabolic-past	Diabolic Past
+flaw.disfigured	Disfigured
+flaw.dwarf	Dwarf
+flaw.enfeebled	Enfeebled
+flaw.evil-destiny	Evil Destiny
+flaw.feral-scent	Feral Scent
+flaw.feral-upbringing	Feral Upbringing
+flaw.fickle-nature	Fickle Nature
+flaw.flashbacks	Flashbacks
+flaw.foreign-upbringing	Foreign Upbringing
+flaw.frail	Frail
+flaw.fury	Fury
+flaw.gullible	Gullible
+flaw.humble	Humble
+flaw.hunchback	Hunchback
+flaw.hunger-for-form-magic	Hunger for (Form) Magic
+flaw.impious-friend	Impious Friend
+flaw.incomprehensible	Incomprehensible
+flaw.inconstant-magic	Inconstant Magic
+flaw.independent-craftsman	Independent Craftsman
+flaw.inscribed-shadow	Inscribed Shadow
+flaw.leprosy	Leprosy
+flaw.loose-magic	Loose Magic
+flaw.lycanthrope	Lycanthrope
+flaw.magic-addiction	Magic Addiction
+flaw.manifest-sin	Manifest Sin
+flaw.master-of-none	Master of None
+flaw.missing-hand	Missing Hand
+flaw.monstrous-blood	Monstrous Blood
+flaw.mute	Mute
+flaw.necessary-realm-aura-for-ability	Necessary (Realm) Aura for (Ability)
+flaw.night-terrors	Night Terrors
+flaw.overconfident	Overconfident
+flaw.palsied-hands	Palsied Hands
+flaw.poor-concentration	Poor Concentration
+flaw.poor-student	Poor Student
+flaw.primitive-equipment	Primitive Equipment
+flaw.raised-in-the-gutter	Raised in the Gutter
+flaw.repellent	Repellent
+flaw.restricted-learning	Restricted Learning
+flaw.savantism	Savantism
+flaw.sheltered-upbringing	Sheltered Upbringing
+flaw.stuck-in-your-ways	Stuck in Your Ways
+flaw.suppressed-gift	Suppressed Gift
+flaw.surgical-empiricus	Surgical Empiricus
+flaw.susceptibility-to-infernal-power	Susceptibility to Infernal Power
+flaw.uncertain-faith	Uncertain Faith
+flaw.uninspirational	Uninspirational
+flaw.unlucky	Unlucky
+flaw.unspecialized	Unspecialized
+flaw.vengeful-powers	Vengeful Powers
+flaw.warped-by-magic	Warped by Magic
+flaw.warped-senses	Warped Senses
+flaw.weak-parens	Weak Parens
+flaw.weak-personality	Weak Personality
+virtue.academic-concentration-subject	Academic Concentration (Subject)
+virtue.adept-laboratory-student	Adept Laboratory Student
+virtue.alluring-to-beings	Alluring to (Beings)
+virtue.aptitude-for-sin	Aptitude for (Sin)
+virtue.aristotelian-training	Aristotelian Training
+virtue.baccalaureus	Baccalaureus
+virtue.bee-king	Bee King
+virtue.blood-of-the-nephilim	Blood Of The Nephilim
+virtue.brother-sergeant	Brother Sergeant
+virtue.cathedral-school-master	Cathedral School Master
+virtue.clan-ilfetu	Clan Ilfetu
+virtue.clear-thinker	Clear Thinker
+virtue.commanding-aura	Commanding Aura
+virtue.convoluted-mind	Convoluted Mind
+virtue.craft-guild-training	Craft Guild Training
+virtue.custos	Custos
+virtue.cyclic-magic-positive	Cyclic Magic (positive)
+virtue.demonic-blood	Demonic Blood
+virtue.doctor-in-faculty	Doctor in (Faculty)
+virtue.dust-devil	Dust Devil
+virtue.educated-bardic	Educated (Bardic)
+virtue.elemental-magic	Elemental Magic
+virtue.enduring-constitution	Enduring Constitution
+virtue.enticer-of-multitudes	Enticer of Multitudes
+virtue.exotic-casting	Exotic Casting
+virtue.fabric-ripper	Fabric Ripper
+virtue.faerie-blood	Faerie Blood
+virtue.faerie-raised-magic	Faerie-Raised Magic
+virtue.falconer	Falconer
+virtue.falls-like-a-cat	Falls Like a Cat
+virtue.familiarity-with-the-fae	Familiarity with the Fae
+virtue.fast-caster	Fast Caster
+virtue.finding-hidden-loot	Finding Hidden Loot
+virtue.flawless-magic	Flawless Magic
+virtue.folk-magic	Folk Magic
+virtue.forge-companion	Forge-Companion
+virtue.free-expression	Free Expression
+virtue.free-study	Free Study
+virtue.frightful-presence	Frightful Presence
+virtue.ghostly-warder	Ghostly Warder
+virtue.giant-blood	Giant Blood
+virtue.guardian-angel	Guardian Angel
+virtue.guild-dean	Guild Dean
+virtue.guild-master	Guild Master
+virtue.hermetic-experience	Hermetic Experience
+virtue.improved-characteristics	Improved Characteristics
+virtue.ineslemen	Ineslemen
+virtue.inspirational	Inspirational
+virtue.inventive-genius	Inventive Genius
+virtue.jack-of-all-trades	Jack-of-All-Trades
+virtue.jurist	Jurist
+virtue.keen-sense-of-smell	Keen Sense of Smell
+virtue.keen-vision	Keen Vision
+virtue.large	Large
+virtue.learn-ability-from-mistakes	Learn (Ability) From Mistakes
+virtue.leather-ripper	Leather Ripper
+virtue.life-boost	Life Boost
+virtue.light-touch	Light Touch
+virtue.lightning-reflexes	Lightning Reflexes
+virtue.linguist	Linguist
+virtue.lone-redcap	Lone Redcap
+virtue.long-winded	Long-Winded
+virtue.luck	Luck
+virtue.magian-lineage	Magian Lineage
+virtue.magical-blood	Magical Blood
+virtue.maker-of-textured-vessels	Maker of Textured Vessels
+virtue.master-bard	Master Bard
+virtue.mastered-spells	Mastered Spells
+virtue.mentored-by-demons	Mentored by Demons
+virtue.method-caster	Method Caster
+virtue.mild-aging	Mild Aging
+virtue.natural-leader	Natural Leader
+virtue.perfect-balance	Perfect Balance
+virtue.performance-magic	Performance Magic
+virtue.physician-of-salerno	Physician of Salerno
+virtue.piercing-gaze	Piercing Gaze
+virtue.potent-magic	Potent Magic
+virtue.privileged-upbringing	Privileged Upbringing
+virtue.rabbi	Rabbi
+virtue.rapid-convalescence	Rapid Convalescence
+virtue.redcap	Redcap
+virtue.reserves-of-strength	Reserves of Strength
+virtue.ripper	Ripper
+virtue.schooled-in-crime	Schooled in Crime
+virtue.secondary-insight	Secondary Insight
+virtue.self-confident	Self-Confident
+virtue.senior-bard	Senior Bard
+virtue.senior-master	Senior Master
+virtue.shadchan	Shadchan
+virtue.sharp-ears	Sharp Ears
+virtue.side-effect	Side Effect
+virtue.simple-student	Simple Student
+virtue.skilled-parens	Skilled Parens
+virtue.skinchanger	Skinchanger
+virtue.skinchanger-dove	Skinchanger (Dove)
+virtue.special-circumstances	Special Circumstances
+virtue.strong-faerie-blood	Strong Faerie Blood
+virtue.strong-willed	Strong-Willed
+virtue.student-of-realm	Student of (Realm)
+virtue.sufi	Sufi
+virtue.templar-specialist	Templar Specialist
+virtue.tough	Tough
+virtue.town-magistrate	Town Magistrate
+virtue.trained-assassin	Trained Assassin
+virtue.troupe-upbringing	Troupe Upbringing
+virtue.true-love-pc	True Love (PC)
+virtue.university-grammar-teacher	University Grammar Teacher
+virtue.venditor	Venditor
+virtue.venus-blessing	Venus' Blessing
+virtue.ways-of-the-land	Ways Of The (Land)
+virtue.well-traveled	Well-Traveled
+virtue.wisdom-from-ignorance	Wisdom from Ignorance
+virtue.wise-one	Wise One

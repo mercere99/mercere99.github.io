@@ -1,0 +1,58 @@
+{
+  "$schema": "./schema/effect.schema.json",
+  "description": "Hand-curated effects for entries the automatic deriver cannot parse. Wins over auto-derived effects. Lives outside data/*.json because those are regenerated on every build.",
+  "records": [
+    {
+      "record": "virtue.failed-apprentice",
+      "note": "The Oxford-comma category list is not recognized by the automatic parser. Grants Academic, Arcane, and Martial access; cannot be combined with The Gift. Other supernatural permissions still need adjudication.",
+      "effects": [
+        { "type": "ability-access", "categories": ["academic", "arcane", "martial"], "scope": "creation" }
+      ]
+    },
+    {
+      "record": "virtue.turb-trained",
+      "note": "'Allowed to learn' is not recognized by the automatic parser. Grants Martial access. The separate permission for one covenant dead language does not grant access to all Academic Abilities and is not automated here.",
+      "effects": [
+        { "type": "ability-access", "categories": ["martial"], "scope": "creation" }
+      ]
+    },
+    {
+      "record": "virtue.educated",
+      "note": "Creation access is Academic, but the additional 50 XP are restricted specifically to Latin and Artes Liberales, not to all Academic Abilities.",
+      "effects": [
+        { "type": "ability-access", "categories": ["academic"], "scope": "creation" },
+        { "type": "xp-grant", "amount": 50, "restrictedTo": { "kind": "ability", "name": "Latin and Artes Liberales", "abilities": [{ "id": "ability.dead-language", "parameter": "Latin" }, { "id": "ability.artes-liberales" }] } }
+      ]
+    },
+    {
+      "record": "virtue.arcane-lore",
+      "note": "The additional Arcane XP uses a phrasing the current automatic parser does not recognize. Restrictions on learning Parma Magica still require adjudication.",
+      "effects": [
+        { "type": "ability-access", "categories": ["arcane"], "scope": "creation" },
+        { "type": "xp-grant", "amount": 50, "restrictedTo": { "kind": "ability", "category": "arcane" } }
+      ]
+    },
+    {
+      "record": "virtue.hermetic-magus",
+      "note": "The text states only that this is the magus Social Status; the access it confers is established in the Abilities chapter, not in the Virtue's own text.",
+      "effects": [
+        {
+          "type": "ability-access",
+          "categories": ["academic", "arcane", "martial", "spell-mastery"],
+          "scope": "creation"
+        }
+      ]
+    },
+    {
+      "record": "virtue.great-characteristic",
+      "note": "Conditional on the Characteristic already being +3 or better, and capped at +5. The engine applies the bonus; the prerequisite and cap are enforced as findings.",
+      "effects": [
+        {
+          "type": "score-bonus",
+          "target": { "kind": "characteristic", "chosen": true },
+          "value": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "_source": "Ars Magica: Definitive Edition, Character Templates, Grog Templates, 'The Berserker'",
+  "_license": "CC BY-SA 4.0",
+  "schemaVersion": 2,
+  "id": "golden-the-berserker",
+  "ruleset": "definitive",
+  "type": "grog",
+  "name": "The Berserker",
+  "concept": "Berserker grog",
+  "birthYear": 1205,
+  "creationYear": 1220,
+  "details": {},
+  "timeline": [],
+  "characteristics": {
+    "characteristic.intelligence": -2, "characteristic.perception": -1,
+    "characteristic.presence": -1, "characteristic.communication": -1,
+    "characteristic.strength": 3, "characteristic.stamina": 2,
+    "characteristic.dexterity": 2, "characteristic.quickness": 1
+  },
+  "virtuesFlaws": [
+    { "key": "a", "id": "virtue.covenfolk" },
+    { "key": "b", "id": "virtue.berserk" },
+    { "key": "c", "id": "virtue.large" },
+    { "key": "d", "id": "flaw.short-attention-span" },
+    { "key": "e", "id": "flaw.wrathful", "size": "minor" }
+  ],
+  "abilities": [
+    { "key": "n", "id": "ability.living-language", "parameter": "Native Language", "specialty": "insults", "xp": 75, "native": true },
+    { "key": "1", "id": "ability.area-lore", "parameter": "Area", "specialty": "streams", "xp": 5 },
+    { "key": "2", "id": "ability.athletics", "specialty": "running", "xp": 15 },
+    { "key": "3", "id": "ability.awareness", "specialty": "attackers", "xp": 30 },
+    { "key": "4", "id": "ability.brawl", "specialty": "kicking", "xp": 30 },
+    { "key": "5", "id": "ability.guile", "specialty": "apologizing", "xp": 5 },
+    { "key": "6", "id": "ability.great-weapon", "specialty": "pole axe", "xp": 75 },
+    { "key": "7", "id": "ability.single-weapon", "specialty": "heater shield", "xp": 5 },
+    { "key": "8", "id": "ability.survival", "specialty": "hills", "xp": 30 }
+  ],
+  "personality": [ { "name": "Angry", "score": 3 }, { "name": "Brave", "score": 3 }, { "name": "Loyal", "score": 1 } ],
+  "equipment": [
+    { "key": "axe", "name": "Pole Axe", "type": "weapon", "load": 0, "equipped": true, "description": "", "effects": "" },
+    { "key": "armor", "name": "Full metal scale armor", "type": "armor", "load": 0, "equipped": true, "description": "", "effects": "" }
+  ],
+  "notes": "",
+  "overrides": [],
+  "created": "2026-09-03T00:00:00Z",
+  "modified": "2026-09-03T00:00:00Z",
+  "_expected": {
+    "characteristicPointsSpent": 7,
+    "size": 1,
+    "woundBands": [[1,6],[7,12],[13,18],[19,24]],
+    "virtuePoints": 2,
+    "flawPoints": 2,
+    "xpBudget": 195,
+    "xpSpent": 195,
+    "scores": { "ability.great-weapon": 5, "ability.awareness": 3, "ability.area-lore": 1 },
+    "errors": 0
+  }
+}
