@@ -106,9 +106,6 @@ Reaction NOR     metabolic_mult mult 2.0 1
 Reaction XOR     metabolic_mult mult 2.0 1
 Reaction EQU     metabolic_mult mult 2.0 1
 
-# Let the web interface retain the live population and return control to the user.
-on update 10000 pause
-
 population {
   type = "grid";
 }

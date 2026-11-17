@@ -171,6 +171,91 @@
     freezerSizeObserver.observe(grid);
     divider.updateValue();
   };
+  // The document stays mounted when Empirical rebuilds the population widgets (including
+  // the first Play). Fullscreening a canvas/card instead would exit as soon as it is replaced.
+  let populationFullscreen = false, populationBrowserFullscreen = false;
+  let populationScroll = [0, 0], populationFrame = null, populationResizeFrame = 0;
+  const fitPopulation = () => {
+    const frame = document.getElementById('canvas_frame');
+    const canvas = document.getElementById('population_canvas');
+    if (!frame || !canvas) return;
+    if (populationFullscreen) {
+      const width = Number(canvas.dataset.gridWidth), height = Number(canvas.dataset.gridHeight);
+      const scale = Math.min((frame.clientWidth - 4) / width, (frame.clientHeight - 4) / height);
+      frame.style.setProperty('--fullscreen-population-width', `${Math.max(1, width * scale)}px`);
+      frame.style.setProperty('--fullscreen-population-height', `${Math.max(1, height * scale)}px`);
+    }
+    window.AvidaInterface?.redrawPopulation?.();
+  };
+  const schedulePopulationFit = () => {
+    if (populationResizeFrame) return;
+    populationResizeFrame = requestAnimationFrame(() => {
+      populationResizeFrame = 0;
+      fitPopulation();
+    });
+  };
+  const populationSizeObserver = new ResizeObserver(schedulePopulationFit);
+  const updateFullscreenButton = () => {
+    const button = document.getElementById('population_fullscreen_button');
+    if (!button) return;
+    const label = populationFullscreen ? 'Exit full screen' : 'Enter full screen';
+    button.setAttribute('aria-label', label); button.title = label;
+    button.setAttribute('aria-pressed', String(populationFullscreen));
+  };
+  const setPopulationFullscreen = active => {
+    if (active === populationFullscreen) return;
+    if (active) populationScroll = [window.scrollX, window.scrollY];
+    populationFullscreen = active;
+    document.documentElement.classList.toggle('population-fullscreen', active);
+    updateFullscreenButton();
+    schedulePopulationFit();
+    if (!active) {
+      document.getElementById('population_fullscreen_button')?.focus({preventScroll: true});
+      window.scrollTo(...populationScroll);
+    }
+  };
+  const exitPopulationFullscreen = () => {
+    setPopulationFullscreen(false);
+    if (populationBrowserFullscreen && document.fullscreenElement === document.documentElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    populationBrowserFullscreen = false;
+  };
+  const mountPopulationFullscreen = () => {
+    const frame = document.getElementById('canvas_frame');
+    if (frame !== populationFrame) {
+      populationSizeObserver.disconnect(); populationFrame = frame;
+      if (frame) populationSizeObserver.observe(frame);
+    }
+    if (!frame && populationFullscreen) exitPopulationFullscreen();
+    updateFullscreenButton();
+    if (populationFullscreen) schedulePopulationFit();
+  };
+  document.addEventListener('click', event => {
+    if (!event.target.closest?.('#population_fullscreen_button')) return;
+    if (populationFullscreen) { exitPopulationFullscreen(); return; }
+    setPopulationFullscreen(true);
+    const root = document.documentElement;
+    if (document.fullscreenEnabled && root.requestFullscreen) {
+      populationBrowserFullscreen = true;
+      root.requestFullscreen().catch(() => {
+        // Browsers/embeds that block native fullscreen still get a viewport-filling view.
+        populationBrowserFullscreen = false;
+      });
+    }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    if (populationBrowserFullscreen && !document.fullscreenElement) {
+      populationBrowserFullscreen = false;
+      setPopulationFullscreen(false);
+    }
+    schedulePopulationFit();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !populationFullscreen) return;
+    event.preventDefault(); exitPopulationFullscreen();
+  });
+  window.addEventListener('resize', schedulePopulationFit);
   let legendHeight = 0, legendWidth = 0, legendKey = '', legendSmallerSince = null;
   let legendUpdate = 0, legendRunning = false;
   const stabilizeLegend = (update = legendUpdate, running = legendRunning) => {
@@ -332,6 +417,7 @@
       updateGenomeScrollHint();
       observeHeader();
       resizeFreezer();
+      mountPopulationFullscreen();
       stabilizeLegend();
       const preview = document.getElementById('configuration_preview');
       if (preview && preview.dataset.configurationId !== previewedConfiguration) {
