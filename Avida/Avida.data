@@ -1,3 +1,187 @@
+# Defaults for a fixed PopContinuous web composition.
+# The runtime population picker uses Avida-web-dynamic.cfg.
+
+AvidaGP {
+  # Offspring genome size must be within this factor of the parent's
+  # (2.0 = half to double); divides outside the range fail.
+  offspring_size_range = 2;
+
+  # Number of CPU cycles printed by the trace command.
+  trace_cycles = 200;
+}
+
+base {
+  # Filename for the initial ancestor, relative to config_dir.
+  ancestor_filename = "ancestor.org";
+
+  # WebAssembly virtual filesystem locations populated by the web build.
+  config_dir = "/config";
+  data_dir = "/data";
+
+  # Maximum number of updates to run (0 means no limit).
+  max_updates = 0;
+
+  # Main random number seed (0 requests the default randomized seed behavior).
+  random_seed = 0;
+}
+
+continuous {
+  width = 512;
+  height = 512;
+  radius = 3;
+  birth_radius = 2;
+  drift = 0;
+  pressure_limit = 6;
+  max_population = 0;
+}
+
+mutations {
+  # Per-site substitution probability.
+  substitution_prob = 0.01;
+}
+
+# Logic tasks rewarded by the default web environment.
+Reaction ECHO    metabolic_mult mult 2.0 1
+Reaction NOT     metabolic_mult mult 2.0 1
+Reaction NAND    metabolic_mult mult 2.0 1
+Reaction AND     metabolic_mult mult 2.0 1
+Reaction OR_NOT  metabolic_mult mult 2.0 1
+Reaction OR      metabolic_mult mult 2.0 1
+Reaction AND_NOT metabolic_mult mult 2.0 1
+Reaction NOR     metabolic_mult mult 2.0 1
+Reaction XOR     metabolic_mult mult 2.0 1
+Reaction EQU     metabolic_mult mult 2.0 1
+
+# Let the web interface retain the live population and return control to the user.
+on update 10000 pause
+# Runtime population configuration for Avida's WebAssembly build.
+#
+# source/Avida-web.cpp loads this file for every new web run. Adjust the
+# values here to change the defaults served by the web interface.
+
+AvidaGP {
+  # Offspring genome size must be within this factor of the parent's
+  # (2.0 = half to double); divides outside the range fail.
+  offspring_size_range = 2;
+
+  # Number of CPU cycles printed by the trace command.
+  trace_cycles = 200;
+}
+
+base {
+  # Filename for the initial ancestor, relative to config_dir.
+  ancestor_filename = "ancestor.org";
+
+  # WebAssembly virtual filesystem locations populated by the web build.
+  config_dir = "/config";
+  data_dir = "/data";
+
+  # Maximum number of updates to run (0 means no limit).
+  max_updates = 0;
+
+  # Main random number seed (0 requests the default randomized seed behavior).
+  random_seed = 0;
+}
+
+grid {
+  # Number of rows and columns in the population grid.
+  height = 100;
+  width = 100;
+}
+
+mutations {
+  # Per-site substitution probability.
+  substitution_prob = 0.01;
+}
+
+# Logic tasks rewarded by the default web environment.
+Reaction ECHO    metabolic_mult mult 2.0 1
+Reaction NOT     metabolic_mult mult 2.0 1
+Reaction NAND    metabolic_mult mult 2.0 1
+Reaction AND     metabolic_mult mult 2.0 1
+Reaction OR_NOT  metabolic_mult mult 2.0 1
+Reaction OR      metabolic_mult mult 2.0 1
+Reaction AND_NOT metabolic_mult mult 2.0 1
+Reaction NOR     metabolic_mult mult 2.0 1
+Reaction XOR     metabolic_mult mult 2.0 1
+Reaction EQU     metabolic_mult mult 2.0 1
+
+# Let the web interface retain the live population and return control to the user.
+on update 10000 pause
+
+population {
+  type = "grid";
+}
+hex {
+  height = 100;
+  width = 100;
+}
+pop {
+  cap = 10000;
+}
+continuous {
+  width = 512;
+  height = 512;
+  radius = 3;
+  birth_radius = 2;
+  drift = 0;
+  pressure_limit = 6;
+  max_population = 0;
+}
+# Hex-map configuration for Avida's WebAssembly build.
+#
+# source/Avida-web.cpp loads this file for every new web run. Adjust the
+# values here to change the defaults served by the web interface.
+
+AvidaGP {
+  # Offspring genome size must be within this factor of the parent's
+  # (2.0 = half to double); divides outside the range fail.
+  offspring_size_range = 2;
+
+  # Number of CPU cycles printed by the trace command.
+  trace_cycles = 200;
+}
+
+base {
+  # Filename for the initial ancestor, relative to config_dir.
+  ancestor_filename = "ancestor.org";
+
+  # WebAssembly virtual filesystem locations populated by the web build.
+  config_dir = "/config";
+  data_dir = "/data";
+
+  # Maximum number of updates to run (0 means no limit).
+  max_updates = 0;
+
+  # Main random number seed (0 requests the default randomized seed behavior).
+  random_seed = 0;
+}
+
+hex {
+  # Number of rows and columns in the wrapped hex map.
+  height = 100;
+  width = 100;
+}
+
+mutations {
+  # Per-site substitution probability.
+  substitution_prob = 0.01;
+}
+
+# Logic tasks rewarded by the default web environment.
+Reaction ECHO    metabolic_mult mult 2.0 1
+Reaction NOT     metabolic_mult mult 2.0 1
+Reaction NAND    metabolic_mult mult 2.0 1
+Reaction AND     metabolic_mult mult 2.0 1
+Reaction OR_NOT  metabolic_mult mult 2.0 1
+Reaction OR      metabolic_mult mult 2.0 1
+Reaction AND_NOT metabolic_mult mult 2.0 1
+Reaction NOR     metabolic_mult mult 2.0 1
+Reaction XOR     metabolic_mult mult 2.0 1
+Reaction EQU     metabolic_mult mult 2.0 1
+
+# Let the web interface retain the live population and return control to the user.
+on update 10000 pause
 # Canonical configuration for Avida's WebAssembly build.
 #
 # source/Avida-web.cpp loads this file for every new web run. Adjust the
@@ -105,56 +289,25 @@ Reaction EQU     metabolic_mult mult 2.0 1
 
 # Let the web interface retain the live population and return control to the user.
 on update 10000 pause
-// Run-time configurations for Avida
-
-VERSION = "5.0.0";          // Do not change this value (must match executable version)
-RANDOM_SEED = 0;            // For repeatable runs; 0=based on time.
-
-Var MAX_UD = 100000;
-Var CONSOLE_OUTPUT = 1;     // Options: 0:none, 1:normal, 2:verbose, 3:debug
-Var OUTPUT_DIR = "data/";   // Where should output data be written?
-
-include "environment.cfg";  // Include file to specify tasks.
-
-AvidaVM avm_type {
-  INST_SET = "AvidaVM.cfg";
-
-  COPY_MUT_PROB = 0.0075;   // Mutation rate (per site, applied on copy)
-  DIV_MUT_PROB = 0.0;       // Mutation rate (per site, applied on divide)
-  DIV_INS_PROB = 0.0;       // Insertion rate (per site, applied on divide)
-  DIV_DEL_PROB = 0.0;       // Deletion rate (per site, applied on divide)
+# Native Avida defaults. Search paths support both repository-root and build-directory runs.
+base {
+  max_updates = 10000;
+  ancestor_filename = "ancestor.org";
 }
-
-Population pop {
-  GEOMETRY = "Surface"; // Options: "Surface", "Grid", and "None" (for well mixed)
-  X = 100;            // World width (in multiples of base organism radius.)
-  Y = 100;            // World height (in multiples of base organism radius.)
-  MAX_PRESSURE = 10;  // How much pressure on an organism will cause it to die?
-  POPULATION_CAP = 0;         // Max total organisms allowed to coexist; 0=no cap.
-  CAP_ENFORCEMENT = "random"; // Who to remove when cap is reached?
-                              // Options are "random", "min:trait", or "max:trait" for any trait.
-  SCHEDULE_METHOD = "random"; // How should CPU cycles be given out?
-                              // "random" - Give out CPU cycles probabilistically
-                              // "fixed" - Give out CPU cycles systematically
-  SCHEDULE_FUN = "merit";     // Function that uses org traits to determine CPU time.
-                              // Default is "merit"; Set to "1" for even.
-};
-
-@START {
-  Organism inject_org = avm_type.Load("AvidaVM-ancestor.org");
-  pop.Inject(inject_org);
-}
-
-@UPDATE(ud) {
-  if (ud % 100 == 0) {
-    if (CONSOLE_OUTPUT >= 1) {
-      print("Update: ", ud,
-            " Average Fitness: ", pop.traitMean("fitness"));
-            " Max Fitness: ", pop.traitMax("fitness"));
-    }
-  }
-  if (ud == MAX_UD) exit();
-}==For avida Grid objects:
+mutations { substitution_prob = 0.0075; }
+# These match the existing web default rewards. See the logic-9 environment preset
+# for the historical complexity-based reward schedule.
+Reaction ECHO metabolic_mult mult 2 1
+Reaction NOT metabolic_mult mult 2 1
+Reaction NAND metabolic_mult mult 2 1
+Reaction AND metabolic_mult mult 2 1
+Reaction OR_NOT metabolic_mult mult 2 1
+Reaction OR metabolic_mult mult 2 1
+Reaction AND_NOT metabolic_mult mult 2 1
+Reaction NOR metabolic_mult mult 2 1
+Reaction XOR metabolic_mult mult 2 1
+Reaction EQU metabolic_mult mult 2 1
+==For avida Grid objects:
 
 ### REPRODUCTION_GROUP ###
 # Birth and Death config options

@@ -39,7 +39,7 @@
     return result;
   }
 
-  function layout(model, { compact = true, selected = NONE, isolated = false, axis = 'depth' } = {}) {
+  function layout(model, { compact = true, selected = NONE, isolated = false, axis = 'depth', highlights = new Set() } = {}) {
     const path = lineage(model, selected);
     const order = isolated ? model.order.filter(n => path.has(n.id)) : model.order;
     const included = new Set(order.map(n => n.id));
@@ -59,7 +59,7 @@
     for (const node of order) {
       const parent = nearest.get(node.parent) ?? NONE;
       const show = !compact || node.parent === NONE || node.death === NONE
-        || node.children.length !== 1 || node.id === selected || node.id === model.mrca;
+        || node.children.length !== 1 || node.id === selected || node.id === model.mrca || highlights.has(node.id);
       nearest.set(node.id, show ? node.id : parent);
       if (show) visible.push({ node, parent, x: node[axis], y: positions.get(node.id),
         skipped: parent === NONE ? 0 : node.depth - model.nodes.get(parent).depth - 1 });
@@ -76,7 +76,7 @@
     active = null;
   }
 
-  function mount(data, inspect, graphLineage, openLineage, inspectOrganism) {
+  function mount(data, inspect, graphLineage, openLineage, inspectOrganism, highlightTask) {
     unmount();
     const host = document.getElementById('phylogeny_view');
     if (!host) return;
@@ -88,7 +88,14 @@
       target.addEventListener(event, handler, { ...options, signal: controller.signal });
     let selected = NONE, isolated = false, graph, width = 800, height = 520;
     let scale = 1, panX = 0, panY = 0, drag = null, frame = 0, points = [];
-    let message = '';
+    let message = '', highlights = new Set();
+    $('highlights').disabled = !!model.complete;
+    $('highlights').title = model.complete ? 'Task records are available while the run is paused, before completion.' : 'Tasks performed in the recorded current gestation (at capture or death).';
+    on($('highlights'), 'change', () => {
+      highlights.clear();
+      if ($('highlights').value === '') { message = ''; rebuild(); }
+      else highlightTask(Number($('highlights').value));
+    });
     const count = value => value.toLocaleString();
     const summary = [
       ['Update', model.update], ['Living', model.living],
@@ -132,7 +139,7 @@
         : 'No retained ancestry yet. Step or run a population in Population mode to begin.');
     }
     function rebuild(fit = false) {
-      graph = layout(model, { compact: $('detail').value === 'compact', selected, isolated, axis: $('axis').value });
+      graph = layout(model, { compact: $('detail').value === 'compact', selected, isolated, highlights, axis: $('axis').value });
       if (fit) { scale = 1; panX = panY = 0; }
       updateStatus(); schedule();
     }
@@ -191,6 +198,7 @@
           ctx.lineTo(x, y + radius + 1); ctx.lineTo(x - radius - 1, y); ctx.closePath();
           ctx.fillStyle = colors.root;
         } else ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        if (highlights.has(node.id)) ctx.fillStyle = node.death === NONE ? '#ff65b3' : '#edb8d6';
         ctx.fill();
         if (node.id === model.mrca || isSelected) {
           ctx.strokeStyle = isSelected ? colors.selected : colors.mrca; ctx.lineWidth = 2;
@@ -348,6 +356,16 @@
     rebuild(true);
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
     active = {
+      addHighlightChoice(task, name) {
+        const item = document.createElement('option');
+        item.value = task; item.textContent = name; $('highlights').append(item);
+      },
+      setHighlights(ids) {
+        highlights = new Set(ids);
+        host.dataset.highlighted = ids.length;
+        message = `${count(ids.length)} organisms performed ${$('highlights').selectedOptions[0].textContent} in their recorded current gestation · Pink: living · Pastel pink: ancestors`;
+        rebuild();
+      },
       addTaskChoice(task, name, id, parent) {
         if (!model.nodes.has(id)) return;
         const value = `task:${task}`;
@@ -362,6 +380,8 @@
   }
 
   const api = { buildModel, lineage, layout, mount, unmount,
+    addHighlightChoice: (...args) => active?.addHighlightChoice(...args),
+    setHighlights: (...args) => active?.setHighlights(...args),
     addTaskChoice: (...args) => active?.addTaskChoice(...args) };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.avidaPhylogeny = api;

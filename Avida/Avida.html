@@ -11,6 +11,7 @@
   <noscript>Avida requires JavaScript and WebAssembly.</noscript>
   <main id="emp_base"></main>
   <script src="phylogeny.js"></script>
+  <script src="population.js"></script>
   <script src="interface.js"></script>
   <script>
     // Empirical replaces #emp_base when it renders, so look the element up at each use.
@@ -72,7 +73,9 @@
       showStartupError("The optional threaded build needs SharedArrayBuffer and COOP/COEP headers. Run make server-threaded, or remove execution=threaded from the URL to use the ordinary build.");
     } else {
       const script = document.createElement("script");
-      const profile = params.get("population") === "well-mixed" ? "-well-mixed" : "";
+      const profiles = {grid: "-grid", "well-mixed": "-well-mixed", hex: "-hex"};
+      const fixed = params.get("build") === "fixed";
+      const profile = fixed ? (Object.hasOwn(profiles, params.get("population")) ? profiles[params.get("population")] : "-grid") : "";
       script.src = `Avida${profile}${threaded ? "-threaded" : ""}.js`;
       document.body.appendChild(script);
     }

@@ -1,81 +1,36 @@
 /* DOM-only presentation state. Simulation data and actions remain in C++. */
 (() => {
+  // Avida retains state across absent modes and empty selections. Empirical handles the DOM.
+  const stateSelector = 'details[id], #org_genome_list, .org-stats-inspector, '
+    + '.freezer-inspector, .configuration-inspector, .configuration-content, '
+    + '#organism_genome_list, #organism_memory, #organism_stacks, #organism_stack_panel';
   const capture = root => {
-    if (!root) return [];
-    return [root, ...root.querySelectorAll('details[id], #org_genome_list, '
-      + '.org-stats-inspector, .freezer-inspector, .configuration-inspector, .configuration-content, '
-      + '#organism_genome_list, #organism_memory, #organism_stacks, #organism_stack_panel')]
-      .map(element => ({
-      id: element.id, top: element.scrollTop, left: element.scrollLeft,
-      open: element.tagName === 'DETAILS' ? element.open : undefined,
-      expanded: element.id === 'organism_stack_panel' ? element.dataset.expanded : undefined,
-      height: element.id === 'organism_memory' ? element.style.height : undefined
+    const saved = emp.CaptureDOMState(root, 14, stateSelector, '#organism_memory');
+    return (saved?.states || []).map(state => ({...state,
+      expanded: state.id === 'organism_stack_panel'
+        ? document.getElementById(state.id).dataset.expanded : undefined
     }));
   };
-  const restore = (root, state) => {
+  const restore = (root, states) => {
     if (!root) return;
-    for (const item of state) {
-      const element = document.getElementById(item.id);
-      if (!element || !root.contains(element)) continue;
-      if (item.open !== undefined) element.open = item.open;
-      if (item.expanded !== undefined) element.dataset.expanded = item.expanded;
-      if (item.height) element.style.height = item.height;
-      element.scrollTop = item.top; element.scrollLeft = item.left;
+    // Stack expansion changes scroll limits, so apply it before restoring scroll positions.
+    for (const state of states) {
+      if (state.expanded === undefined) continue;
+      const node = document.getElementById(state.id);
+      if (node && root.contains(node)) node.dataset.expanded = state.expanded;
     }
+    emp.RestoreDOMState(root, {states});
   };
-  const focusState = root => {
-    const active = document.activeElement;
-    return root?.contains(active) ? {
-      id: active.id || active.closest('[id]')?.id,
-      summary: active.tagName === 'SUMMARY'
-    } : null;
+  const focusState = root => emp.CaptureDOMState(root, 1, ':scope', ':scope')?.focus;
+  const restoreFocus = focus => emp.RestoreDOMState(document.documentElement, {states: [], focus});
+  const patchHTML = (root, html) => {
+    if (!root) return;
+    const states = capture(root), focus = focusState(root);
+    emp.PatchHTML(root, html, 0, ':scope', ':scope');
+    restore(root, states);
+    restoreFocus(focus);
   };
-  const restoreFocus = state => {
-    let target = state?.id && document.getElementById(state.id);
-    if (target && state.summary) target = target.querySelector(':scope > summary');
-    if (target && !target.disabled && target.getClientRects().length) target.focus({preventScroll:true});
-  };
-  // Keep existing nodes (including scroll, focus, resized memory, and disclosures) when only
-  // execution values changed. IDs keep growing genomes and filtered task rows aligned.
-  const patch = (current, next) => {
-    if (current.nodeType !== next.nodeType || current.nodeName !== next.nodeName) {
-      current.replaceWith(next.cloneNode(true)); return;
-    }
-    if (current.nodeType === Node.TEXT_NODE) {
-      if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
-      return;
-    }
-    if (current.nodeType !== Node.ELEMENT_NODE) return;
-    for (const attr of [...current.attributes]) {
-      if ((current.tagName === 'DETAILS' && attr.name === 'open')
-          || (current.id === 'organism_stack_panel' && attr.name === 'data-expanded')
-          || (current.id === 'organism_memory' && attr.name === 'style')) continue;
-      if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
-    }
-    for (const attr of next.attributes) {
-      if (current.id === 'organism_stack_panel' && attr.name === 'data-expanded') continue;
-      if (current.getAttribute(attr.name) !== attr.value) current.setAttribute(attr.name, attr.value);
-    }
-    const oldChildren = [...current.childNodes];
-    const keyed = new Map(oldChildren.filter(n => n.nodeType === 1 && n.id).map(n => [n.id,n]));
-    let index = 0;
-    for (const child of [...next.childNodes]) {
-      let existing = current.childNodes[index];
-      if (child.nodeType === 1 && child.id) {
-        const match = keyed.get(child.id);
-        if (match && match !== existing) { current.insertBefore(match, existing || null); existing = match; }
-        else if (!match && existing?.id !== child.id) {
-          current.insertBefore(child.cloneNode(true), existing || null); ++index; continue;
-        }
-      }
-      if (!existing) current.append(child.cloneNode(true));
-      else patch(existing, child);
-      ++index;
-    }
-    while (current.childNodes.length > index) current.lastChild.remove();
-    if (current.tagName === 'SELECT' && current.value !== next.value) current.value = next.value;
-  };
-  let inspector = [], legend = [], page = [], focused = null, inspectorFocus = null;
+  let inspector = [], page = [], focused = null, inspectorFocus = null;
   let freezerSearch = '', freezerSort = 'newest', previewedConfiguration = null;
   document.addEventListener('click', event => {
     const expand = event.target.closest?.('[data-stack-expand]');
@@ -248,7 +203,7 @@
     const descriptions = {
       scheduled_events: 'Schedule pauses and resource changes at run start, run end, or selected updates. Add an event, choose when it runs, and select its action. Add a resource pool in Environment before scheduling resource changes.\n\nBefore the run starts, new events default to a pause at update 10,000. After the run starts, new events default to pausing 1,000 updates from now. Existing events can be edited while the run is paused. A warning marks elapsed schedules: past actions are not replayed, but future interval repetitions still run. Elapsed events remain in saved configurations for future runs.',
       resource_pools: 'Resource pools are shared supplies that can limit the rewards organisms receive for performing tasks. Give each pool a name, choose its starting amount, and set its inflow and outflow. All organisms draw from the same pool.\n\nEach update first removes the outflow fraction, then adds the inflow amount. Assign a pool to a reaction to make its reward depend on how much resource it consumes. An empty pool gives no reward. Events can set or adjust a pool during a run; Population shows current amounts and Graphs shows their history.\n\nEdit the environment while paused, including after startup. Existing pools retain their current quantities, even when renamed; new pools use their initial amounts. Inflow and outflow changes take effect at the next update. Use an event to change the current amount directly.',
-      reactions: 'Reactions connect a computational task to a change in an organism’s traits, such as increasing its merit. Choose the task, the affected trait, the operation, and the reward value. The trigger limit controls how many executions are rewarded per gestation; zero means unlimited.\n\nA reaction without a resource pool applies its full reward. With a pool, it requests the selected fraction of the available resource: Multiply uses the reward value raised to the units consumed, while Add uses the reward value times the units consumed. An empty pool provides no reward. This lets organisms compete for resources by performing tasks.\n\nChanges made while paused affect subsequent task executions. Existing earned rewards and task counts remain unchanged; trigger limits still use the current gestation’s task counts.',
+      reactions: 'Reactions connect a computational task to a change in an organism’s traits, such as increasing its merit. Choose the task, the affected trait, the operation, and the reward value. The trigger limit controls how many executions are rewarded per gestation; zero means unlimited.\n\nA reaction without a resource pool applies its full reward. With a pool, it requests the selected fraction of the available resource: Multiply uses the reward value raised to the units consumed, while Add uses the reward value times the units consumed. An empty pool provides no reward. This lets organisms compete for resources by performing tasks. Add byproduct creates an output resource and a conversion ratio: units produced per unit of input consumed. Multiple byproducts are allowed.\n\nChanges made while paused affect subsequent task executions. Existing earned rewards and task counts remain unchanged; trigger limits still use the current gestation’s task counts.',
       name: 'The resource name used to connect a reaction or event to this resource pool.',
       initial: 'The starting quantity for a new pool or a new run. Editing this value after startup does not reset an existing pool’s current amount; use a resource event to change that amount.',
       inflow: 'The quantity added to this resource pool per update.',
@@ -259,6 +214,8 @@
       value: 'The reward value applied when this reaction triggers.',
       max_triggers: 'The maximum rewarded executions per gestation. Zero means no limit.',
       resource: 'The shared resource pool consumed by this reaction. Without a pool the reward is not resource limited.',
+      byproduct_ratio: 'Units added to the byproduct pool per unit of input resource actually consumed. A reaction must have an input resource. Zero consumption or an exhausted trigger limit produces no byproducts. Multiple outputs are allowed; repeated output pools receive the sum of their contributions.',
+      substitution_prob: 'Set the probability of substituting each genome instruction during reproduction, from 0 to 1 inclusive. Zero disables substitutions. The new probability applies to subsequent reproduction after the event fires.',
       fraction: 'The requested fraction of the pool consumed when the reaction triggers, from 0 to 1.',
       resource_fraction: 'The requested fraction of the pool consumed when the reaction triggers, from 0 to 1.',
       timing: 'At start runs once when the experiment starts, before its first update.\n\nAt update runs once at the specified update.\n\nAt intervals repeats from Start, every specified number of updates, through the final update you set. Through = 0 means continue until the run ends.\n\nAt end runs once when the experiment finishes; it does not run each time you pause. Update events run after resource inflow and outflow.',
@@ -266,7 +223,7 @@
       interval: 'The number of updates between repeated executions, starting from Start. For example, Start = 100 and Every = 50 schedules updates 100, 150, 200, and so on, up to Through. The interval must be at least 1.',
       stop: 'The last update at which a repeated event may run, inclusive. The action runs there only if it falls on the interval schedule. Set Through to 0 to keep repeating until the experiment ends.',
       command: 'The Avida command executed when the event fires. Imported configurations can contain commands beyond the actions offered here; those commands are preserved.',
-      action: 'Pause stops evolution at the scheduled point so you can inspect the population and resume when ready.\n\nSet resource replaces a pool’s current amount with the specified nonnegative quantity. Adjust resource adds the specified number of units; a negative change removes units, stopping at zero. Add a pool in Environment to make these actions available.\n\nImported configurations may also contain other Avida commands. These remain listed so their behavior is preserved.',
+      action: 'Pause stops evolution at the scheduled point so you can inspect the population and resume when ready.\n\nSet resource replaces a pool’s current amount with the specified nonnegative quantity. Adjust resource adds the specified number of units; a negative change removes units, stopping at zero. Add a pool in Environment to make these actions available.\n\nSet substitution prob changes the per-instruction mutation probability for subsequent reproduction; use a value from 0 to 1, including zero.\n\nImported configurations may also contain other Avida commands. These remain listed so their behavior is preserved.',
       event_resource: 'Choose the existing resource pool this event will change. Set resource replaces its amount; Adjust resource adds or removes units. Define pools in Environment before scheduling changes. Update events run after the normal inflow and outflow.',
       amount: 'For Set resource, enter the new nonnegative total in the pool. For Adjust resource, enter the number of units to add; use a negative value to remove units. Removal stops at zero. For example, setting 100 replaces the total with 100, while adjusting by 100 adds 100 to the existing total.',
       preset: 'A preset replaces the environment resources and reactions with the selected template. Selecting a preset only previews it: the environment will not be altered until you click Load environment.\n\nLoading replaces reactions and resource pools. Events for removed pools are also removed; other settings and events are kept. You can edit the result below. After startup, pause first: matching pools retain their current amounts and new pools use their initial amounts.'
@@ -284,6 +241,8 @@
       const field = section ? null : label.closest('.configuration-setting, .structured-configuration-field') || label.parentElement;
       const description = field?.querySelector('.configuration-description');
       let key = section || control.id.replace(/^(resource|reaction|event)_/, '').replace(/_\d+$/, '');
+      if (control.id.includes('byproduct_') && control.id.endsWith('_ratio')) key = 'byproduct_ratio';
+      if (control.id.includes('byproduct_') && control.id.endsWith('_resource')) key = 'byproduct_ratio';
       if (control.id.startsWith('event_resource_')) key = 'event_resource';
       let text = description?.textContent.trim() || descriptions[key]
         || (control.id.includes('preset') ? descriptions.preset : control.title)
@@ -321,15 +280,7 @@
   window.AvidaInterface = {
     stabilizeLegend,
     patchOrganism(html) {
-      const root = document.getElementById('organism_mode_content');
-      if (!root) return;
-      const focused = focusState(root);
-      const template = document.createElement('template');
-      template.innerHTML = html;
-      const next = root.cloneNode(false);
-      next.append(template.content);
-      patch(root, next);
-      if (document.activeElement === document.body) restoreFocus(focused);
+      patchHTML(document.getElementById('organism_mode_content'), html);
     },
     preserveInspector() {
       const root = document.getElementById('org_stats_inspector');
@@ -353,12 +304,13 @@
         if (element) element.open = expanded;
         const saved = page.find(item => item.id === id);
         if (saved) saved.open = expanded;
-        else page.push({id, top:0, left:0, open: expanded});
+        else page.push({id, scroll: [0, 0], open: expanded});
       }
     },
-    preserveLegend() { legend = capture(document.getElementById('population_color_legend')); },
-    restoreLegend(update, running) {
-      restore(document.getElementById('population_color_legend'), legend);
+    patchLegend(html, update, running) {
+      // Retain the summary node so a redraw between pointerdown and click cannot
+      // swallow the user's toggle during Play or fast-forward.
+      patchHTML(document.getElementById('population_color_legend'), html);
       stabilizeLegend(update, running);
     },
     refresh: null,
@@ -392,7 +344,17 @@
     },
     select: null
   };
+  document.addEventListener('change', event => {
+    if (event.target.id !== 'population_color_mode' && event.target.id !== 'population_color_task') return;
+    const legend = document.getElementById('legend_disclosure');
+    if (legend) legend.open = true;
+  }, true);
   document.addEventListener('toggle', event => {
+    if (event.target.id === 'legend_more') {
+      // Explicit expansion/collapse should resize immediately, even during a run.
+      legendHeight = 0; legendSmallerSince = null;
+      stabilizeLegend();
+    }
     if (event.target.open && (event.target.id === 'legend_disclosure' || event.target.id === 'population_statistics_disclosure' || event.target.id === 'organism_statistics_disclosure'
         || event.target.dataset.lazy === 'true')) window.AvidaInterface.refresh?.();
   }, true);
@@ -402,7 +364,15 @@
       const width = Number(target.dataset.gridWidth), height = Number(target.dataset.gridHeight);
       const current = Math.max(0, Number(target.dataset.activeCell || 0));
       let next = current;
-      if (event.key === 'ArrowLeft') next = Math.max(0, current - 1);
+      if (target.dataset.cellShape === 'circle') {
+        next = window.avidaPopulationGeometry.moveCircle(target, current, event.key);
+        if (next === null) return;
+      }
+      else if (target.dataset.cellShape === 'hex') {
+        next = window.avidaPopulationGeometry.move(current, width, height, event.key, event.shiftKey);
+        if (next === null) return;
+      }
+      else if (event.key === 'ArrowLeft') next = Math.max(0, current - 1);
       else if (event.key === 'ArrowRight') next = Math.min(width * height - 1, current + 1);
       else if (event.key === 'ArrowUp') next = Math.max(0, current - width);
       else if (event.key === 'ArrowDown') next = Math.min(width * height - 1, current + width);
@@ -410,6 +380,16 @@
       else if (event.key === 'End') next = width * height - 1;
       else return;
       event.preventDefault(); window.AvidaInterface.select?.(next);
+    }
+    const populationTypes = target?.closest('#population_type_picker');
+    if (populationTypes && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
+      const choices = [...populationTypes.querySelectorAll('button:not(:disabled)')];
+      let index = choices.indexOf(target);
+      if (index < 0 || !choices.length) return;
+      index = event.key === 'Home' ? 0 : event.key === 'End' ? choices.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : choices.length - 1)) % choices.length;
+      event.preventDefault(); choices[index].focus(); choices[index].click();
+      return;
     }
     const tabs = target?.closest('#mode_buttons, #configuration_tabs');
     if (!tabs || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
